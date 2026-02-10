@@ -277,7 +277,7 @@ async fn load_config(
                 theme: Some(IconTheme::Dark),
             },
         ],
-        website_url: Some("https://github.com/KingingWang/crates-docs-mcp".to_string()),
+        website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
         host: config.server.host,
         port: config.server.port,
         enable_sse: config.server.enable_sse,

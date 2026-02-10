@@ -3,7 +3,7 @@ version: '3.8'
 services:
   crates-docs:
     build: .
-    container_name: crates-docs-mcp
+    container_name: crates-docs
     ports:
       - "8080:8080"
     volumes:

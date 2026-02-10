@@ -70,7 +70,7 @@ impl LookupCrateToolImpl {
         let client = reqwest::Client::new();
         let response = client
             .get(&url)
-            .header("User-Agent", "crates-docs-mcp/0.1.0")
+            .header("User-Agent", "crates-docs/0.1.0")
             .send()
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
@@ -201,7 +201,7 @@ impl LookupItemToolImpl {
         let client = reqwest::Client::new();
         let response = client
             .get(&url)
-            .header("User-Agent", "crates-docs-mcp/0.1.0")
+            .header("User-Agent", "crates-docs/0.1.0")
             .send()
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;

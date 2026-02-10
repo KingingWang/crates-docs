@@ -23,7 +23,7 @@ pub use crate::server::{CratesDocsServer, ServerConfig};
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// 服务器名称
-pub const NAME: &str = "crates-docs-mcp";
+pub const NAME: &str = "crates-docs";
 
 /// 初始化日志系统
 ///

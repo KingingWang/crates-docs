@@ -1,5 +1,5 @@
 [server]
-name = "crates-docs-mcp"
+name = "crates-docs"
 version = "0.1.0"
 description = "高性能 Rust crate 文档查询 MCP 服务器"
 host = "127.0.0.1"

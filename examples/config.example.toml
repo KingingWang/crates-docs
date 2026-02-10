@@ -2,7 +2,7 @@
 
 [server]
 # 服务器名称
-name = "crates-docs-mcp"
+name = "crates-docs"
 # 服务器版本
 version = "0.1.0"
 # 服务器描述

@@ -111,7 +111,7 @@ pub struct PerformanceConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            name: "crates-docs-mcp".to_string(),
+            name: "crates-docs".to_string(),
             version: crate::VERSION.to_string(),
             description: Some("高性能 Rust crate 文档查询 MCP 服务器".to_string()),
             host: "127.0.0.1".to_string(),
@@ -291,7 +291,7 @@ impl AppConfig {
         // 然后应用环境变量配置（覆盖文件配置）
         if let Some(env) = env_config {
             // 合并服务器配置
-            if env.server.name != "crates-docs-mcp" {
+            if env.server.name != "crates-docs" {
                 config.server.name = env.server.name;
             }
             if env.server.host != "127.0.0.1" {

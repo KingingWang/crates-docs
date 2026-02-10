@@ -49,7 +49,7 @@ pub struct ServerConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
-            name: "crates-docs-mcp".to_string(),
+            name: "crates-docs".to_string(),
             version: crate::VERSION.to_string(),
             description: Some("高性能 Rust crate 文档查询 MCP 服务器".to_string()),
             icons: vec![
@@ -66,7 +66,7 @@ impl Default for ServerConfig {
                     theme: Some(IconTheme::Dark),
                 },
             ],
-            website_url: Some("https://github.com/KingingWang/crates-docs-mcp".to_string()),
+            website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
             host: "127.0.0.1".to_string(),
             port: 8080,
             enable_sse: true,

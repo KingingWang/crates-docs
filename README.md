@@ -32,10 +32,10 @@ cargo run -- serve
 
 ```bash
 # 构建 Docker 镜像
-docker build -t crates-docs-mcp .
+docker build -t crates-docs .
 
 # 运行容器
-docker run -p 8080:8080 crates-docs-mcp
+docker run -p 8080:8080 crates-docs
 ```
 
 ## 使用方法
@@ -54,6 +54,9 @@ cargo run -- serve --mode http --host 0.0.0.0 --port 8080
 
 # 启用调试日志
 cargo run -- serve --debug
+
+# 启用详细输出
+cargo run -- serve --verbose
 
 # 使用自定义配置文件
 cargo run -- serve --config /path/to/config.toml
@@ -106,7 +109,7 @@ cargo run -- health --check-type external
 
 ```toml
 [server]
-name = "crates-docs-mcp"
+name = "crates-docs"
 version = "0.1.0"
 description = "高性能 Rust crate 文档查询 MCP 服务器"
 host = "127.0.0.1"
@@ -167,7 +170,7 @@ export CRATES_DOCS_LOG_LEVEL="debug"
 ### 可用工具
 
 1. **lookup_crate** - 查找 crate 文档
-   - `crate_name`: crate 名称（必需）
+   - `crateName`: crate 名称（必需）
    - `version`: 版本号（可选）
    - `format`: 输出格式（markdown/text/html，默认：markdown）
 
@@ -177,12 +180,12 @@ export CRATES_DOCS_LOG_LEVEL="debug"
    - `format`: 输出格式（markdown/text/json，默认：markdown）
 
 3. **lookup_item** - 查找 crate 中的特定项目
-   - `crate_name`: crate 名称（必需）
-   - `item_path`: 项目路径（如 std::vec::Vec）（必需）
+   - `crateName`: crate 名称（必需）
+   - `itemPath`: 项目路径（如 std::vec::Vec）（必需）
    - `version`: 版本号（可选）
 
 4. **health_check** - 健康检查
-   - `check_type`: 检查类型（all/external/internal/docs_rs/crates_io，默认：all）
+   - `checkType`: 检查类型（all/external/internal/docs_rs/crates_io，默认：all）
    - `verbose`: 详细输出（true/false，默认：false）
 
 ## 传输协议
@@ -213,7 +216,7 @@ curl http://localhost:8080/health
 
 ### SSE 模式（Server-Sent Events）
 
-用于向后兼容：
+用于向后兼容（已弃用，推荐使用 Hybrid 模式）：
 
 ```bash
 # 启动 SSE 服务器
@@ -222,7 +225,7 @@ cargo run -- serve --mode sse --host 0.0.0.0 --port 8080
 
 ### 混合模式（HTTP + SSE）
 
-同时支持两种协议：
+推荐模式，同时支持 Streamable HTTP 和 Server-Sent Events 通信：
 
 ```bash
 # 启动混合服务器
@@ -362,35 +365,41 @@ WantedBy=multi-user.target
 
 ### Docker Compose
 
-创建 `docker-compose.yml`：
+项目包含完整的 `docker-compose.yml`，支持以下服务：
 
 ```yaml
 version: '3.8'
 
 services:
-  crates-docs:
+  crates-docs:    # 主服务
     build: .
     ports:
       - "8080:8080"
-    volumes:
-      - ./config.toml:/app/config.toml
-      - ./logs:/app/logs
-    environment:
-      - RUST_LOG=info
-      - CRATES_DOCS_HOST=0.0.0.0
-      - CRATES_DOCS_PORT=8080
-    restart: unless-stopped
-
-  redis:
+  
+  redis:          # Redis 缓存服务
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
+  
+  prometheus:     # Prometheus 监控（可选）
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+  
+  grafana:        # Grafana 仪表板（可选）
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+```
 
-volumes:
-  redis-data:
+启动所有服务：
+```bash
+docker-compose up -d
+```
+
+仅启动核心服务（不包含监控）：
+```bash
+docker-compose up -d crates-docs redis
 ```
 
 ## API 文档
