@@ -1,0 +1,114 @@
+# Crates Docs MCP 服务器配置示例
+
+[server]
+# 服务器名称
+name = "crates-docs-mcp"
+# 服务器版本
+version = "0.1.0"
+# 服务器描述
+description = "高性能 Rust crate 文档查询 MCP 服务器"
+# 监听主机
+host = "127.0.0.1"
+# 监听端口
+port = 8080
+# 传输模式: stdio, http, sse, hybrid
+transport_mode = "hybrid"
+# 启用 SSE 支持
+enable_sse = true
+# 启用 OAuth 认证
+enable_oauth = false
+# 最大并发连接数
+max_connections = 100
+# 请求超时时间（秒）
+request_timeout_secs = 30
+# 响应超时时间（秒）
+response_timeout_secs = 60
+
+[cache]
+# 缓存类型: memory, redis
+cache_type = "memory"
+# 内存缓存大小（条目数）
+memory_size = 1000
+# Redis 连接 URL（仅当 cache_type = "redis" 时使用）
+# redis_url = "redis://localhost:6379"
+# 默认缓存时间（秒）
+default_ttl = 3600
+
+[oauth]
+# 是否启用 OAuth
+enabled = false
+# OAuth 客户端 ID
+# client_id = "your-client-id"
+# OAuth 客户端密钥
+# client_secret = "your-client-secret"
+# 重定向 URI
+# redirect_uri = "http://localhost:8080/oauth/callback"
+# 授权端点
+# authorization_endpoint = "https://provider.com/oauth/authorize"
+# 令牌端点
+# token_endpoint = "https://provider.com/oauth/token"
+# 授权范围
+scopes = ["openid", "profile", "email"]
+# OAuth 提供者: Custom, GitHub, Google, Keycloak
+provider = "Custom"
+
+# GitHub OAuth 示例配置
+# [oauth]
+# enabled = true
+# client_id = "github-client-id"
+# client_secret = "github-client-secret"
+# redirect_uri = "http://localhost:8080/oauth/callback"
+# authorization_endpoint = "https://github.com/login/oauth/authorize"
+# token_endpoint = "https://github.com/login/oauth/access_token"
+# scopes = ["read:user", "user:email"]
+# provider = "GitHub"
+
+# Google OAuth 示例配置
+# [oauth]
+# enabled = true
+# client_id = "google-client-id"
+# client_secret = "google-client-secret"
+# redirect_uri = "http://localhost:8080/oauth/callback"
+# authorization_endpoint = "https://accounts.google.com/o/oauth2/v2/auth"
+# token_endpoint = "https://oauth2.googleapis.com/token"
+# scopes = ["openid", "https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"]
+# provider = "Google"
+
+# Keycloak OAuth 示例配置
+# [oauth]
+# enabled = true
+# client_id = "keycloak-client-id"
+# client_secret = "keycloak-client-secret"
+# redirect_uri = "http://localhost:8080/oauth/callback"
+# authorization_endpoint = "https://keycloak.example.com/realms/myrealm/protocol/openid-connect/auth"
+# token_endpoint = "https://keycloak.example.com/realms/myrealm/protocol/openid-connect/token"
+# scopes = ["openid", "profile", "email"]
+# provider = "Keycloak"
+
+[logging]
+# 日志级别: trace, debug, info, warn, error
+level = "info"
+# 日志文件路径
+file_path = "./logs/crates-docs.log"
+# 是否启用控制台日志
+enable_console = true
+# 是否启用文件日志
+enable_file = true
+# 日志文件最大大小（MB）
+max_file_size_mb = 100
+# 保留的日志文件数量
+max_files = 10
+
+[performance]
+# HTTP 客户端连接池大小
+http_client_pool_size = 10
+# 缓存最大大小（条目数）
+cache_max_size = 1000
+# 缓存默认 TTL（秒）
+cache_default_ttl_secs = 3600
+# 请求速率限制（每秒请求数）
+rate_limit_per_second = 100
+# 并发请求限制
+concurrent_request_limit = 50
+# 启用响应压缩
+enable_response_compression = true

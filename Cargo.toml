@@ -1,0 +1,93 @@
+[package]
+name = "crates-docs"
+version = "0.1.0"
+edition = "2024"
+description = "高性能 Rust crate 文档查询 MCP 服务器，支持 Stdio/HTTP/SSE 传输和 OAuth 认证"
+authors = ["KingingWang <KingingWang@foxmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/KingingWang/crates-docs-mcp"
+readme = "README.md"
+keywords = ["mcp", "rust", "docs", "documentation", "crates", "server"]
+categories = ["api-bindings", "web-programming", "network-programming"]
+
+[features]
+default = ["server", "stdio", "macros", "cache-memory", "logging"]
+server = ["rust-mcp-sdk/server"]
+client = ["rust-mcp-sdk/client"]
+hyper-server = ["rust-mcp-sdk/hyper-server"]
+streamable-http = ["rust-mcp-sdk/streamable-http"]
+sse = ["rust-mcp-sdk/sse"]
+stdio = ["rust-mcp-sdk/stdio"]
+macros = ["rust-mcp-sdk/macros"]
+auth = ["rust-mcp-sdk/auth", "rust-mcp-extra"]
+cache-memory = ["dep:moka"]
+cache-redis = ["dep:redis"]
+tls = ["rust-mcp-sdk/ssl"]
+logging = []
+
+[dependencies]
+# MCP 核心依赖
+rust-mcp-sdk = { version = "0.8.3", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http"] }
+rust-mcp-macros = "0.8.1"
+rust-mcp-schema = "0.9.5"
+rust-mcp-extra = { version = "0.2.3", optional = true }
+
+# HTTP 客户端
+reqwest = { version = "0.13", features = ["json"] }
+tokio = { version = "1.40", features = ["full"] }
+
+# 序列化和配置
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.9"
+anyhow = "1.0"
+thiserror = "2.0"
+
+# 缓存系统
+moka = { version = "0.12", optional = true, features = ["sync"] }
+redis = { version = "0.25", optional = true }
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+# 工具库
+async-trait = "0.1"
+html2md = "0.2"
+url = "2.5"
+base64 = "0.22"
+parking_lot = "0.12"
+flate2 = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+urlencoding = "2.1"
+
+# CLI 工具
+clap = { version = "4.5", features = ["derive", "env"] }
+
+[build-dependencies]
+chrono = "0.4"
+
+[dev-dependencies]
+tokio = { version = "1.40", features = ["full", "test-util"] }
+reqwest = { version = "0.13", features = ["json"] }
+serde_json = "1.0"
+tempfile = "3.10"
+
+[[bin]]
+name = "crates-docs"
+path = "src/main.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.test]
+opt-level = 0
+debug = true
