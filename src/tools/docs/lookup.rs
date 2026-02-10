@@ -107,12 +107,240 @@ impl LookupCrateToolImpl {
 
         Ok(docs)
     }
+
+    /// 获取原始 HTML 文档（用于 text 格式）
+    async fn fetch_raw_html(
+        &self,
+        crate_name: &str,
+        version: Option<&str>,
+    ) -> std::result::Result<String, CallToolError> {
+        // 构建 URL
+        let url = if let Some(ver) = version {
+            format!("https://docs.rs/{crate_name}/{ver}/")
+        } else {
+            format!("https://docs.rs/{crate_name}/")
+        };
+
+        // 发送 HTTP 请求
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&url)
+            .header("User-Agent", "crates-docs/0.1.0")
+            .send()
+            .await
+            .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
+
+        if !response.status().is_success() {
+            return Err(CallToolError::from_message(format!(
+                "获取文档失败: HTTP {} - {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            )));
+        }
+
+        let html = response
+            .text()
+            .await
+            .map_err(|e| CallToolError::from_message(format!("读取响应失败: {e}")))?;
+
+        Ok(html)
+    }
 }
 
 /// 从 HTML 中提取文档内容
 fn extract_documentation(html: &str) -> String {
-    // 使用 html2md 库将 HTML 转换为 Markdown
-    html2md::parse_html(html)
+    // 先清理 HTML（移除 script, style, noscript 等标签及内容）
+    let cleaned_html = clean_html(html);
+    // 使用 html2md 库将清理后的 HTML 转换为 Markdown
+    html2md::parse_html(&cleaned_html)
+}
+
+/// 清理 HTML，移除不需要的标签（script, style, noscript, iframe）及其内容
+fn clean_html(html: &str) -> String {
+    let mut result = String::new();
+    let mut i = 0;
+    let chars: Vec<char> = html.chars().collect();
+    let len = chars.len();
+    let mut skip_depth = 0; // 跟跳过标签的嵌套深度
+
+    while i < len {
+        let c = chars[i];
+
+        match c {
+            '<' => {
+                let start = i;
+                let mut j = i + 1;
+
+                // 收集标签名
+                let mut tag_name = String::new();
+                while j < len && chars[j] != '>' && !chars[j].is_whitespace() {
+                    tag_name.push(chars[j]);
+                    j += 1;
+                }
+
+                let tag_lower = tag_name.to_lowercase();
+                let pure_tag = tag_lower.trim_start_matches('/');
+
+                // 检查是否是需要跳过内容的标签
+                let is_skip_tag = pure_tag == "script"
+                    || pure_tag == "style"
+                    || pure_tag == "noscript"
+                    || pure_tag == "iframe";
+
+                if is_skip_tag {
+                    if tag_lower.starts_with('/') {
+                        // 结束标签
+                        if skip_depth > 0 {
+                            skip_depth -= 1;
+                        }
+                        // 跳过整个标签
+                        while j < len && chars[j] != '>' {
+                            j += 1;
+                        }
+                        if j < len {
+                            j += 1;
+                        }
+                        i = j;
+                        continue;
+                    } else {
+                        // 开始标签
+                        skip_depth += 1;
+                        // 跳过整个标签
+                        while j < len && chars[j] != '>' {
+                            j += 1;
+                        }
+                        if j < len {
+                            j += 1;
+                        }
+                        i = j;
+                        continue;
+                    }
+                }
+
+                // 跳过直到 '>'
+                while j < len && chars[j] != '>' {
+                    j += 1;
+                }
+                if j < len {
+                    j += 1;
+                }
+
+                // 保留不是跳过标签的内容
+                if skip_depth == 0 {
+                    for k in start..j {
+                        result.push(chars[k]);
+                    }
+                }
+
+                i = j;
+            }
+            _ => {
+                if skip_depth == 0 {
+                    result.push(c);
+                }
+                i += 1;
+            }
+        }
+    }
+
+    result
+}
+
+/// 将 HTML 转换为纯文本（移除所有 HTML 标签）
+fn html_to_text(html: &str) -> String {
+    let mut result = String::new();
+    let mut skip_content = false; // 是否跳过标签内容（如 script, style）
+    let mut i = 0;
+    let chars: Vec<char> = html.chars().collect();
+    let len = chars.len();
+
+    while i < len {
+        let c = chars[i];
+
+        match c {
+            '<' => {
+                // 跳过标签
+                let mut j = i + 1;
+                let mut tag_name = String::new();
+
+                // 收集标签名
+                while j < len && chars[j] != '>' && !chars[j].is_whitespace() {
+                    tag_name.push(chars[j]);
+                    j += 1;
+                }
+
+                let tag_lower = tag_name.to_lowercase();
+                let is_closing = tag_lower.starts_with('/');
+                let pure_tag = tag_lower.trim_start_matches('/');
+
+                // 检查是否是需要跳过内容的标签
+                if !is_closing && !skip_content {
+                    skip_content = pure_tag == "script"
+                        || pure_tag == "style"
+                        || pure_tag == "noscript"
+                        || pure_tag == "iframe";
+                } else if is_closing {
+                    skip_content = false;
+                }
+
+                // 跳过整个标签
+                while j < len && chars[j] != '>' {
+                    j += 1;
+                }
+                if j < len {
+                    j += 1; // 跳过 '>'
+                }
+
+                i = j;
+
+                // 标签后添加空格（如果是块级元素）
+                if !skip_content {
+                    result.push(' ');
+                }
+            }
+            '&' => {
+                // 处理 HTML 实体
+                let mut j = i + 1;
+                let mut entity = String::new();
+                while j < len && chars[j] != ';' {
+                    entity.push(chars[j]);
+                    j += 1;
+                }
+                if j < len {
+                    j += 1; // 跳过 ';'
+                }
+
+                // 常见 HTML 实体映射
+                let replacement = match entity.as_str() {
+                    "lt" => "<",
+                    "gt" => ">",
+                    "amp" => "&",
+                    "quot" => "\"",
+                    "apos" => "'",
+                    "nbsp" => " ",
+                    _ => "",
+                };
+                if !replacement.is_empty() {
+                    result.push_str(replacement);
+                }
+                i = j;
+            }
+            _ => {
+                if !skip_content {
+                    result.push(c);
+                }
+                i += 1;
+            }
+        }
+    }
+
+    // 清理多余的空白
+    clean_whitespace(&result)
+}
+
+/// 清理多余的空白字符
+fn clean_whitespace(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[async_trait]
@@ -135,18 +363,21 @@ impl Tool for LookupCrateToolImpl {
             )
         })?;
 
-        let docs = self
-            .fetch_crate_docs(&params.crate_name, params.version.as_deref())
-            .await?;
-
         let format = params.format.unwrap_or_else(|| "markdown".to_string());
         let content = match format.as_str() {
-            "text" => html2md::parse_html(&docs),
-            "html" => format!(
-                "<pre><code>{}</code></pre>",
-                docs.replace('<', "<").replace('>', ">")
-            ),
-            _ => docs, // "markdown" 和其他格式都返回原始文档
+            "text" => {
+                // 获取原始 HTML 并转换为纯文本
+                let html = self
+                    .fetch_raw_html(&params.crate_name, params.version.as_deref())
+                    .await?;
+                html_to_text(&html)
+            }
+            _ => {
+                let docs = self
+                    .fetch_crate_docs(&params.crate_name, params.version.as_deref())
+                    .await?;
+                docs // "markdown" 和其他格式都返回原始文档
+            }
         };
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
@@ -276,12 +507,62 @@ impl LookupItemToolImpl {
 
         Ok(docs)
     }
+
+    /// 获取原始 HTML（用于 text 格式）
+    async fn fetch_raw_html_for_item(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+    ) -> std::result::Result<String, CallToolError> {
+        // 构建搜索 URL
+        let url = if let Some(ver) = version {
+            format!(
+                "https://docs.rs/{}/{}/?search={}",
+                crate_name,
+                ver,
+                urlencoding::encode(item_path)
+            )
+        } else {
+            format!(
+                "https://docs.rs/{}/?search={}",
+                crate_name,
+                urlencoding::encode(item_path)
+            )
+        };
+
+        // 发送 HTTP 请求
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&url)
+            .header("User-Agent", "crates-docs/0.1.0")
+            .send()
+            .await
+            .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
+
+        if !response.status().is_success() {
+            return Err(CallToolError::from_message(format!(
+                "获取项目文档失败: HTTP {} - {}",
+                response.status(),
+                response.text().await.unwrap_or_default()
+            )));
+        }
+
+        let html = response
+            .text()
+            .await
+            .map_err(|e| CallToolError::from_message(format!("读取响应失败: {e}")))?;
+
+        Ok(html)
+    }
 }
 
 /// 从 HTML 中提取搜索结果
 fn extract_search_results(html: &str, item_path: &str) -> String {
-    // 使用 html2md 库将 HTML 转换为 Markdown
-    let markdown = html2md::parse_html(html);
+    // 先清理 HTML（移除 script, style, noscript 等标签及内容）
+    let cleaned_html = clean_html(html);
+    // 使用 html2md 库将清理后的 HTML 转换为 Markdown
+    let markdown = html2md::parse_html(&cleaned_html);
 
     // 如果搜索结果为空，返回提示信息
     if markdown.trim().is_empty() {
@@ -311,22 +592,31 @@ impl Tool for LookupItemToolImpl {
             )
         })?;
 
-        let docs = self
-            .fetch_item_docs(
-                &params.crate_name,
-                &params.item_path,
-                params.version.as_deref(),
-            )
-            .await?;
-
         let format = params.format.unwrap_or_else(|| "markdown".to_string());
         let content = match format.as_str() {
-            "text" => html2md::parse_html(&docs),
-            "html" => format!(
-                "<pre><code>{}</code></pre>",
-                docs.replace('<', "<").replace('>', ">")
-            ),
-            _ => docs, // "markdown" 和其他格式都返回原始文档
+            "text" => {
+                // 获取原始 HTML 并转换为纯文本
+                let html = self
+                    .fetch_raw_html_for_item(
+                        &params.crate_name,
+                        &params.item_path,
+                        params.version.as_deref(),
+                    )
+                    .await?;
+                let docs = html_to_text(&html);
+                // 添加搜索结果标题
+                format!("搜索结果: {}\n\n{}", params.item_path, docs)
+            }
+            _ => {
+                let docs = self
+                    .fetch_item_docs(
+                        &params.crate_name,
+                        &params.item_path,
+                        params.version.as_deref(),
+                    )
+                    .await?;
+                docs // "markdown" 和其他格式都返回原始文档
+            }
         };
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
