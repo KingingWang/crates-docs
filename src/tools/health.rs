@@ -25,9 +25,13 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone, Deserialize, Serialize, macros::JsonSchema)]
 pub struct HealthCheckTool {
     /// 检查类型
-    #[json_schema(title = "检查类型", description = "要执行的健康检查类型", default = "all")]
+    #[json_schema(
+        title = "检查类型",
+        description = "要执行的健康检查类型",
+        default = "all"
+    )]
     pub check_type: Option<String>,
-    
+
     /// 详细输出
     #[json_schema(title = "详细输出", description = "是否显示详细输出", default = false)]
     pub verbose: Option<bool>,
@@ -59,21 +63,22 @@ pub struct HealthCheckToolImpl {
 
 impl HealthCheckToolImpl {
     /// 创建新的健康检查工具
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             start_time: Instant::now(),
         }
     }
-    
+
     /// 检查 docs.rs 服务
     #[allow(clippy::cast_possible_truncation)]
     async fn check_docs_rs(&self) -> HealthCheck {
         let start = Instant::now();
         let client = reqwest::Client::new();
-        
+
         match client
             .get("https://docs.rs/")
+            .header("User-Agent", format!("CratesDocsMCP/{}", crate::VERSION))
             .timeout(Duration::from_secs(5))
             .send()
             .await
@@ -110,15 +115,16 @@ impl HealthCheckToolImpl {
             }
         }
     }
-    
+
     /// 检查 crates.io 服务
     #[allow(clippy::cast_possible_truncation)]
     async fn check_crates_io(&self) -> HealthCheck {
         let start = Instant::now();
         let client = reqwest::Client::new();
-        
+
         match client
             .get("https://crates.io/api/v1/crates?q=serde&per_page=1")
+            .header("User-Agent", format!("CratesDocsMCP/{}", crate::VERSION))
             .timeout(Duration::from_secs(5))
             .send()
             .await
@@ -155,7 +161,7 @@ impl HealthCheckToolImpl {
             }
         }
     }
-    
+
     /// 检查内存使用
     fn check_memory() -> HealthCheck {
         HealthCheck {
@@ -166,11 +172,11 @@ impl HealthCheckToolImpl {
             error: None,
         }
     }
-    
+
     /// 执行所有健康检查
     async fn perform_checks(&self, check_type: &str, verbose: bool) -> HealthStatus {
         let mut checks = Vec::new();
-        
+
         match check_type {
             "all" => {
                 checks.push(self.check_docs_rs().await);
@@ -200,7 +206,7 @@ impl HealthCheckToolImpl {
                 });
             }
         }
-        
+
         // 确定总体状态
         let overall_status = if checks.iter().all(|c| c.status == "healthy") {
             "healthy".to_string()
@@ -209,7 +215,7 @@ impl HealthCheckToolImpl {
         } else {
             "degraded".to_string()
         };
-        
+
         HealthStatus {
             status: overall_status,
             timestamp: chrono::Utc::now().to_rfc3339(),
@@ -217,7 +223,8 @@ impl HealthCheckToolImpl {
                 checks
             } else {
                 // 非详细模式下只返回有问题的检查
-                checks.into_iter()
+                checks
+                    .into_iter()
                     .filter(|c| c.status != "healthy")
                     .collect()
             },
@@ -231,32 +238,46 @@ impl Tool for HealthCheckToolImpl {
     fn definition(&self) -> rust_mcp_sdk::schema::Tool {
         HealthCheckTool::tool()
     }
-    
-    async fn execute(&self, arguments: serde_json::Value) -> std::result::Result<rust_mcp_sdk::schema::CallToolResult, rust_mcp_sdk::schema::CallToolError> {
-        let params: HealthCheckTool = serde_json::from_value(arguments)
-            .map_err(|e| rust_mcp_sdk::schema::CallToolError::invalid_arguments("health_check", Some(format!("参数解析失败: {e}"))))?;
-        
+
+    async fn execute(
+        &self,
+        arguments: serde_json::Value,
+    ) -> std::result::Result<
+        rust_mcp_sdk::schema::CallToolResult,
+        rust_mcp_sdk::schema::CallToolError,
+    > {
+        let params: HealthCheckTool = serde_json::from_value(arguments).map_err(|e| {
+            rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                "health_check",
+                Some(format!("参数解析失败: {e}")),
+            )
+        })?;
+
         let check_type = params.check_type.unwrap_or_else(|| "all".to_string());
         let verbose = params.verbose.unwrap_or(false);
-        
+
         let health_status = self.perform_checks(&check_type, verbose).await;
-        
+
         let content = if verbose {
-            serde_json::to_string_pretty(&health_status)
-                .map_err(|e| rust_mcp_sdk::schema::CallToolError::from_message(format!("JSON 序列化失败: {e}")))?
+            serde_json::to_string_pretty(&health_status).map_err(|e| {
+                rust_mcp_sdk::schema::CallToolError::from_message(format!("JSON 序列化失败: {e}"))
+            })?
         } else {
             let mut summary = format!(
                 "状态: {}\n运行时间: {:.2?}\n时间戳: {}",
-                health_status.status,
-                health_status.uptime,
-                health_status.timestamp
+                health_status.status, health_status.uptime, health_status.timestamp
             );
-            
+
             if !health_status.checks.is_empty() {
                 use std::fmt::Write;
                 summary.push_str("\n\n检查结果:");
                 for check in &health_status.checks {
-                    write!(summary, "\n- {}: {} ({:.2}ms)", check.name, check.status, check.duration_ms).unwrap();
+                    write!(
+                        summary,
+                        "\n- {}: {} ({:.2}ms)",
+                        check.name, check.status, check.duration_ms
+                    )
+                    .unwrap();
                     if let Some(ref msg) = check.message {
                         write!(summary, " - {msg}").unwrap();
                     }
@@ -265,11 +286,13 @@ impl Tool for HealthCheckToolImpl {
                     }
                 }
             }
-            
+
             summary
         };
-        
-        Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![content.into()]))
+
+        Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
+            content.into(),
+        ]))
     }
 }
 

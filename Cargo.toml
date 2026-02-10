@@ -27,7 +27,7 @@ logging = []
 
 [dependencies]
 # MCP 核心依赖
-rust-mcp-sdk = { version = "0.8.3", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http"] }
+rust-mcp-sdk = { version = "0.8.3", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http", "sse"] }
 rust-mcp-macros = "0.8.1"
 rust-mcp-schema = "0.9.5"
 rust-mcp-extra = { version = "0.2.3", optional = true }

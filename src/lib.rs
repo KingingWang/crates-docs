@@ -30,7 +30,7 @@ pub const NAME: &str = "crates-docs";
 /// # Errors
 /// 如果日志系统初始化失败，返回错误
 pub fn init_logging(debug: bool) -> Result<()> {
-    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
     let filter = if debug {
         EnvFilter::new("debug")

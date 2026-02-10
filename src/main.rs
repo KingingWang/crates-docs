@@ -1,8 +1,8 @@
 //! Crates Docs MCP 服务器主程序
 
 use clap::{Parser, Subcommand};
-use crates_docs::{init_logging, CratesDocsServer};
 use crates_docs::server::transport;
+use crates_docs::{CratesDocsServer, init_logging};
 use rust_mcp_sdk::schema::{Icon, IconTheme};
 use std::path::PathBuf;
 
@@ -13,15 +13,15 @@ use std::path::PathBuf;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    
+
     /// 配置文件路径
     #[arg(short, long, global = true, default_value = "config.toml")]
     config: PathBuf,
-    
+
     /// 启用调试日志
     #[arg(short, long, global = true)]
     debug: bool,
-    
+
     /// 启用详细输出
     #[arg(short, long, global = true)]
     verbose: bool,
@@ -34,85 +34,85 @@ enum Commands {
         /// 传输模式 [stdio, http, sse, hybrid]
         #[arg(short, long, default_value = "hybrid")]
         mode: String,
-        
+
         /// 监听主机
         #[arg(long, default_value = "0.0.0.0")]
         host: String,
-        
+
         /// 监听端口
         #[arg(short, long, default_value = "8080")]
         port: u16,
-        
+
         /// 启用 OAuth 认证
         #[arg(long)]
         enable_oauth: bool,
-        
+
         /// OAuth 客户端 ID
         #[arg(long)]
         oauth_client_id: Option<String>,
-        
+
         /// OAuth 客户端密钥
         #[arg(long)]
         oauth_client_secret: Option<String>,
-        
+
         /// OAuth 重定向 URI
         #[arg(long)]
         oauth_redirect_uri: Option<String>,
     },
-    
+
     /// 生成配置文件
     Config {
         /// 输出文件路径
         #[arg(short, long, default_value = "config.toml")]
         output: PathBuf,
-        
+
         /// 覆盖已存在的文件
         #[arg(short, long)]
         force: bool,
     },
-    
+
     /// 测试工具
     Test {
         /// 要测试的工具 [lookup_crate, search_crates, lookup_item, health_check]
         #[arg(short, long, default_value = "lookup_crate")]
         tool: String,
-        
+
         /// Crate 名称（用于 lookup_crate 和 lookup_item）
         #[arg(long)]
         crate_name: Option<String>,
-        
+
         /// 项目路径（用于 lookup_item）
         #[arg(long)]
         item_path: Option<String>,
-        
+
         /// 搜索查询（用于 search_crates）
         #[arg(long)]
         query: Option<String>,
-        
+
         /// 版本号（可选）
         #[arg(long)]
         version: Option<String>,
-        
+
         /// 结果限制（用于 search_crates）
         #[arg(long, default_value = "10")]
         limit: u32,
-        
+
         /// 输出格式 [json, markdown, text]
         #[arg(long, default_value = "markdown")]
         format: String,
     },
-    
+
     /// 检查服务器健康状态
     Health {
         /// 检查类型 [all, external, internal, docs_rs, crates_io]
         #[arg(short = 't', long, default_value = "all")]
         check_type: String,
-        
+
         /// 详细输出
         #[arg(short, long)]
         verbose: bool,
     },
-    
+
     /// 显示版本信息
     Version,
 }
@@ -120,10 +120,10 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-    
+
     // 初始化日志
     init_logging(cli.debug).map_err(|e| e.to_string())?;
-    
+
     match cli.command {
         Commands::Serve {
             mode,
@@ -144,7 +144,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 oauth_client_id,
                 oauth_client_secret,
                 oauth_redirect_uri,
-            ).await?;
+            )
+            .await?;
         }
         Commands::Config { output, force } => {
             config_command(&output, force)?;
@@ -166,16 +167,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 version.as_deref(),
                 limit,
                 &format,
-            ).await?;
+            )
+            .await?;
         }
-        Commands::Health { check_type, verbose } => {
+        Commands::Health {
+            check_type,
+            verbose,
+        } => {
             health_command(&check_type, verbose).await?;
         }
         Commands::Version => {
             version_command();
         }
     }
-    
+
     Ok(())
 }
 
@@ -193,41 +198,45 @@ async fn serve_command(
     _oauth_redirect_uri: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("启动 Crates Docs MCP 服务器 v{}", env!("CARGO_PKG_VERSION"));
-    
+
     // 加载配置
     let config = load_config(config_path, host, port, mode, enable_oauth).await?;
-    
+
     // 创建服务器
-    let server: CratesDocsServer = CratesDocsServer::new(config)
-        .map_err(|e| format!("创建服务器失败: {}", e))?;
-    
+    let server: CratesDocsServer =
+        CratesDocsServer::new(config).map_err(|e| format!("创建服务器失败: {}", e))?;
+
     // 根据模式启动服务器
     match mode.to_lowercase().as_str() {
         "stdio" => {
             tracing::info!("使用 Stdio 传输模式");
-            transport::run_stdio_server(&server).await
+            transport::run_stdio_server(&server)
+                .await
                 .map_err(|e| format!("Stdio 服务器启动失败: {}", e))?;
         }
         "http" => {
             tracing::info!("使用 HTTP 传输模式，监听 {}:{}", host, port);
-            transport::run_http_server(&server).await
+            transport::run_http_server(&server)
+                .await
                 .map_err(|e| format!("HTTP 服务器启动失败: {}", e))?;
         }
         "sse" => {
             tracing::info!("使用 SSE 传输模式，监听 {}:{}", host, port);
-            transport::run_sse_server(&server).await
+            transport::run_sse_server(&server)
+                .await
                 .map_err(|e| format!("SSE 服务器启动失败: {}", e))?;
         }
         "hybrid" => {
             tracing::info!("使用混合传输模式（HTTP + SSE），监听 {}:{}", host, port);
-            transport::run_hybrid_server(&server).await
+            transport::run_hybrid_server(&server)
+                .await
                 .map_err(|e| format!("混合服务器启动失败: {}", e))?;
         }
         _ => {
             return Err(format!("未知的传输模式: {}", mode).into());
         }
     }
-    
+
     Ok(())
 }
 
@@ -247,17 +256,18 @@ async fn load_config(
         tracing::warn!("配置文件不存在，使用默认配置: {}", config_path.display());
         crates_docs::config::AppConfig::default()
     };
-    
+
     // 覆盖命令行参数
     config.server.host = host.to_string();
     config.server.port = port;
     config.server.transport_mode = mode.to_string();
     config.server.enable_oauth = enable_oauth;
-    
+
     // 验证配置
-    config.validate()
+    config
+        .validate()
         .map_err(|e| format!("配置验证失败: {}", e))?;
-    
+
     // 将 config::ServerConfig 转换为 server::ServerConfig
     let server_config = crates_docs::ServerConfig {
         name: config.server.name,
@@ -284,7 +294,7 @@ async fn load_config(
         enable_oauth: config.server.enable_oauth,
         cache: config.cache.clone(),
     };
-    
+
     Ok(server_config)
 }
 
@@ -293,14 +303,15 @@ fn config_command(output: &PathBuf, force: bool) -> Result<(), Box<dyn std::erro
     if output.exists() && !force {
         return Err(format!("配置文件已存在: {}，使用 --force 覆盖", output.display()).into());
     }
-    
+
     let config = crates_docs::config::AppConfig::default();
-    config.save_to_file(output)
+    config
+        .save_to_file(output)
         .map_err(|e| format!("保存配置文件失败: {}", e))?;
-    
+
     println!("配置文件已生成: {}", output.display());
     println!("请根据需要编辑配置文件。");
-    
+
     Ok(())
 }
 
@@ -315,7 +326,7 @@ async fn test_command(
     format: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("测试工具: {}", tool);
-    
+
     // 创建缓存
     let cache_config = crates_docs::cache::CacheConfig {
         cache_type: "memory".to_string(),
@@ -323,32 +334,32 @@ async fn test_command(
         default_ttl: Some(3600),
         redis_url: None,
     };
-    
+
     let cache = crates_docs::cache::create_cache(&cache_config)?;
     let cache_arc: std::sync::Arc<dyn crates_docs::cache::Cache> = std::sync::Arc::from(cache);
-    
+
     // 创建文档服务
     let doc_service = std::sync::Arc::new(crates_docs::tools::docs::DocService::new(cache_arc));
-    
+
     // 创建工具注册表
     let registry = crates_docs::tools::create_default_registry(&doc_service);
-    
+
     match tool {
         "lookup_crate" => {
             if let Some(name) = crate_name {
                 println!("测试查找 crate: {} (版本: {:?})", name, version);
                 println!("输出格式: {}", format);
-                
+
                 // 准备参数
                 let mut arguments = serde_json::json!({
-                    "crateName": name,
+                    "crate_name": name,
                     "format": format
                 });
-                
+
                 if let Some(v) = version {
                     arguments["version"] = serde_json::Value::String(v.to_string());
                 }
-                
+
                 // 执行工具
                 match registry.execute_tool("lookup_crate", arguments).await {
                     Ok(result) => {
@@ -376,14 +387,14 @@ async fn test_command(
             if let Some(q) = query {
                 println!("测试搜索 crate: {} (限制: {})", q, limit);
                 println!("输出格式: {}", format);
-                
+
                 // 准备参数 - search_crates 可能也需要 camelCase
                 let arguments = serde_json::json!({
                     "query": q,
                     "limit": limit,
                     "format": format
                 });
-                
+
                 // 执行工具
                 match registry.execute_tool("search_crates", arguments).await {
                     Ok(result) => {
@@ -411,18 +422,18 @@ async fn test_command(
             if let (Some(name), Some(path)) = (crate_name, item_path) {
                 println!("测试查找项目: {}::{} (版本: {:?})", name, path, version);
                 println!("输出格式: {}", format);
-                
+
                 // 准备参数
                 let mut arguments = serde_json::json!({
-                    "crateName": name,
+                    "crate_name": name,
                     "itemPath": path,
                     "format": format
                 });
-                
+
                 if let Some(v) = version {
                     arguments["version"] = serde_json::Value::String(v.to_string());
                 }
-                
+
                 // 执行工具
                 match registry.execute_tool("lookup_item", arguments).await {
                     Ok(result) => {
@@ -448,13 +459,13 @@ async fn test_command(
         }
         "health_check" => {
             println!("测试健康检查");
-            
+
             // 准备参数 - health_check 可能也需要 camelCase
             let arguments = serde_json::json!({
                 "checkType": "all",
                 "verbose": true
             });
-            
+
             // 执行工具
             match registry.execute_tool("health_check", arguments).await {
                 Ok(result) => {
@@ -479,19 +490,16 @@ async fn test_command(
             return Err(format!("未知的工具: {}", tool).into());
         }
     }
-    
+
     println!("工具测试完成");
     Ok(())
 }
 
 /// 健康检查命令
-async fn health_command(
-    check_type: &str,
-    verbose: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn health_command(check_type: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("执行健康检查: {}", check_type);
     println!("详细模式: {}", verbose);
-    
+
     // 这里可以添加实际的健康检查逻辑
     println!("健康检查完成（模拟）");
     Ok(())

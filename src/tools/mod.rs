@@ -14,9 +14,12 @@ use std::sync::Arc;
 pub trait Tool: Send + Sync {
     /// 获取工具定义
     fn definition(&self) -> McpTool;
-    
+
     /// 执行工具
-    async fn execute(&self, arguments: serde_json::Value) -> std::result::Result<CallToolResult, CallToolError>;
+    async fn execute(
+        &self,
+        arguments: serde_json::Value,
+    ) -> std::result::Result<CallToolResult, CallToolError>;
 }
 
 /// 工具注册器
@@ -26,24 +29,24 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     /// 创建新的工具注册器
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self { tools: Vec::new() }
     }
-    
+
     /// 注册工具
     #[must_use]
     pub fn register<T: Tool + 'static>(mut self, tool: T) -> Self {
         self.tools.push(Box::new(tool));
         self
     }
-    
+
     /// 获取所有工具定义
-    #[must_use] 
+    #[must_use]
     pub fn get_tools(&self) -> Vec<McpTool> {
         self.tools.iter().map(|t| t.definition()).collect()
     }
-    
+
     /// 执行工具
     pub async fn execute_tool(
         &self,
@@ -55,7 +58,7 @@ impl ToolRegistry {
                 return tool.execute(arguments).await;
             }
         }
-        
+
         Err(CallToolError::unknown_tool(name.to_string()))
     }
 }

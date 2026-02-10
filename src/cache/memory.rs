@@ -1,8 +1,8 @@
 //! 内存缓存实现
 
-use std::time::{Duration, Instant};
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 /// 缓存条目
 struct CacheEntry {
@@ -12,7 +12,8 @@ struct CacheEntry {
 
 impl CacheEntry {
     fn is_expired(&self) -> bool {
-        self.expires_at.is_some_and(|expiry| expiry <= Instant::now())
+        self.expires_at
+            .is_some_and(|expiry| expiry <= Instant::now())
     }
 }
 
@@ -24,7 +25,7 @@ pub struct MemoryCache {
 
 impl MemoryCache {
     /// 创建新的内存缓存
-    #[must_use] 
+    #[must_use]
     pub fn new(max_size: usize) -> Self {
         Self {
             cache: RwLock::new(HashMap::with_capacity(max_size)),
@@ -68,11 +69,8 @@ impl super::Cache for MemoryCache {
         self.evict_if_full();
 
         let expires_at = ttl.map(|duration| Instant::now() + duration);
-        
-        let entry = CacheEntry {
-            value,
-            expires_at,
-        };
+
+        let entry = CacheEntry { value, expires_at };
 
         let mut cache = self.cache.write();
         cache.insert(key, entry);
@@ -103,17 +101,21 @@ mod tests {
     #[tokio::test]
     async fn test_memory_cache_basic() {
         let cache = MemoryCache::new(10);
-        
+
         // 测试设置和获取
-        cache.set("key1".to_string(), "value1".to_string(), None).await;
+        cache
+            .set("key1".to_string(), "value1".to_string(), None)
+            .await;
         assert_eq!(cache.get("key1").await, Some("value1".to_string()));
-        
+
         // 测试删除
         cache.delete("key1").await;
         assert_eq!(cache.get("key1").await, None);
-        
+
         // 测试清空
-        cache.set("key2".to_string(), "value2".to_string(), None).await;
+        cache
+            .set("key2".to_string(), "value2".to_string(), None)
+            .await;
         cache.clear().await;
         assert_eq!(cache.get("key2").await, None);
     }
@@ -121,17 +123,18 @@ mod tests {
     #[tokio::test]
     async fn test_memory_cache_ttl() {
         let cache = MemoryCache::new(10);
-        
+
         // 测试带 TTL 的缓存
-        cache.set(
-            "key1".to_string(),
-            "value1".to_string(),
-            Some(Duration::from_millis(100)),
-        )
-        .await;
-        
+        cache
+            .set(
+                "key1".to_string(),
+                "value1".to_string(),
+                Some(Duration::from_millis(100)),
+            )
+            .await;
+
         assert_eq!(cache.get("key1").await, Some("value1".to_string()));
-        
+
         // 等待过期
         sleep(Duration::from_millis(150)).await;
         assert_eq!(cache.get("key1").await, None);
@@ -140,14 +143,20 @@ mod tests {
     #[tokio::test]
     async fn test_memory_cache_eviction() {
         let cache = MemoryCache::new(2);
-        
+
         // 填满缓存
-        cache.set("key1".to_string(), "value1".to_string(), None).await;
-        cache.set("key2".to_string(), "value2".to_string(), None).await;
-        
+        cache
+            .set("key1".to_string(), "value1".to_string(), None)
+            .await;
+        cache
+            .set("key2".to_string(), "value2".to_string(), None)
+            .await;
+
         // 添加第三个条目，应该触发淘汰
-        cache.set("key3".to_string(), "value3".to_string(), None).await;
-        
+        cache
+            .set("key3".to_string(), "value3".to_string(), None)
+            .await;
+
         // 缓存中应该只有 2 个条目
         let cache_size = {
             let cache_read = cache.cache.read();

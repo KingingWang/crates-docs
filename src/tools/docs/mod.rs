@@ -1,8 +1,8 @@
 //! 文档查询工具模块
 
+pub mod cache;
 pub mod lookup;
 pub mod search;
-pub mod cache;
 
 use crate::cache::Cache;
 use std::sync::Arc;
@@ -28,19 +28,19 @@ impl DocService {
             doc_cache,
         }
     }
-    
+
     /// 获取 HTTP 客户端
     #[must_use]
     pub fn client(&self) -> &reqwest::Client {
         &self.client
     }
-    
+
     /// 获取缓存
     #[must_use]
     pub fn cache(&self) -> &Arc<dyn Cache> {
         &self.cache
     }
-    
+
     /// 获取文档缓存
     #[must_use]
     pub fn doc_cache(&self) -> &cache::DocCache {
@@ -57,5 +57,5 @@ impl Default for DocService {
 
 /// 重新导出工具
 pub use lookup::LookupCrateTool;
-pub use search::SearchCratesTool;
 pub use lookup::LookupItemTool;
+pub use search::SearchCratesTool;

@@ -170,7 +170,7 @@ export CRATES_DOCS_LOG_LEVEL="debug"
 ### 可用工具
 
 1. **lookup_crate** - 查找 crate 文档
-   - `crateName`: crate 名称（必需）
+   - `crate_name`: crate 名称（必需）
    - `version`: 版本号（可选）
    - `format`: 输出格式（markdown/text/html，默认：markdown）
 
@@ -180,7 +180,7 @@ export CRATES_DOCS_LOG_LEVEL="debug"
    - `format`: 输出格式（markdown/text/json，默认：markdown）
 
 3. **lookup_item** - 查找 crate 中的特定项目
-   - `crateName`: crate 名称（必需）
+   - `crate_name`: crate 名称（必需）
    - `itemPath`: 项目路径（如 std::vec::Vec）（必需）
    - `version`: 版本号（可选）
 
