@@ -140,6 +140,7 @@ impl CratesDocsServer {
     ///
     /// 支持内存缓存和 Redis 缓存（需要 cache-redis feature）。
     #[allow(unused_variables)]
+    #[allow(clippy::unused_async)]
     pub async fn new_async(config: ServerConfig) -> Result<Self> {
         // 根据缓存类型和 feature 决定使用哪种创建方法
         #[cfg(feature = "cache-redis")]
