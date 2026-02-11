@@ -1,5 +1,5 @@
 # 使用 Rust 官方镜像作为构建环境
-FROM rust:1.85-slim AS builder
+FROM rust:1.88-slim AS builder
 
 # 安装构建依赖
 RUN apt-get update && apt-get install -y \
