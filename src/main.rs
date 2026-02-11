@@ -1,8 +1,8 @@
 //! Crates Docs MCP 服务器主程序
 
 use clap::{Parser, Subcommand};
-use crates_docs::server::transport;
 use crates_docs::CratesDocsServer;
+use crates_docs::server::transport;
 use rust_mcp_sdk::schema::{Icon, IconTheme};
 use std::path::PathBuf;
 
@@ -198,7 +198,17 @@ async fn serve_command(
     oauth_redirect_uri: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // 加载配置
-    let config = load_config(config_path, host, port, mode, enable_oauth, oauth_client_id, oauth_client_secret, oauth_redirect_uri).await?;
+    let config = load_config(
+        config_path,
+        host,
+        port,
+        mode,
+        enable_oauth,
+        oauth_client_id,
+        oauth_client_secret,
+        oauth_redirect_uri,
+    )
+    .await?;
 
     // 获取实际使用的传输模式（用于日志和启动）
     let transport_mode = config.transport_mode.clone();
@@ -218,8 +228,9 @@ async fn serve_command(
     tracing::info!("启动 Crates Docs MCP 服务器 v{}", env!("CARGO_PKG_VERSION"));
 
     // 创建服务器（异步方式支持 Redis）
-    let server: CratesDocsServer =
-        CratesDocsServer::new_async(config).await.map_err(|e| format!("创建服务器失败: {}", e))?;
+    let server: CratesDocsServer = CratesDocsServer::new_async(config)
+        .await
+        .map_err(|e| format!("创建服务器失败: {}", e))?;
 
     // 根据模式启动服务器
     match transport_mode.to_lowercase().as_str() {
@@ -230,19 +241,31 @@ async fn serve_command(
                 .map_err(|e| format!("Stdio 服务器启动失败: {}", e))?;
         }
         "http" => {
-            tracing::info!("使用 HTTP 传输模式，监听 {}:{}", server.config().host, server.config().port);
+            tracing::info!(
+                "使用 HTTP 传输模式，监听 {}:{}",
+                server.config().host,
+                server.config().port
+            );
             transport::run_http_server(&server)
                 .await
                 .map_err(|e| format!("HTTP 服务器启动失败: {}", e))?;
         }
         "sse" => {
-            tracing::info!("使用 SSE 传输模式，监听 {}:{}", server.config().host, server.config().port);
+            tracing::info!(
+                "使用 SSE 传输模式，监听 {}:{}",
+                server.config().host,
+                server.config().port
+            );
             transport::run_sse_server(&server)
                 .await
                 .map_err(|e| format!("SSE 服务器启动失败: {}", e))?;
         }
         "hybrid" => {
-            tracing::info!("使用混合传输模式（HTTP + SSE），监听 {}:{}", server.config().host, server.config().port);
+            tracing::info!(
+                "使用混合传输模式（HTTP + SSE），监听 {}:{}",
+                server.config().host,
+                server.config().port
+            );
             transport::run_hybrid_server(&server)
                 .await
                 .map_err(|e| format!("混合服务器启动失败: {}", e))?;
@@ -287,11 +310,17 @@ async fn load_config(
     }
     if let Some(m) = mode {
         config.server.transport_mode = m;
-        tracing::info!("命令行参数覆盖 transport_mode: {}", config.server.transport_mode);
+        tracing::info!(
+            "命令行参数覆盖 transport_mode: {}",
+            config.server.transport_mode
+        );
     }
     if let Some(eo) = enable_oauth {
         config.server.enable_oauth = eo;
-        tracing::info!("命令行参数覆盖 enable_oauth: {}", config.server.enable_oauth);
+        tracing::info!(
+            "命令行参数覆盖 enable_oauth: {}",
+            config.server.enable_oauth
+        );
     }
 
     // 覆盖命令行 OAuth 参数（如果提供）

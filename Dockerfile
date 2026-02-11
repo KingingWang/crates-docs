@@ -1,5 +1,5 @@
 # 使用 Rust 官方镜像作为构建环境
-FROM rust:1.75-slim AS builder
+FROM rust:1.82-slim AS builder
 
 # 安装构建依赖
 RUN apt-get update && apt-get install -y \
@@ -37,10 +37,10 @@ COPY --from=builder /app/target/release/crates-docs /app/crates-docs
 COPY --from=builder /app/target/release/build/*/build_script_build-*/out/*.so /app/ 2>/dev/null || true
 
 # 复制配置文件示例
-COPY examples/config.example.toml /app/config.toml
+COPY examples/config.example.toml /app/config.example.toml
 
-# 创建日志目录
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app
+# 创建日志和数据目录
+RUN mkdir -p /app/logs /app/data && chown -R appuser:appuser /app
 
 # 切换到非 root 用户
 USER appuser
@@ -48,15 +48,8 @@ USER appuser
 # 暴露端口
 EXPOSE 8080
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
 # 设置环境变量
 ENV RUST_LOG=info
-ENV CRATES_DOCS_HOST=0.0.0.0
-ENV CRATES_DOCS_PORT=8080
-ENV CRATES_DOCS_TRANSPORT_MODE=hybrid
 
-# 启动命令
-CMD ["/app/crates-docs", "serve", "--config", "/app/config.toml"]
+# 启动命令（默认使用配置文件）
+CMD ["/app/crates-docs", "serve", "--config", "/app/config.example.toml"]

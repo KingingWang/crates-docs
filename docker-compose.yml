@@ -7,80 +7,34 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./config.toml:/app/config.toml
+      - ./examples/config.example.toml:/app/config.toml
       - ./logs:/app/logs
       - ./data:/app/data
     environment:
       - RUST_LOG=info
-      - CRATES_DOCS_HOST=0.0.0.0
-      - CRATES_DOCS_PORT=8080
-      - CRATES_DOCS_TRANSPORT_MODE=hybrid
-      - CRATES_DOCS_LOG_LEVEL=info
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-    networks:
-      - crates-docs-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: crates-docs-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
-    command: redis-server /usr/local/etc/redis/redis.conf
     restart: unless-stopped
     networks:
       - crates-docs-network
 
-  # 可选：Prometheus 监控
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: crates-docs-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    restart: unless-stopped
-    networks:
-      - crates-docs-network
-
-  # 可选：Grafana 仪表板
-  grafana:
-    image: grafana/grafana:latest
-    container_name: crates-docs-grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    restart: unless-stopped
-    networks:
-      - crates-docs-network
+  # Redis 服务（可选，用于 Redis 缓存）
+  # 如需使用 Redis 缓存，请：
+  # 1. 取消下面 redis 服务的注释
+  # 2. 在 config.toml 中设置 cache_type = "redis" 和 redis_url = "redis://redis:6379"
+  # 3. 启用 cache-redis feature（修改 Dockerfile：RUN cargo build --release --features cache-redis）
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: crates-docs-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - crates-docs-network
 
 volumes:
   redis-data:
-    driver: local
-  prometheus-data:
-    driver: local
-  grafana-data:
     driver: local
 
 networks:

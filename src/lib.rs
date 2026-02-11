@@ -65,10 +65,9 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
     let level = match config.level.to_lowercase().as_str() {
         "trace" => "trace",
         "debug" => "debug",
-        "info" => "info",
         "warn" => "warn",
         "error" => "error",
-        _ => "info", // 默认值
+        _ => "info",
     };
 
     let filter = EnvFilter::new(level);

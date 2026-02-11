@@ -202,7 +202,7 @@ fn clean_html(html: &str) -> String {
                     i = j;
                     continue;
                 }
-                
+
                 // 开始标签
                 skip_depth += 1;
                 // 跳过整个标签

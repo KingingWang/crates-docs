@@ -144,8 +144,7 @@ impl CratesDocsServer {
         // 根据缓存类型和 feature 决定使用哪种创建方法
         #[cfg(feature = "cache-redis")]
         {
-            let cache_box: Box<dyn Cache> =
-                crate::cache::create_cache_async(&config.cache).await?;
+            let cache_box: Box<dyn Cache> = crate::cache::create_cache_async(&config.cache).await?;
             let cache: Arc<dyn Cache> = Arc::from(cache_box);
 
             // 创建文档服务
