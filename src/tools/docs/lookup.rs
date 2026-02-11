@@ -166,80 +166,75 @@ fn clean_html(html: &str) -> String {
     while i < len {
         let c = chars[i];
 
-        match c {
-            '<' => {
-                let start = i;
-                let mut j = i + 1;
+        if c == '<' {
+            let start = i;
+            let mut j = i + 1;
 
-                // 收集标签名
-                let mut tag_name = String::new();
-                while j < len && chars[j] != '>' && !chars[j].is_whitespace() {
-                    tag_name.push(chars[j]);
-                    j += 1;
-                }
+            // 收集标签名
+            let mut tag_name = String::new();
+            while j < len && chars[j] != '>' && !chars[j].is_whitespace() {
+                tag_name.push(chars[j]);
+                j += 1;
+            }
 
-                let tag_lower = tag_name.to_lowercase();
-                let pure_tag = tag_lower.trim_start_matches('/');
+            let tag_lower = tag_name.to_lowercase();
+            let pure_tag = tag_lower.trim_start_matches('/');
 
-                // 检查是否是需要跳过内容的标签
-                let is_skip_tag = pure_tag == "script"
-                    || pure_tag == "style"
-                    || pure_tag == "noscript"
-                    || pure_tag == "iframe";
+            // 检查是否是需要跳过内容的标签
+            let is_skip_tag = pure_tag == "script"
+                || pure_tag == "style"
+                || pure_tag == "noscript"
+                || pure_tag == "iframe";
 
-                if is_skip_tag {
-                    if tag_lower.starts_with('/') {
-                        // 结束标签
-                        if skip_depth > 0 {
-                            skip_depth -= 1;
-                        }
-                        // 跳过整个标签
-                        while j < len && chars[j] != '>' {
-                            j += 1;
-                        }
-                        if j < len {
-                            j += 1;
-                        }
-                        i = j;
-                        continue;
-                    } else {
-                        // 开始标签
-                        skip_depth += 1;
-                        // 跳过整个标签
-                        while j < len && chars[j] != '>' {
-                            j += 1;
-                        }
-                        if j < len {
-                            j += 1;
-                        }
-                        i = j;
-                        continue;
+            if is_skip_tag {
+                if tag_lower.starts_with('/') {
+                    // 结束标签
+                    if skip_depth > 0 {
+                        skip_depth -= 1;
                     }
+                    // 跳过整个标签
+                    while j < len && chars[j] != '>' {
+                        j += 1;
+                    }
+                    if j < len {
+                        j += 1;
+                    }
+                    i = j;
+                    continue;
                 }
-
-                // 跳过直到 '>'
+                
+                // 开始标签
+                skip_depth += 1;
+                // 跳过整个标签
                 while j < len && chars[j] != '>' {
                     j += 1;
                 }
                 if j < len {
                     j += 1;
                 }
-
-                // 保留不是跳过标签的内容
-                if skip_depth == 0 {
-                    for k in start..j {
-                        result.push(chars[k]);
-                    }
-                }
-
                 i = j;
+                continue;
             }
-            _ => {
-                if skip_depth == 0 {
-                    result.push(c);
-                }
-                i += 1;
+
+            // 跳过直到 '>'
+            while j < len && chars[j] != '>' {
+                j += 1;
             }
+            if j < len {
+                j += 1;
+            }
+
+            // 保留不是跳过标签的内容
+            if skip_depth == 0 {
+                result.extend(chars[start..j].iter().copied());
+            }
+
+            i = j;
+        } else {
+            if skip_depth == 0 {
+                result.push(c);
+            }
+            i += 1;
         }
     }
 
@@ -373,10 +368,9 @@ impl Tool for LookupCrateToolImpl {
                 html_to_text(&html)
             }
             _ => {
-                let docs = self
-                    .fetch_crate_docs(&params.crate_name, params.version.as_deref())
-                    .await?;
-                docs // "markdown" 和其他格式都返回原始文档
+                // "markdown" 和其他格式都返回原始文档
+                self.fetch_crate_docs(&params.crate_name, params.version.as_deref())
+                    .await?
             }
         };
 
@@ -603,19 +597,16 @@ impl Tool for LookupItemToolImpl {
                         params.version.as_deref(),
                     )
                     .await?;
-                let docs = html_to_text(&html);
-                // 添加搜索结果标题
-                format!("搜索结果: {}\n\n{}", params.item_path, docs)
+                format!("搜索结果: {}\n\n{}", params.item_path, html_to_text(&html))
             }
             _ => {
-                let docs = self
-                    .fetch_item_docs(
-                        &params.crate_name,
-                        &params.item_path,
-                        params.version.as_deref(),
-                    )
-                    .await?;
-                docs // "markdown" 和其他格式都返回原始文档
+                // "markdown" 和其他格式都返回原始文档
+                self.fetch_item_docs(
+                    &params.crate_name,
+                    &params.item_path,
+                    params.version.as_deref(),
+                )
+                .await?
             }
         };
 
