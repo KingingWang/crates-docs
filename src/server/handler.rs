@@ -4,6 +4,7 @@ use crate::server::CratesDocsServer;
 use crate::tools::ToolRegistry;
 use async_trait::async_trait;
 use rust_mcp_sdk::{
+    McpServer,
     mcp_server::{ServerHandler, ServerHandlerCore},
     schema::{
         CallToolError, CallToolRequestParams, CallToolResult, GetPromptRequestParams,
@@ -11,7 +12,6 @@ use rust_mcp_sdk::{
         NotificationFromClient, PaginatedRequestParams, ReadResourceRequestParams,
         ReadResourceResult, RequestFromClient, ResultFromServer, RpcError,
     },
-    McpServer,
 };
 use std::sync::Arc;
 

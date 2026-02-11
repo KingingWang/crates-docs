@@ -11,19 +11,18 @@ fn main() {
     if let Ok(output) = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output()
+        && output.status.success()
     {
-        if output.status.success() {
-            let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            println!("cargo:rustc-env=GIT_COMMIT={}", commit);
-        }
+        let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        println!("cargo:rustc-env=GIT_COMMIT={}", commit);
     }
 
     // 获取 Rust 版本
-    if let Ok(output) = Command::new("rustc").args(["--version"]).output() {
-        if output.status.success() {
-            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            println!("cargo:rustc-env=RUST_VERSION={}", version);
-        }
+    if let Ok(output) = Command::new("rustc").args(["--version"]).output()
+        && output.status.success()
+    {
+        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        println!("cargo:rustc-env=RUST_VERSION={}", version);
     }
 
     // 如果没有获取到 Git 信息，设置默认值

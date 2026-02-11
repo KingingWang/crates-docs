@@ -3,13 +3,13 @@
 //! 提供 Stdio、HTTP 和 SSE 传输支持。
 
 use crate::error::Result;
-use crate::server::handler::CratesDocsHandler;
 use crate::server::CratesDocsServer;
+use crate::server::handler::CratesDocsHandler;
 use rust_mcp_sdk::{
+    McpServer, StdioTransport, ToMcpServerHandler, TransportOptions,
     error::McpSdkError,
     event_store,
-    mcp_server::{hyper_server, server_runtime, HyperServerOptions, McpServerOptions},
-    McpServer, StdioTransport, ToMcpServerHandler, TransportOptions,
+    mcp_server::{HyperServerOptions, McpServerOptions, hyper_server, server_runtime},
 };
 use std::sync::Arc;
 

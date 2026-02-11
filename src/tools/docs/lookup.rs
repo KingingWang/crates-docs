@@ -2,8 +2,8 @@
 #![allow(clippy::no_effect_replace)]
 #![allow(missing_docs)]
 
-use crate::tools::docs::DocService;
 use crate::tools::Tool;
+use crate::tools::docs::DocService;
 use async_trait::async_trait;
 use rust_mcp_sdk::schema::CallToolError;
 use serde::{Deserialize, Serialize};

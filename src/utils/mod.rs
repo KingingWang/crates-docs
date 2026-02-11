@@ -148,8 +148,8 @@ impl RateLimiter {
 /// 响应压缩工具
 pub mod compression {
     use crate::error::{Error, Result};
-    use flate2::write::GzEncoder;
     use flate2::Compression;
+    use flate2::write::GzEncoder;
     use std::io::Write;
 
     /// 压缩数据（Gzip）
@@ -283,8 +283,8 @@ pub mod validation {
 
 /// 性能监控
 pub mod metrics {
-    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Instant;
 
     /// 性能计数器

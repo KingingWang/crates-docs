@@ -1,8 +1,8 @@
 //! Crates Docs MCP 服务器主程序
 
 use clap::{Parser, Subcommand};
-use crates_docs::server::transport;
 use crates_docs::CratesDocsServer;
+use crates_docs::server::transport;
 use rust_mcp_sdk::schema::{Icon, IconTheme};
 use std::path::PathBuf;
 
