@@ -1,22 +1,333 @@
-name: Rust
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main, master ]
+    tags:
+      - 'v*.*.*'
   pull_request:
-    branches: [ "main" ]
+    branches: [ main, master ]
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  build:
-
+  # 代码质量检查
+  check:
+    name: Code Quality Checks
     runs-on: ubuntu-latest
-
+    
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+      
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+        
+    - name: Check formatting
+      run: cargo fmt -- --check
+      
+    - name: Run clippy
+      run: cargo clippy --all-targets -- -D warnings
+      
+    - name: Check with all features
+      run: cargo clippy --all-features --all-targets -- -D warnings
+
+  # 安全审计
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Run cargo audit
+      run: |
+        cargo install cargo-audit
+        cargo audit
+
+  # 测试
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        rust: [stable, beta, nightly]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+      
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+        
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
+      
+    - name: Test
       run: cargo test --verbose
+      
+    - name: Test with all features
+      run: cargo test --all-features --verbose
+
+  # 测试 Redis 缓存功能
+  test-redis:
+    name: Test with Redis
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-redis-cargo-${{ hashFiles('**/Cargo.toml') }}
+        
+    - name: Build with Redis feature
+      run: cargo build --features cache-redis --verbose
+      
+    - name: Test with Redis feature
+      run: cargo test --features cache-redis --verbose
+
+  # 文档构建检查
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-docs-cargo-${{ hashFiles('**/Cargo.toml') }}
+        
+    - name: Build documentation
+      run: cargo doc --no-deps --all-features
+      
+    - name: Check documentation links
+      run: cargo doc --no-deps --all-features --document-private-items
+
+  # 代码覆盖率测试
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Install tarpaulin
+      run: cargo install cargo-tarpaulin
+      
+    - name: Generate coverage
+      run: cargo tarpaulin --out Xml --all-features --verbose
+      
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v5
+      with:
+        files: ./cobertura.xml
+        flags: unittests
+        name: codecov-umbrella
+        token: ${{ secrets.CODECOV_TOKEN }}
+      continue-on-error: true
+
+  # Docker 镜像构建测试
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      run: docker build -t crates-docs:test .
+      
+    - name: Test Docker image
+      run: |
+        docker run -d --name test-container -p 8080:8080 crates-docs:test
+        sleep 5
+        docker logs test-container
+        docker stop test-container
+        docker rm test-container
+
+  # 发布检查 - 在每次 push 时运行
+  publish-check:
+    name: Publish Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-publish-cargo-${{ hashFiles('**/Cargo.toml') }}
+        
+    - name: Check publish
+      run: cargo publish --dry-run
+
+  # 实际发布 - 只在推送版本标签时运行
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check, security, test, test-redis, docs, docker]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-publish-cargo-${{ hashFiles('**/Cargo.toml') }}
+        
+    - name: Parse version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Tag version: $VERSION"
+        
+    - name: Verify version matches Cargo.toml
+      run: |
+        CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+        TAG_VERSION="${{ steps.version.outputs.version }}"
+        
+        echo "Cargo.toml version: $CARGO_VERSION"
+        echo "Tag version: $TAG_VERSION"
+        
+        if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+          echo "Error: Version mismatch!"
+          echo "  Cargo.toml version: $CARGO_VERSION"
+          echo "  Tag version: $TAG_VERSION"
+          exit 1
+        fi
+        
+        echo "Version check passed!"
+        
+    - name: Login to crates.io
+      run: cargo login ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      
+    - name: Publish to crates.io
+      run: cargo publish
+
+  # Docker 镜像发布 - 只在推送版本标签时运行
+  publish-docker:
+    name: Publish Docker Images
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check, test, docs, docker]
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+      
+    - name: Extract version
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Tag version: $VERSION"
+        
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/crates-docs:latest
+          ${{ secrets.DOCKER_USERNAME }}/crates-docs:${{ steps.version.outputs.version }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
