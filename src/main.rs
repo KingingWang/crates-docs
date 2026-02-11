@@ -2,7 +2,7 @@
 
 use clap::{Parser, Subcommand};
 use crates_docs::server::transport;
-use crates_docs::{CratesDocsServer, init_logging};
+use crates_docs::CratesDocsServer;
 use rust_mcp_sdk::schema::{Icon, IconTheme};
 use std::path::PathBuf;
 
@@ -32,20 +32,20 @@ enum Commands {
     /// 启动服务器
     Serve {
         /// 传输模式 [stdio, http, sse, hybrid]
-        #[arg(short, long, default_value = "hybrid")]
-        mode: String,
+        #[arg(short, long)]
+        mode: Option<String>,
 
         /// 监听主机
-        #[arg(long, default_value = "0.0.0.0")]
-        host: String,
+        #[arg(long)]
+        host: Option<String>,
 
         /// 监听端口
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
+        #[arg(short, long)]
+        port: Option<u16>,
 
         /// 启用 OAuth 认证
         #[arg(long)]
-        enable_oauth: bool,
+        enable_oauth: Option<bool>,
 
         /// OAuth 客户端 ID
         #[arg(long)]
@@ -121,8 +121,8 @@ enum Commands {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
-    // 初始化日志
-    init_logging(cli.debug).map_err(|e| e.to_string())?;
+    // 注意：日志系统将在 serve_command 中初始化（使用配置文件）
+    // 这里不提前初始化，以便使用配置文件中的日志设置
 
     match cli.command {
         Commands::Serve {
@@ -137,8 +137,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             serve_command(
                 &cli.config,
                 cli.debug,
-                &mode,
-                &host,
+                mode,
+                host,
                 port,
                 enable_oauth,
                 oauth_client_id,
@@ -188,26 +188,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[allow(clippy::too_many_arguments)]
 async fn serve_command(
     config_path: &PathBuf,
-    _debug: bool,
-    mode: &str,
-    host: &str,
-    port: u16,
-    enable_oauth: bool,
-    _oauth_client_id: Option<String>,
-    _oauth_client_secret: Option<String>,
-    _oauth_redirect_uri: Option<String>,
+    debug: bool,
+    mode: Option<String>,
+    host: Option<String>,
+    port: Option<u16>,
+    enable_oauth: Option<bool>,
+    oauth_client_id: Option<String>,
+    oauth_client_secret: Option<String>,
+    oauth_redirect_uri: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // 加载配置
+    let config = load_config(config_path, host, port, mode, enable_oauth, oauth_client_id, oauth_client_secret, oauth_redirect_uri).await?;
+
+    // 获取实际使用的传输模式（用于日志和启动）
+    let transport_mode = config.transport_mode.clone();
+
+    // 初始化日志系统（优先使用配置文件，debug 模式使用 debug 级别）
+    if debug {
+        // 在 debug 模式下，覆盖配置文件中的日志级别
+        let mut debug_config = config.logging.clone();
+        debug_config.level = "debug".to_string();
+        crates_docs::init_logging_with_config(&debug_config)
+            .map_err(|e| format!("初始化日志系统失败: {e}"))?;
+    } else {
+        crates_docs::init_logging_with_config(&config.logging)
+            .map_err(|e| format!("初始化日志系统失败: {e}"))?;
+    }
+
     tracing::info!("启动 Crates Docs MCP 服务器 v{}", env!("CARGO_PKG_VERSION"));
 
-    // 加载配置
-    let config = load_config(config_path, host, port, mode, enable_oauth).await?;
-
-    // 创建服务器
+    // 创建服务器（异步方式支持 Redis）
     let server: CratesDocsServer =
-        CratesDocsServer::new(config).map_err(|e| format!("创建服务器失败: {}", e))?;
+        CratesDocsServer::new_async(config).await.map_err(|e| format!("创建服务器失败: {}", e))?;
 
     // 根据模式启动服务器
-    match mode.to_lowercase().as_str() {
+    match transport_mode.to_lowercase().as_str() {
         "stdio" => {
             tracing::info!("使用 Stdio 传输模式");
             transport::run_stdio_server(&server)
@@ -215,25 +230,25 @@ async fn serve_command(
                 .map_err(|e| format!("Stdio 服务器启动失败: {}", e))?;
         }
         "http" => {
-            tracing::info!("使用 HTTP 传输模式，监听 {}:{}", host, port);
+            tracing::info!("使用 HTTP 传输模式，监听 {}:{}", server.config().host, server.config().port);
             transport::run_http_server(&server)
                 .await
                 .map_err(|e| format!("HTTP 服务器启动失败: {}", e))?;
         }
         "sse" => {
-            tracing::info!("使用 SSE 传输模式，监听 {}:{}", host, port);
+            tracing::info!("使用 SSE 传输模式，监听 {}:{}", server.config().host, server.config().port);
             transport::run_sse_server(&server)
                 .await
                 .map_err(|e| format!("SSE 服务器启动失败: {}", e))?;
         }
         "hybrid" => {
-            tracing::info!("使用混合传输模式（HTTP + SSE），监听 {}:{}", host, port);
+            tracing::info!("使用混合传输模式（HTTP + SSE），监听 {}:{}", server.config().host, server.config().port);
             transport::run_hybrid_server(&server)
                 .await
                 .map_err(|e| format!("混合服务器启动失败: {}", e))?;
         }
         _ => {
-            return Err(format!("未知的传输模式: {}", mode).into());
+            return Err(format!("未知的传输模式: {}", transport_mode).into());
         }
     }
 
@@ -241,12 +256,16 @@ async fn serve_command(
 }
 
 /// 加载配置
+#[allow(clippy::too_many_arguments)]
 async fn load_config(
     config_path: &PathBuf,
-    host: &str,
-    port: u16,
-    mode: &str,
-    enable_oauth: bool,
+    host: Option<String>,
+    port: Option<u16>,
+    mode: Option<String>,
+    enable_oauth: Option<bool>,
+    oauth_client_id: Option<String>,
+    oauth_client_secret: Option<String>,
+    oauth_redirect_uri: Option<String>,
 ) -> Result<crates_docs::ServerConfig, Box<dyn std::error::Error>> {
     let mut config = if config_path.exists() {
         tracing::info!("从文件加载配置: {}", config_path.display());
@@ -257,18 +276,42 @@ async fn load_config(
         crates_docs::config::AppConfig::default()
     };
 
-    // 覆盖命令行参数
-    config.server.host = host.to_string();
-    config.server.port = port;
-    config.server.transport_mode = mode.to_string();
-    config.server.enable_oauth = enable_oauth;
+    // 仅当命令行参数显式提供时，才覆盖配置文件
+    if let Some(h) = host {
+        config.server.host = h;
+        tracing::info!("命令行参数覆盖 host: {}", config.server.host);
+    }
+    if let Some(p) = port {
+        config.server.port = p;
+        tracing::info!("命令行参数覆盖 port: {}", config.server.port);
+    }
+    if let Some(m) = mode {
+        config.server.transport_mode = m;
+        tracing::info!("命令行参数覆盖 transport_mode: {}", config.server.transport_mode);
+    }
+    if let Some(eo) = enable_oauth {
+        config.server.enable_oauth = eo;
+        tracing::info!("命令行参数覆盖 enable_oauth: {}", config.server.enable_oauth);
+    }
+
+    // 覆盖命令行 OAuth 参数（如果提供）
+    if let Some(client_id) = oauth_client_id {
+        config.oauth.client_id = Some(client_id);
+        config.oauth.enabled = true;
+    }
+    if let Some(client_secret) = oauth_client_secret {
+        config.oauth.client_secret = Some(client_secret);
+    }
+    if let Some(redirect_uri) = oauth_redirect_uri {
+        config.oauth.redirect_uri = Some(redirect_uri);
+    }
 
     // 验证配置
     config
         .validate()
         .map_err(|e| format!("配置验证失败: {}", e))?;
 
-    // 将 config::ServerConfig 转换为 server::ServerConfig
+    // 将 config::AppConfig 转换为 server::ServerConfig（传递所有配置）
     let server_config = crates_docs::ServerConfig {
         name: config.server.name,
         version: config.server.version,
@@ -290,9 +333,16 @@ async fn load_config(
         website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
         host: config.server.host,
         port: config.server.port,
+        transport_mode: config.server.transport_mode,
         enable_sse: config.server.enable_sse,
         enable_oauth: config.server.enable_oauth,
-        cache: config.cache.clone(),
+        max_connections: config.server.max_connections,
+        request_timeout_secs: config.server.request_timeout_secs,
+        response_timeout_secs: config.server.response_timeout_secs,
+        cache: config.cache,
+        oauth: config.oauth,
+        logging: config.logging,
+        performance: config.performance,
     };
 
     Ok(server_config)

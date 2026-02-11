@@ -39,14 +39,35 @@ pub struct ServerConfig {
     /// 端口
     pub port: u16,
 
+    /// 传输模式
+    pub transport_mode: String,
+
     /// 启用 SSE 支持
     pub enable_sse: bool,
 
     /// 启用 OAuth 认证
     pub enable_oauth: bool,
 
+    /// 最大并发连接数
+    pub max_connections: usize,
+
+    /// 请求超时时间（秒）
+    pub request_timeout_secs: u64,
+
+    /// 响应超时时间（秒）
+    pub response_timeout_secs: u64,
+
     /// 缓存配置
     pub cache: crate::cache::CacheConfig,
+
+    /// OAuth 配置
+    pub oauth: crate::server::auth::OAuthConfig,
+
+    /// 日志配置
+    pub logging: crate::config::LoggingConfig,
+
+    /// 性能配置
+    pub performance: crate::config::PerformanceConfig,
 }
 
 impl Default for ServerConfig {
@@ -72,9 +93,16 @@ impl Default for ServerConfig {
             website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
             host: "127.0.0.1".to_string(),
             port: 8080,
+            transport_mode: "hybrid".to_string(),
             enable_sse: true,
             enable_oauth: false,
+            max_connections: 100,
+            request_timeout_secs: 30,
+            response_timeout_secs: 60,
             cache: crate::cache::CacheConfig::default(),
+            oauth: crate::server::auth::OAuthConfig::default(),
+            logging: crate::config::LoggingConfig::default(),
+            performance: crate::config::PerformanceConfig::default(),
         }
     }
 }
@@ -88,7 +116,9 @@ pub struct CratesDocsServer {
 }
 
 impl CratesDocsServer {
-    /// 创建新的服务器实例
+    /// 创建新的服务器实例（同步）
+    ///
+    /// 注意：此方法只支持内存缓存。如需使用 Redis，请使用 `new_async` 方法。
     pub fn new(config: ServerConfig) -> Result<Self> {
         let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
         let cache: Arc<dyn Cache> = Arc::from(cache_box);
@@ -104,6 +134,51 @@ impl CratesDocsServer {
             tool_registry,
             cache,
         })
+    }
+
+    /// 创建新的服务器实例（异步）
+    ///
+    /// 支持内存缓存和 Redis 缓存（需要 cache-redis feature）。
+    #[allow(unused_variables)]
+    pub async fn new_async(config: ServerConfig) -> Result<Self> {
+        // 根据缓存类型和 feature 决定使用哪种创建方法
+        #[cfg(feature = "cache-redis")]
+        {
+            let cache_box: Box<dyn Cache> =
+                crate::cache::create_cache_async(&config.cache).await?;
+            let cache: Arc<dyn Cache> = Arc::from(cache_box);
+
+            // 创建文档服务
+            let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
+
+            // 创建工具注册器
+            let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
+
+            Ok(Self {
+                config,
+                tool_registry,
+                cache,
+            })
+        }
+
+        #[cfg(not(feature = "cache-redis"))]
+        {
+            // 没有 cache-redis feature，回退到同步创建
+            let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
+            let cache: Arc<dyn Cache> = Arc::from(cache_box);
+
+            // 创建文档服务
+            let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
+
+            // 创建工具注册器
+            let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
+
+            Ok(Self {
+                config,
+                tool_registry,
+                cache,
+            })
+        }
     }
 
     /// 获取服务器配置
