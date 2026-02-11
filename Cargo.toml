@@ -45,7 +45,7 @@ thiserror = "2.0"
 
 # 缓存系统
 moka = { version = "0.12", optional = true, features = ["sync"] }
-redis = { version = "0.25", optional = true }
+redis = { version = "1.0", optional = true, features = ["tokio-comp"] }
 
 # 日志
 tracing = "0.1"

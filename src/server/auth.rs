@@ -176,7 +176,7 @@ impl OAuthConfig {
         Ok(())
     }
 
-    /// 转换为 rust-mcp-sdk 的 OAuthConfig
+    /// 转换为 rust-mcp-sdk 的 `OAuthConfig`
     #[cfg(feature = "auth")]
     pub fn to_mcp_config(&self) -> Result<()> {
         if !self.enabled {

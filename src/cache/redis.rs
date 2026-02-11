@@ -2,7 +2,6 @@
 //!
 //! 提供 Redis 后端的缓存支持。
 
-use async_trait::async_trait;
 use std::time::Duration;
 
 use crate::error::Error;
@@ -25,7 +24,7 @@ impl RedisCache {
 
         // 测试连接
         let mut conn = client
-            .get_async_connection()
+            .get_multiplexed_async_connection()
             .await
             .map_err(|e| Error::Cache(format!("Redis 连接测试失败: {e}")))?;
 
@@ -42,18 +41,17 @@ impl RedisCache {
 #[async_trait::async_trait]
 impl super::Cache for RedisCache {
     async fn get(&self, key: &str) -> Option<String> {
-        let mut conn = self.client.get_async_connection().await.ok()?;
+        let mut conn = self.client.get_multiplexed_async_connection().await.ok()?;
 
         redis::cmd("GET").arg(key).query_async(&mut conn).await.ok()
     }
 
     async fn set(&self, key: String, value: String, ttl: Option<Duration>) {
-        let mut conn = match self.client.get_async_connection().await {
-            Ok(conn) => conn,
-            Err(_) => return,
+        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
+            return;
         };
 
-        let result = if let Some(ttl) = ttl {
+        let result: redis::RedisResult<()> = if let Some(ttl) = ttl {
             let secs = ttl.as_secs();
             redis::cmd("SETEX")
                 .arg(key)
@@ -74,9 +72,8 @@ impl super::Cache for RedisCache {
     }
 
     async fn delete(&self, key: &str) {
-        let mut conn = match self.client.get_async_connection().await {
-            Ok(conn) => conn,
-            Err(_) => return,
+        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
+            return;
         };
 
         let _: () = redis::cmd("DEL")
@@ -87,9 +84,8 @@ impl super::Cache for RedisCache {
     }
 
     async fn clear(&self) {
-        let mut conn = match self.client.get_async_connection().await {
-            Ok(conn) => conn,
-            Err(_) => return,
+        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
+            return;
         };
 
         let _: () = redis::cmd("FLUSHDB")
@@ -99,9 +95,8 @@ impl super::Cache for RedisCache {
     }
 
     async fn exists(&self, key: &str) -> bool {
-        let mut conn = match self.client.get_async_connection().await {
-            Ok(conn) => conn,
-            Err(_) => return false,
+        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
+            return false;
         };
 
         redis::cmd("EXISTS")
@@ -116,6 +111,7 @@ impl super::Cache for RedisCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::Cache;
 
     #[tokio::test]
     #[ignore = "需要 Redis 服务器"]
