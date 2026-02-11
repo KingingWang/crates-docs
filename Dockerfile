@@ -34,7 +34,6 @@ WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/target/release/crates-docs /app/crates-docs
-COPY --from=builder /app/target/release/build/*/build_script_build-*/out/*.so /app/ 2>/dev/null || true
 
 # 复制配置文件示例
 COPY examples/config.example.toml /app/config.example.toml
