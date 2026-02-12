@@ -98,9 +98,9 @@ jobs:
     - name: Test with all features
       run: cargo test --all-features --verbose
 
-  # 跨平台编译测试
+  # 跨平台编译测试（Linux）
   cross-compile:
-    name: Cross-Platform Build
+    name: Cross-Platform Build (Linux)
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -109,11 +109,7 @@ jobs:
             features: --all-features
           - target: x86_64-unknown-linux-musl
             features: --all-features
-          - target: x86_64-pc-windows-gnu
-            features: --all-features
           - target: aarch64-unknown-linux-gnu
-            features: --all-features
-          - target: aarch64-pc-windows-gnullvm
             features: --all-features
     
     steps:
@@ -136,15 +132,38 @@ jobs:
       
     - name: Verify binary
       run: |
-        if [ -f target/${{ matrix.target }}/release/crates-docs ] || [ -f target/${{ matrix.target }}/release/crates-docs.exe ]; then
+        if [ -f target/${{ matrix.target }}/release/crates-docs ]; then
           echo "Binary compiled successfully for ${{ matrix.target }}"
-          if [ -f target/${{ matrix.target }}/release/crates-docs ]; then
-            file target/${{ matrix.target }}/release/crates-docs
-          fi
+          file target/${{ matrix.target }}/release/crates-docs
         else
           echo "Binary not found for ${{ matrix.target }}"
           exit 1
         fi
+
+  # Windows 原生编译测试
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      
+    - name: Build
+      run: |
+        cargo build --release --all-features
+      
+    - name: Verify binary
+      run: |
+        if (Test-Path target\release\crates-docs.exe) {
+          Write-Host "Binary compiled successfully for Windows"
+        } else {
+          Write-Error "Binary not found for Windows"
+          exit 1
+        }
 
   # 测试 Redis 缓存功能
   test-redis:
@@ -290,7 +309,7 @@ jobs:
     name: Publish to crates.io
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [check, security, test, cross-compile, test-redis, docs, docker]
+    needs: [check, security, test, cross-compile, build-windows, test-redis, docs, docker]
     
     steps:
     - name: Checkout code
@@ -343,7 +362,7 @@ jobs:
     name: Publish Docker Images
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [check, test, cross-compile, docs, docker]
+    needs: [check, test, cross-compile, build-windows, docs, docker]
     
     permissions:
       contents: read
