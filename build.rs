@@ -8,29 +8,27 @@ fn main() {
     );
 
     // 获取 Git 提交信息
+    let mut commit = String::from("unknown");
     if let Ok(output) = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output()
-        && output.status.success()
     {
-        let commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        println!("cargo:rustc-env=GIT_COMMIT={}", commit);
+        if output.status.success() {
+            commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        }
     }
+    println!("cargo:rustc-env=GIT_COMMIT={}", commit);
 
     // 获取 Rust 版本
-    if let Ok(output) = Command::new("rustc").args(["--version"]).output()
-        && output.status.success()
-    {
-        let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        println!("cargo:rustc-env=RUST_VERSION={}", version);
+    let mut version = String::from("unknown");
+    if let Ok(output) = Command::new("rustc").args(["--version"]).output() {
+        if output.status.success() {
+            version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        }
     }
+    println!("cargo:rustc-env=RUST_VERSION={}", version);
 
-    // 如果没有获取到 Git 信息，设置默认值
-    if std::env::var("GIT_COMMIT").is_err() {
-        println!("cargo:rustc-env=GIT_COMMIT=unknown");
-    }
-
-    if std::env::var("RUST_VERSION").is_err() {
-        println!("cargo:rustc-env=RUST_VERSION=unknown");
-    }
+    // 重新 cargo rerun 逻辑
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=.git/HEAD");
 }
