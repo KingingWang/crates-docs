@@ -12,18 +12,19 @@ fn main() {
     if let Ok(output) = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output()
-        && output.status.success()
     {
-        commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if output.status.success() {
+            commit = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        }
     }
     println!("cargo:rustc-env=GIT_COMMIT={}", commit);
 
     // 获取 Rust 版本
     let mut version = String::from("unknown");
-    if let Ok(output) = Command::new("rustc").args(["--version"]).output()
-        && output.status.success()
-    {
-        version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if let Ok(output) = Command::new("rustc").args(["--version"]).output() {
+        if output.status.success() {
+            version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        }
     }
     println!("cargo:rustc-env=RUST_VERSION={}", version);
 

@@ -7,13 +7,17 @@ use std::time::Duration;
 use crate::error::Error;
 
 /// Redis 缓存实现
+///
+/// 使用 ConnectionManager 复用连接，避免每次操作都创建新连接。
 pub struct RedisCache {
-    /// Redis 客户端
-    client: redis::Client,
+    /// Redis 连接管理器（自动复用连接）
+    connection_manager: redis::aio::ConnectionManager,
 }
 
 impl RedisCache {
     /// 创建新的 Redis 缓存实例
+    ///
+    /// 使用 ConnectionManager 自动管理连接池，复用连接以提高性能。
     ///
     /// # Errors
     ///
@@ -22,34 +26,32 @@ impl RedisCache {
         let client =
             redis::Client::open(url).map_err(|e| Error::Cache(format!("Redis 连接失败: {e}")))?;
 
-        // 测试连接
-        let mut conn = client
-            .get_multiplexed_async_connection()
+        // 创建连接管理器（自动复用连接）
+        let connection_manager = client
+            .get_connection_manager()
             .await
-            .map_err(|e| Error::Cache(format!("Redis 连接测试失败: {e}")))?;
+            .map_err(|e| Error::Cache(format!("Redis 连接管理器创建失败: {e}")))?;
 
         // 简单的 ping 测试
+        let mut conn = connection_manager.clone();
         let _: String = redis::cmd("PING")
             .query_async(&mut conn)
             .await
             .map_err(|e| Error::Cache(format!("Redis ping 失败: {e}")))?;
 
-        Ok(Self { client })
+        Ok(Self { connection_manager })
     }
 }
 
 #[async_trait::async_trait]
 impl super::Cache for RedisCache {
     async fn get(&self, key: &str) -> Option<String> {
-        let mut conn = self.client.get_multiplexed_async_connection().await.ok()?;
-
+        let mut conn = self.connection_manager.clone();
         redis::cmd("GET").arg(key).query_async(&mut conn).await.ok()
     }
 
     async fn set(&self, key: String, value: String, ttl: Option<Duration>) {
-        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
-            return;
-        };
+        let mut conn = self.connection_manager.clone();
 
         let result: redis::RedisResult<()> = if let Some(ttl) = ttl {
             let secs = ttl.as_secs();
@@ -72,10 +74,7 @@ impl super::Cache for RedisCache {
     }
 
     async fn delete(&self, key: &str) {
-        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
-            return;
-        };
-
+        let mut conn = self.connection_manager.clone();
         let _: () = redis::cmd("DEL")
             .arg(key)
             .query_async(&mut conn)
@@ -84,10 +83,7 @@ impl super::Cache for RedisCache {
     }
 
     async fn clear(&self) {
-        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
-            return;
-        };
-
+        let mut conn = self.connection_manager.clone();
         let _: () = redis::cmd("FLUSHDB")
             .query_async(&mut conn)
             .await
@@ -95,10 +91,7 @@ impl super::Cache for RedisCache {
     }
 
     async fn exists(&self, key: &str) -> bool {
-        let Ok(mut conn) = self.client.get_multiplexed_async_connection().await else {
-            return false;
-        };
-
+        let mut conn = self.connection_manager.clone();
         redis::cmd("EXISTS")
             .arg(key)
             .query_async(&mut conn)

@@ -2,8 +2,8 @@
 #![allow(clippy::no_effect_replace)]
 #![allow(missing_docs)]
 
-use crate::tools::Tool;
 use crate::tools::docs::DocService;
+use crate::tools::Tool;
 use async_trait::async_trait;
 use rust_mcp_sdk::schema::CallToolError;
 use serde::{Deserialize, Serialize};
@@ -74,11 +74,11 @@ impl LookupCrateToolImpl {
             format!("https://docs.rs/{crate_name}/")
         };
 
-        // 发送 HTTP 请求
-        let client = reqwest::Client::new();
-        let response = client
+        // 发送 HTTP 请求（复用 DocService 的客户端）
+        let response = self
+            .service
+            .client()
             .get(&url)
-            .header("User-Agent", "crates-docs/0.1.0")
             .send()
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
@@ -121,11 +121,11 @@ impl LookupCrateToolImpl {
             format!("https://docs.rs/{crate_name}/")
         };
 
-        // 发送 HTTP 请求
-        let client = reqwest::Client::new();
-        let response = client
+        // 发送 HTTP 请求（复用 DocService 的客户端）
+        let response = self
+            .service
+            .client()
             .get(&url)
-            .header("User-Agent", "crates-docs/0.1.0")
             .send()
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
@@ -468,11 +468,11 @@ impl LookupItemToolImpl {
             )
         };
 
-        // 发送 HTTP 请求
-        let client = reqwest::Client::new();
-        let response = client
+        // 发送 HTTP 请求（复用 DocService 的客户端）
+        let response = self
+            .service
+            .client()
             .get(&url)
-            .header("User-Agent", "crates-docs/0.1.0")
             .send()
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
@@ -525,11 +525,11 @@ impl LookupItemToolImpl {
             )
         };
 
-        // 发送 HTTP 请求
-        let client = reqwest::Client::new();
-        let response = client
+        // 发送 HTTP 请求（复用 DocService 的客户端）
+        let response = self
+            .service
+            .client()
             .get(&url)
-            .header("User-Agent", "crates-docs/0.1.0")
             .send()
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;

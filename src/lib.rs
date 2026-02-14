@@ -31,7 +31,7 @@ pub const NAME: &str = "crates-docs";
 /// 如果日志系统初始化失败，返回错误
 #[deprecated(note = "请使用 init_logging_with_config 代替")]
 pub fn init_logging(debug: bool) -> Result<()> {
-    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
     let filter = if debug {
         EnvFilter::new("debug")
@@ -59,7 +59,7 @@ pub fn init_logging(debug: bool) -> Result<()> {
 /// # Errors
 /// 如果日志系统初始化失败，返回错误
 pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result<()> {
-    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
     // 解析日志级别
     let level = match config.level.to_lowercase().as_str() {

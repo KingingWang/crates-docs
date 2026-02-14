@@ -1,7 +1,7 @@
 //! 集成测试
 
 use crates_docs::{
-    cache::{CacheConfig, create_cache},
+    cache::{create_cache, CacheConfig},
     config::AppConfig,
     server::{CratesDocsServer, ServerConfig},
     tools::docs::DocService,
