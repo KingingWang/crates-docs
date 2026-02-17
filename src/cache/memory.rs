@@ -1,7 +1,8 @@
 //! 内存缓存实现
+//!
+//! 使用 LRU（最近最少使用）淘汰策略的内存缓存。
 
-use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// 缓存条目
@@ -11,6 +12,11 @@ struct CacheEntry {
 }
 
 impl CacheEntry {
+    fn new(value: String, ttl: Option<Duration>) -> Self {
+        let expires_at = ttl.map(|duration| Instant::now() + duration);
+        Self { value, expires_at }
+    }
+
     fn is_expired(&self) -> bool {
         self.expires_at
             .is_some_and(|expiry| expiry <= Instant::now())
@@ -18,35 +24,45 @@ impl CacheEntry {
 }
 
 /// 内存缓存实现
+///
+/// 使用 LRU 淘汰策略，当缓存满时移除最近最少使用的条目。
 pub struct MemoryCache {
-    cache: RwLock<HashMap<String, CacheEntry>>,
-    max_size: usize,
+    /// LRU 缓存，使用 Mutex 实现线程安全
+    cache: Mutex<lru::LruCache<String, CacheEntry>>,
 }
 
 impl MemoryCache {
     /// 创建新的内存缓存
+    ///
+    /// # Arguments
+    /// * `max_size` - 最大缓存条目数
     #[must_use]
     pub fn new(max_size: usize) -> Self {
+        // 使用 non-zero 类型确保缓存大小至少为 1
+        let cap =
+            std::num::NonZeroUsize::new(max_size.max(1)).expect("cache size must be at least 1");
         Self {
-            cache: RwLock::new(HashMap::with_capacity(max_size)),
-            max_size,
+            cache: Mutex::new(lru::LruCache::new(cap)),
         }
     }
 
     /// 清理过期条目
-    fn cleanup(&self) {
-        let mut cache = self.cache.write();
-        cache.retain(|_, entry| !entry.is_expired());
-    }
+    fn cleanup_expired(cache: &mut lru::LruCache<String, CacheEntry>) {
+        // 收集过期的键
+        let expired_keys: Vec<String> = cache
+            .iter()
+            .filter_map(|(k, v)| {
+                if v.is_expired() {
+                    Some(k.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-    /// 如果缓存已满，移除最旧的条目
-    fn evict_if_full(&self) {
-        let mut cache = self.cache.write();
-        if cache.len() >= self.max_size {
-            // 简单策略：移除第一个条目
-            if let Some(key) = cache.keys().next().cloned() {
-                cache.remove(&key);
-            }
+        // 移除过期条目
+        for key in expired_keys {
+            cache.pop(&key);
         }
     }
 }
@@ -54,7 +70,12 @@ impl MemoryCache {
 #[async_trait::async_trait]
 impl super::Cache for MemoryCache {
     async fn get(&self, key: &str) -> Option<String> {
-        let cache = self.cache.read();
+        let mut cache = self.cache.lock().expect("cache lock poisoned");
+
+        // 先检查并清理过期条目
+        Self::cleanup_expired(&mut cache);
+
+        // 获取值（LRU 会自动将其移到最近使用的位置）
         cache.get(key).and_then(|entry| {
             if entry.is_expired() {
                 None
@@ -65,30 +86,30 @@ impl super::Cache for MemoryCache {
     }
 
     async fn set(&self, key: String, value: String, ttl: Option<Duration>) {
-        self.cleanup();
-        self.evict_if_full();
+        let mut cache = self.cache.lock().expect("cache lock poisoned");
 
-        let expires_at = ttl.map(|duration| Instant::now() + duration);
+        // 清理过期条目
+        Self::cleanup_expired(&mut cache);
 
-        let entry = CacheEntry { value, expires_at };
-
-        let mut cache = self.cache.write();
-        cache.insert(key, entry);
+        // LRU 会自动处理淘汰
+        let entry = CacheEntry::new(value, ttl);
+        cache.put(key, entry);
     }
 
     async fn delete(&self, key: &str) {
-        let mut cache = self.cache.write();
-        cache.remove(key);
+        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        cache.pop(key);
     }
 
     async fn clear(&self) {
-        let mut cache = self.cache.write();
+        let mut cache = self.cache.lock().expect("cache lock poisoned");
         cache.clear();
     }
 
     async fn exists(&self, key: &str) -> bool {
-        let cache = self.cache.read();
-        cache.get(key).is_some_and(|entry| !entry.is_expired())
+        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        Self::cleanup_expired(&mut cache);
+        cache.contains(key)
     }
 }
 
@@ -132,7 +153,6 @@ mod tests {
                 Some(Duration::from_millis(100)),
             )
             .await;
-
         assert_eq!(cache.get("key1").await, Some("value1".to_string()));
 
         // 等待过期
@@ -141,7 +161,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_memory_cache_eviction() {
+    async fn test_memory_cache_lru_eviction() {
         let cache = MemoryCache::new(2);
 
         // 填满缓存
@@ -152,16 +172,30 @@ mod tests {
             .set("key2".to_string(), "value2".to_string(), None)
             .await;
 
-        // 添加第三个条目，应该触发淘汰
+        // 访问 key1，使其成为最近使用
+        let _ = cache.get("key1").await;
+
+        // 添加第三个条目，应该淘汰 key2（最少使用）
         cache
             .set("key3".to_string(), "value3".to_string(), None)
             .await;
 
-        // 缓存中应该只有 2 个条目
-        let cache_size = {
-            let cache_read = cache.cache.read();
-            cache_read.len()
-        };
-        assert_eq!(cache_size, 2);
+        // key1 应该还在（因为刚被访问）
+        assert_eq!(cache.get("key1").await, Some("value1".to_string()));
+        // key2 应该被淘汰
+        assert_eq!(cache.get("key2").await, None);
+        // key3 应该存在
+        assert_eq!(cache.get("key3").await, Some("value3".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_memory_cache_exists() {
+        let cache = MemoryCache::new(10);
+
+        cache
+            .set("key1".to_string(), "value1".to_string(), None)
+            .await;
+        assert!(cache.exists("key1").await);
+        assert!(!cache.exists("key2").await);
     }
 }
