@@ -12,7 +12,7 @@ use std::sync::Arc;
 #[macros::mcp_tool(
     name = "search_crates",
     title = "搜索 Crates",
-    description = "从 crates.io 搜索 Rust crate",
+    description = "从 crates.io 搜索 Rust crate。返回匹配的 crate 列表，包括名称、描述、版本、下载量等信息。适用于发现和比较可用的 Rust 库。",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -26,13 +26,16 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Deserialize, Serialize, macros::JsonSchema)]
 pub struct SearchCratesTool {
     /// 搜索查询
-    #[json_schema(title = "搜索查询", description = "搜索关键词")]
+    #[json_schema(
+        title = "搜索查询",
+        description = "搜索关键词，例如：web framework、async、http client、serialization"
+    )]
     pub query: String,
 
     /// 结果数量限制
     #[json_schema(
         title = "结果限制",
-        description = "返回的最大结果数量",
+        description = "返回的最大结果数量，范围 1-100",
         minimum = 1,
         maximum = 100,
         default = 10
@@ -42,7 +45,7 @@ pub struct SearchCratesTool {
     /// 输出格式
     #[json_schema(
         title = "输出格式",
-        description = "搜索结果输出格式",
+        description = "搜索结果输出格式：markdown（默认）、text（纯文本）、json（原始 JSON）",
         default = "markdown"
     )]
     pub format: Option<String>,

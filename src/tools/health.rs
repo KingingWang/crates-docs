@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 #[macros::mcp_tool(
     name = "health_check",
     title = "健康检查",
-    description = "检查服务器和外部服务的健康状态",
+    description = "检查服务器和外部服务（docs.rs、crates.io）的健康状态。用于诊断连接问题和监控系统可用性。",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -27,13 +27,17 @@ pub struct HealthCheckTool {
     /// 检查类型
     #[json_schema(
         title = "检查类型",
-        description = "要执行的健康检查类型",
+        description = "要执行的健康检查类型：all（全部检查）、external（外部服务：docs.rs、crates.io）、internal（内部状态）、docs_rs（仅 docs.rs）、crates_io（仅 crates.io）",
         default = "all"
     )]
     pub check_type: Option<String>,
 
     /// 详细输出
-    #[json_schema(title = "详细输出", description = "是否显示详细输出", default = false)]
+    #[json_schema(
+        title = "详细输出",
+        description = "是否显示详细输出，包括每个检查的响应时间",
+        default = false
+    )]
     pub verbose: Option<bool>,
 }
 

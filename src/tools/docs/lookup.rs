@@ -13,7 +13,7 @@ use std::sync::Arc;
 #[rust_mcp_sdk::macros::mcp_tool(
     name = "lookup_crate",
     title = "查找 Crate 文档",
-    description = "从 docs.rs 获取 Rust crate 的文档",
+    description = "从 docs.rs 获取 Rust crate 的完整文档。返回 crate 的主要文档页面内容，包括模块、结构体、函数等概述。适用于了解一个 crate 的整体功能和用法。",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -27,15 +27,25 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupCrateTool {
     /// crate 名称
-    #[json_schema(title = "Crate 名称", description = "要查找的 crate 名称")]
+    #[json_schema(
+        title = "Crate 名称",
+        description = "要查找的 crate 名称，例如：serde、tokio、reqwest"
+    )]
     pub crate_name: String,
 
     /// 版本号（可选，默认为最新版本）
-    #[json_schema(title = "版本号", description = "crate 版本号（可选，默认为最新版本）")]
+    #[json_schema(
+        title = "版本号",
+        description = "指定 crate 版本号，例如：1.0.0。不指定则使用最新版本"
+    )]
     pub version: Option<String>,
 
     /// 输出格式：markdown、text 或 html
-    #[json_schema(title = "输出格式", description = "文档输出格式", default = "markdown")]
+    #[json_schema(
+        title = "输出格式",
+        description = "文档输出格式：markdown（默认）、text（纯文本）、html",
+        default = "markdown"
+    )]
     pub format: Option<String>,
 }
 
@@ -390,7 +400,7 @@ impl Default for LookupCrateToolImpl {
 #[rust_mcp_sdk::macros::mcp_tool(
     name = "lookup_item",
     title = "查找 Crate 项目文档",
-    description = "从 docs.rs 获取 Rust crate 中特定项目的文档",
+    description = "从 docs.rs 获取 Rust crate 中特定项目（函数、结构体、trait、模块等）的文档。适用于查找特定 API 的详细用法和签名。支持搜索路径如 serde::Serialize、std::collections::HashMap 等。",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -404,22 +414,32 @@ impl Default for LookupCrateToolImpl {
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupItemTool {
     /// crate 名称
-    #[json_schema(title = "Crate 名称", description = "要查找的 crate 名称")]
+    #[json_schema(
+        title = "Crate 名称",
+        description = "要查找的 crate 名称，例如：serde、tokio、std"
+    )]
     pub crate_name: String,
 
     /// 项目路径（例如 `std::collections::HashMap`）
     #[json_schema(
         title = "项目路径",
-        description = "要查找的项目路径（例如 'std::collections::HashMap'）"
+        description = "要查找的项目路径，格式为 '模块::子模块::项目名'。例如：serde::Serialize、tokio::runtime::Runtime、std::collections::HashMap"
     )]
     pub item_path: String,
 
     /// 版本号（可选，默认为最新版本）
-    #[json_schema(title = "版本号", description = "crate 版本号（可选，默认为最新版本）")]
+    #[json_schema(
+        title = "版本号",
+        description = "指定 crate 版本号。不指定则使用最新版本"
+    )]
     pub version: Option<String>,
 
     /// 输出格式：markdown、text 或 html
-    #[json_schema(title = "输出格式", description = "文档输出格式", default = "markdown")]
+    #[json_schema(
+        title = "输出格式",
+        description = "文档输出格式：markdown（默认）、text（纯文本）、html",
+        default = "markdown"
+    )]
     pub format: Option<String>,
 }
 

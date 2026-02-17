@@ -4,7 +4,7 @@
 
 ## 特性
 
-- 🚀 **高性能**: 使用异步 Rust 和智能缓存
+- 🚀 **高性能**: 使用异步 Rust 和 LRU 智能缓存
 - 🔧 **多种传输协议**: 支持 Stdio、HTTP 和 SSE
 - 🔐 **OAuth 认证**: 支持 GitHub、Google、Keycloak 等
 - 📚 **完整的文档查询**: 支持查找 crate、搜索 crate、查找特定项目
@@ -16,19 +16,20 @@
 
 ### 安装
 
+#### 从源码构建
+
 ```bash
 # 克隆仓库
-git clone <repository-url>
+git clone https://github.com/KingingWang/crates-docs.git
 cd crates-docs
 
 # 构建项目
 cargo build --release
 
-# 运行服务器
-cargo run -- serve
+# 二进制文件位于 target/release/crates-docs
 ```
 
-### 使用 Docker
+#### 使用 Docker
 
 ```bash
 # 构建 Docker 镜像
@@ -38,7 +39,243 @@ docker build -t crates-docs .
 docker run -p 8080:8080 crates-docs
 ```
 
-## 使用方法
+#### 从 crates.io 安装（发布后）
+
+```bash
+cargo install crates-docs
+```
+
+## MCP 客户端集成指南
+
+### 在 Claude Desktop 中使用
+
+编辑 Claude Desktop 配置文件：
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+添加以下配置：
+
+```json
+{
+  "mcpServers": {
+    "crates-docs": {
+      "command": "/path/to/crates-docs",
+      "args": ["serve", "--mode", "stdio"]
+    }
+  }
+}
+```
+
+### 在 Cursor 中使用
+
+编辑 Cursor 配置文件 `~/.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "crates-docs": {
+      "command": "/path/to/crates-docs",
+      "args": ["serve", "--mode", "stdio"]
+    }
+  }
+}
+```
+
+### 在 Windsurf 中使用
+
+编辑 Windsurf 配置文件 `~/.codeium/windsurf/mcp_config.json`：
+
+```json
+{
+  "mcpServers": {
+    "crates-docs": {
+      "command": "/path/to/crates-docs",
+      "args": ["serve", "--mode", "stdio"]
+    }
+  }
+}
+```
+
+### 在 Zed 中使用
+
+编辑 Zed 配置文件 `~/.config/zed/settings.json`：
+
+```json
+{
+  "mcp_servers": {
+    "crates-docs": {
+      "command": "/path/to/crates-docs",
+      "args": ["serve", "--mode", "stdio"]
+    }
+  }
+}
+```
+
+### 使用 HTTP 模式
+
+如果需要通过网络访问，可以使用 HTTP 模式：
+
+```bash
+# 启动 HTTP 服务器
+cargo run -- serve --mode http --host 0.0.0.0 --port 8080
+```
+
+然后在 MCP 客户端中配置：
+
+```json
+{
+  "mcpServers": {
+    "crates-docs": {
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+## MCP 工具详解
+
+### 1. lookup_crate - 查找 Crate 文档
+
+从 docs.rs 获取 Rust crate 的完整文档。
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 描述 |
+|------|------|------|------|
+| `crate_name` | string | ✅ | Crate 名称，如 `serde`、`tokio` |
+| `version` | string | ❌ | 版本号，默认最新版本，如 `1.0.0` |
+| `format` | string | ❌ | 输出格式：`markdown`（默认）、`text`、`html` |
+
+**示例**：
+
+```json
+// 查找最新版本
+{ "crate_name": "serde" }
+
+// 查找特定版本
+{ "crate_name": "tokio", "version": "1.35.0" }
+
+// 获取纯文本格式
+{ "crate_name": "reqwest", "format": "text" }
+```
+
+### 2. search_crates - 搜索 Crate
+
+从 crates.io 搜索 Rust crate。
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 描述 |
+|------|------|------|------|
+| `query` | string | ✅ | 搜索关键词 |
+| `limit` | number | ❌ | 结果数量（1-100），默认 10 |
+| `format` | string | ❌ | 输出格式：`markdown`（默认）、`text`、`json` |
+
+**示例**：
+
+```json
+// 基本搜索
+{ "query": "web framework" }
+
+// 限制结果数量
+{ "query": "async runtime", "limit": 5 }
+
+// 获取 JSON 格式
+{ "query": "serialization", "format": "json" }
+```
+
+### 3. lookup_item - 查找特定项目文档
+
+在指定 crate 中查找特定类型、函数或模块的文档。
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 描述 |
+|------|------|------|------|
+| `crate_name` | string | ✅ | Crate 名称 |
+| `itemPath` | string | ✅ | 项目路径，如 `serde::Serialize`、`std::collections::HashMap` |
+| `version` | string | ❌ | 版本号 |
+| `format` | string | ❌ | 输出格式：`markdown`（默认）、`text` |
+
+**示例**：
+
+```json
+// 查找 serde 的 Serialize trait
+{ "crate_name": "serde", "itemPath": "serde::Serialize" }
+
+// 查找 tokio 的 run 函数
+{ "crate_name": "tokio", "itemPath": "tokio::runtime::Runtime::run" }
+
+// 查找特定版本的 HashMap
+{ "crate_name": "std", "itemPath": "std::collections::HashMap", "version": "1.75.0" }
+```
+
+### 4. health_check - 健康检查
+
+检查服务器和外部服务的健康状态。
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 描述 |
+|------|------|------|------|
+| `checkType` | string | ❌ | 检查类型：`all`（默认）、`external`、`internal`、`docs_rs`、`crates_io` |
+| `verbose` | boolean | ❌ | 详细输出，默认 false |
+
+**示例**：
+
+```json
+// 完整检查
+{ "checkType": "all", "verbose": true }
+
+// 只检查外部服务
+{ "checkType": "external" }
+
+// 只检查 docs.rs
+{ "checkType": "docs_rs" }
+```
+
+## 使用示例
+
+### 示例 1: 了解一个新 crate
+
+**用户**: "帮我了解一下 serde 这个 crate"
+
+**AI 会使用**:
+```json
+{ "crate_name": "serde" }
+```
+
+### 示例 2: 查找特定功能
+
+**用户**: "tokio 怎么创建一个异步任务？"
+
+**AI 会使用**:
+```json
+{ "crate_name": "tokio", "itemPath": "tokio::spawn" }
+```
+
+### 示例 3: 搜索相关 crate
+
+**用户**: "有什么好用的 HTTP 客户端库？"
+
+**AI 会使用**:
+```json
+{ "query": "http client", "limit": 10 }
+```
+
+### 示例 4: 比较版本差异
+
+**用户**: "reqwest 0.11 和 0.12 有什么区别？"
+
+**AI 会使用**:
+```json
+{ "crate_name": "reqwest", "version": "0.11" }
+{ "crate_name": "reqwest", "version": "0.12" }
+```
+
+## 命令行使用
 
 ### 启动服务器
 
@@ -46,7 +283,7 @@ docker run -p 8080:8080 crates-docs
 # 使用默认配置启动服务器（混合模式：HTTP + SSE）
 cargo run -- serve
 
-# 使用 Stdio 模式（用于 CLI 集成）
+# 使用 Stdio 模式（用于 MCP 客户端集成）
 cargo run -- serve --mode stdio
 
 # 使用 HTTP 模式
@@ -54,9 +291,6 @@ cargo run -- serve --mode http --host 0.0.0.0 --port 8080
 
 # 启用调试日志
 cargo run -- serve --debug
-
-# 启用详细输出
-cargo run -- serve --verbose
 
 # 使用自定义配置文件
 cargo run -- serve --config /path/to/config.toml
@@ -122,10 +356,10 @@ request_timeout_secs = 30
 response_timeout_secs = 60
 
 [cache]
-cache_type = "memory"
-memory_size = 1000
-redis_url = null
-default_ttl = 3600
+cache_type = "memory"  # 或 "redis"
+memory_size = 1000     # 内存缓存条目数（使用 LRU 淘汰策略）
+redis_url = "redis://localhost:6379"
+default_ttl = 3600     # 默认缓存时间（秒）
 
 [oauth]
 enabled = false
@@ -165,136 +399,38 @@ export CRATES_DOCS_TRANSPORT_MODE="http"
 export CRATES_DOCS_LOG_LEVEL="debug"
 ```
 
-## MCP 工具
-
-### 可用工具
-
-1. **lookup_crate** - 查找 crate 文档
-   - `crate_name`: crate 名称（必需）
-   - `version`: 版本号（可选）
-   - `format`: 输出格式（markdown/text/html，默认：markdown）
-
-2. **search_crates** - 搜索 crate
-   - `query`: 搜索关键词（必需）
-   - `limit`: 结果数量限制（1-100，默认：10）
-   - `format`: 输出格式（markdown/text/json，默认：markdown）
-
-3. **lookup_item** - 查找 crate 中的特定项目
-   - `crate_name`: crate 名称（必需）
-   - `itemPath`: 项目路径（如 std::vec::Vec）（必需）
-   - `version`: 版本号（可选）
-
-4. **health_check** - 健康检查
-   - `checkType`: 检查类型（all/external/internal/docs_rs/crates_io，默认：all）
-   - `verbose`: 详细输出（true/false，默认：false）
-
 ## 传输协议
 
-### Stdio 模式
+### Stdio 模式（推荐用于 MCP 客户端）
 
-用于 CLI 工具集成：
+最简单、最安全的模式，适合与 MCP 客户端（Claude Desktop、Cursor 等）集成：
 
 ```bash
-# 通过 Stdio 运行
 cargo run -- serve --mode stdio
-
-# 使用 MCP Inspector 测试
-npx @modelcontextprotocol/inspector cargo run -- serve --mode stdio
 ```
 
 ### HTTP 模式（Streamable HTTP）
 
-用于网络服务：
+适合网络服务和需要远程访问的场景：
 
 ```bash
-# 启动 HTTP 服务器
 cargo run -- serve --mode http --host 0.0.0.0 --port 8080
-
-# 使用 curl 测试
-curl http://localhost:8080/health
 ```
 
 ### SSE 模式（Server-Sent Events）
 
-用于向后兼容（已弃用，推荐使用 Hybrid 模式）：
+用于向后兼容，推荐使用 Hybrid 模式：
 
 ```bash
-# 启动 SSE 服务器
 cargo run -- serve --mode sse --host 0.0.0.0 --port 8080
 ```
 
-### 混合模式（HTTP + SSE）
+### 混合模式（推荐用于网络服务）
 
-推荐模式，同时支持 Streamable HTTP 和 Server-Sent Events 通信：
+同时支持 HTTP 和 SSE，最灵活的模式：
 
 ```bash
-# 启动混合服务器
 cargo run -- serve --mode hybrid --host 0.0.0.0 --port 8080
-```
-
-## OAuth 认证
-
-### 启用 OAuth
-
-1. 在配置文件中启用 OAuth：
-
-```toml
-[oauth]
-enabled = true
-client_id = "your-client-id"
-client_secret = "your-client-secret"
-redirect_uri = "http://localhost:8080/oauth/callback"
-authorization_endpoint = "https://provider.com/oauth/authorize"
-token_endpoint = "https://provider.com/oauth/token"
-scopes = ["openid", "profile", "email"]
-provider = "Custom"
-```
-
-2. 或使用预配置的提供者：
-
-```bash
-# GitHub OAuth
-cargo run -- serve --enable-oauth \
-  --oauth-client-id "github-client-id" \
-  --oauth-client-secret "github-client-secret" \
-  --oauth-redirect-uri "http://localhost:8080/oauth/callback"
-
-# Google OAuth
-cargo run -- serve --enable-oauth \
-  --oauth-client-id "google-client-id" \
-  --oauth-client-secret "google-client-secret" \
-  --oauth-redirect-uri "http://localhost:8080/oauth/callback"
-```
-
-### 支持的 OAuth 提供者
-
-- **GitHub**: `provider = "GitHub"`
-- **Google**: `provider = "Google"`
-- **Keycloak**: `provider = "Keycloak"`
-- **自定义**: `provider = "Custom"`
-
-## 性能优化
-
-### 缓存
-
-支持内存缓存和 Redis 缓存：
-
-```toml
-[cache]
-cache_type = "memory"  # 或 "redis"
-memory_size = 1000     # 内存缓存条目数
-redis_url = "redis://localhost:6379"  # Redis 连接 URL
-default_ttl = 3600     # 默认缓存时间（秒）
-```
-
-### 连接池
-
-```toml
-[performance]
-http_client_pool_size = 10           # HTTP 客户端连接池大小
-concurrent_request_limit = 50        # 并发请求限制
-rate_limit_per_second = 100          # 每秒请求限制
-enable_response_compression = true   # 启用响应压缩
 ```
 
 ## 开发
@@ -325,6 +461,9 @@ cargo test --test integration_tests
 
 # 运行特定测试
 cargo test test_lookup_crate
+
+# 运行所有特性测试
+cargo test --all-features
 ```
 
 ### 代码质量
@@ -365,52 +504,38 @@ WantedBy=multi-user.target
 
 ### Docker Compose
 
-项目包含完整的 `docker-compose.yml`，支持以下服务：
-
 ```yaml
 version: '3.8'
-
 services:
-  crates-docs:    # 主服务
+  crates-docs:
     build: .
     ports:
       - "8080:8080"
+    volumes:
+      - ./config.toml:/app/config.toml
   
-  redis:          # Redis 缓存服务
+  redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-  
-  prometheus:     # Prometheus 监控（可选）
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-  
-  grafana:        # Grafana 仪表板（可选）
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
 ```
 
-启动所有服务：
+启动服务：
+
 ```bash
 docker-compose up -d
 ```
 
-仅启动核心服务（不包含监控）：
+## API 端点
+
+### 健康检查
+
 ```bash
-docker-compose up -d crates-docs redis
-```
-
-## API 文档
-
-### 健康检查端点
-
-```
 GET /health
 ```
 
 响应：
+
 ```json
 {
   "status": "healthy",
@@ -437,27 +562,31 @@ GET /health
 ### 常见问题
 
 1. **端口被占用**
-   ```bash
-   # 检查端口占用
-   sudo lsof -i :8080
-   
-   # 杀死占用进程
-   sudo kill -9 <PID>
-   ```
+
+```bash
+# 检查端口占用
+sudo lsof -i :8080
+
+# 杀死占用进程
+sudo kill -9 <PID>
+```
 
 2. **内存不足**
-   ```bash
-   # 调整缓存大小
-   [cache]
-   memory_size = 500  # 减少缓存大小
-   ```
+
+调整配置文件中的缓存大小：
+
+```toml
+[cache]
+memory_size = 500
+```
 
 3. **网络问题**
-   ```bash
-   # 检查网络连接
-   curl -I https://docs.rs/
-   curl -I https://crates.io/api/v1/crates?q=test&per_page=1
-   ```
+
+```bash
+# 检查网络连接
+curl -I https://docs.rs/
+curl -I https://crates.io/api/v1/crates?q=test&per_page=1
+```
 
 ### 日志
 
@@ -491,6 +620,7 @@ MIT License
 ## 支持
 
 如有问题，请：
+
 1. 查看 [Issues](https://github.com/KingingWang/crates-docs/issues)
 2. 查看 [文档](https://github.com/KingingWang/crates-docs/wiki)
 3. 发送邮件到 kingingwang@foxmail.com
