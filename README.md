@@ -1,6 +1,31 @@
 # Crates Docs MCP 服务器
 
+[![Crates.io](https://img.shields.io/crates/v/crates-docs.svg)](https://crates.io/crates/crates-docs)
+[![Documentation](https://docs.rs/crates-docs/badge.svg)](https://docs.rs/crates-docs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://github.com/KingingWang/crates-docs/workflows/CI/badge.svg)](https://github.com/KingingWang/crates-docs/actions)
+
 一个高性能的 Rust crate 文档查询 MCP 服务器，支持多种传输协议和 OAuth 认证。
+
+## 目录
+
+- [特性](#特性)
+- [快速开始](#快速开始)
+  - [安装](#安装)
+- [MCP 客户端集成指南](#mcp-客户端集成指南)
+- [MCP 工具详解](#mcp-工具详解)
+- [使用示例](#使用示例)
+- [命令行使用](#命令行使用)
+- [配置](#配置)
+- [传输协议](#传输协议)
+- [开发](#开发)
+- [部署](#部署)
+- [API 端点](#api-端点)
+- [故障排除](#故障排除)
+- [许可证](#许可证)
+- [贡献](#贡献)
+- [致谢](#致谢)
+- [支持](#支持)
 
 ## 特性
 
@@ -195,7 +220,7 @@ cargo run -- serve --mode http --host 0.0.0.0 --port 8080
 | 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
 | `crate_name` | string | ✅ | Crate 名称 |
-| `itemPath` | string | ✅ | 项目路径，如 `serde::Serialize`、`std::collections::HashMap` |
+| `item_path` | string | ✅ | 项目路径，如 `serde::Serialize`、`std::collections::HashMap` |
 | `version` | string | ❌ | 版本号 |
 | `format` | string | ❌ | 输出格式：`markdown`（默认）、`text` |
 
@@ -203,13 +228,13 @@ cargo run -- serve --mode http --host 0.0.0.0 --port 8080
 
 ```json
 // 查找 serde 的 Serialize trait
-{ "crate_name": "serde", "itemPath": "serde::Serialize" }
+{ "crate_name": "serde", "item_path": "serde::Serialize" }
 
 // 查找 tokio 的 run 函数
-{ "crate_name": "tokio", "itemPath": "tokio::runtime::Runtime::run" }
+{ "crate_name": "tokio", "item_path": "tokio::runtime::Runtime::run" }
 
 // 查找特定版本的 HashMap
-{ "crate_name": "std", "itemPath": "std::collections::HashMap", "version": "1.75.0" }
+{ "crate_name": "std", "item_path": "std::collections::HashMap", "version": "1.75.0" }
 ```
 
 ### 4. health_check - 健康检查
@@ -220,20 +245,20 @@ cargo run -- serve --mode http --host 0.0.0.0 --port 8080
 
 | 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
-| `checkType` | string | ❌ | 检查类型：`all`（默认）、`external`、`internal`、`docs_rs`、`crates_io` |
+| `check_type` | string | ❌ | 检查类型：`all`（默认）、`external`、`internal`、`docs_rs`、`crates_io` |
 | `verbose` | boolean | ❌ | 详细输出，默认 false |
 
 **示例**：
 
 ```json
 // 完整检查
-{ "checkType": "all", "verbose": true }
+{ "check_type": "all", "verbose": true }
 
 // 只检查外部服务
-{ "checkType": "external" }
+{ "check_type": "external" }
 
 // 只检查 docs.rs
-{ "checkType": "docs_rs" }
+{ "check_type": "docs_rs" }
 ```
 
 ## 使用示例
@@ -253,7 +278,7 @@ cargo run -- serve --mode http --host 0.0.0.0 --port 8080
 
 **AI 会使用**:
 ```json
-{ "crate_name": "tokio", "itemPath": "tokio::spawn" }
+{ "crate_name": "tokio", "item_path": "tokio::spawn" }
 ```
 
 ### 示例 3: 搜索相关 crate
