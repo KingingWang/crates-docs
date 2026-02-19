@@ -176,7 +176,10 @@ fn test_config_validation_invalid_transport_mode() {
     config.server.transport_mode = "invalid".to_string();
     let result = config.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid transport mode"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid transport mode"));
 }
 
 /// 测试配置验证 - 无效日志级别
@@ -186,7 +189,10 @@ fn test_config_validation_invalid_log_level() {
     config.logging.level = "invalid".to_string();
     let result = config.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid log level"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid log level"));
 }
 
 /// 测试配置验证 - 最大连接数为 0
@@ -765,15 +771,27 @@ fn test_error_variants_display() {
             Error::Initialization("init failed".to_string()),
             "Initialization failed",
         ),
-        (Error::Config("bad config".to_string()), "Configuration error"),
+        (
+            Error::Config("bad config".to_string()),
+            "Configuration error",
+        ),
         (
             Error::HttpRequest("request failed".to_string()),
             "HTTP request failed",
         ),
         (Error::Parse("parse error".to_string()), "Parse failed"),
-        (Error::Cache("cache error".to_string()), "Cache operation failed"),
-        (Error::Auth("auth failed".to_string()), "Authentication failed"),
-        (Error::Mcp("protocol error".to_string()), "MCP protocol error"),
+        (
+            Error::Cache("cache error".to_string()),
+            "Cache operation failed",
+        ),
+        (
+            Error::Auth("auth failed".to_string()),
+            "Authentication failed",
+        ),
+        (
+            Error::Mcp("protocol error".to_string()),
+            "MCP protocol error",
+        ),
         (Error::Other("unknown error".to_string()), "Unknown error"),
     ];
 

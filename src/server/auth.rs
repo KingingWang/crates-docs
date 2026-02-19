@@ -144,7 +144,9 @@ impl OAuthConfig {
         }
 
         if self.authorization_endpoint.is_none() {
-            return Err(Error::Config("authorization_endpoint is required".to_string()));
+            return Err(Error::Config(
+                "authorization_endpoint is required".to_string(),
+            ));
         }
 
         if self.token_endpoint.is_none() {

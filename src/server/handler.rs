@@ -185,7 +185,8 @@ impl ServerHandlerCore for CratesDocsHandlerCore {
             }
             _ => {
                 // Other requests use default handling
-                Err(RpcError::method_not_found().with_message("Unimplemented request type".to_string()))
+                Err(RpcError::method_not_found()
+                    .with_message("Unimplemented request type".to_string()))
             }
         }
     }

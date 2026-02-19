@@ -24,8 +24,8 @@ impl RedisCache {
     ///
     /// Returns an error if Redis connection fails
     pub async fn new(url: &str) -> Result<Self, Error> {
-        let client =
-            redis::Client::open(url).map_err(|e| Error::Cache(format!("Redis connection failed: {e}")))?;
+        let client = redis::Client::open(url)
+            .map_err(|e| Error::Cache(format!("Redis connection failed: {e}")))?;
 
         // Create multiplexed connection (can be shared across multiple operations)
         let conn = client

@@ -75,7 +75,9 @@ impl Default for ServerConfig {
         Self {
             name: "crates-docs".to_string(),
             version: crate::VERSION.to_string(),
-            description: Some("High-performance Rust crate documentation query MCP server".to_string()),
+            description: Some(
+                "High-performance Rust crate documentation query MCP server".to_string(),
+            ),
             icons: vec![
                 Icon {
                     src: "https://docs.rs/static/favicon-32x32.png".to_string(),

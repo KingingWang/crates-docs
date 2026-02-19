@@ -243,7 +243,9 @@ pub mod validation {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
         {
-            return Err(Error::Other("Crate name contains invalid characters".to_string()));
+            return Err(Error::Other(
+                "Crate name contains invalid characters".to_string(),
+            ));
         }
 
         Ok(())

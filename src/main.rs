@@ -225,7 +225,10 @@ async fn serve_command(
             .map_err(|e| format!("Failed to initialize logging system: {e}"))?;
     }
 
-    tracing::info!("Starting Crates Docs MCP Server v{}", env!("CARGO_PKG_VERSION"));
+    tracing::info!(
+        "Starting Crates Docs MCP Server v{}",
+        env!("CARGO_PKG_VERSION")
+    );
 
     // Create server (async to support Redis)
     let server: CratesDocsServer = CratesDocsServer::new_async(config)
@@ -295,18 +298,27 @@ async fn load_config(
         crates_docs::config::AppConfig::from_file(config_path)
             .map_err(|e| format!("Failed to load config file: {}", e))?
     } else {
-        tracing::warn!("Config file does not exist, using default config: {}", config_path.display());
+        tracing::warn!(
+            "Config file does not exist, using default config: {}",
+            config_path.display()
+        );
         crates_docs::config::AppConfig::default()
     };
 
     // Only override config file when command line arguments are explicitly provided
     if let Some(h) = host {
         config.server.host = h;
-        tracing::info!("Command line argument overrides host: {}", config.server.host);
+        tracing::info!(
+            "Command line argument overrides host: {}",
+            config.server.host
+        );
     }
     if let Some(p) = port {
         config.server.port = p;
-        tracing::info!("Command line argument overrides port: {}", config.server.port);
+        tracing::info!(
+            "Command line argument overrides port: {}",
+            config.server.port
+        );
     }
     if let Some(m) = mode {
         config.server.transport_mode = m;
@@ -380,7 +392,11 @@ async fn load_config(
 /// Generate configuration file command
 fn config_command(output: &PathBuf, force: bool) -> Result<(), Box<dyn std::error::Error>> {
     if output.exists() && !force {
-        return Err(format!("Config file already exists: {}, use --force to overwrite", output.display()).into());
+        return Err(format!(
+            "Config file already exists: {}, use --force to overwrite",
+            output.display()
+        )
+        .into());
     }
 
     let config = crates_docs::config::AppConfig::default();
@@ -499,7 +515,10 @@ async fn test_command(
         }
         "lookup_item" => {
             if let (Some(name), Some(path)) = (crate_name, item_path) {
-                println!("Testing item lookup: {}::{} (version: {:?})", name, path, version);
+                println!(
+                    "Testing item lookup: {}::{} (version: {:?})",
+                    name, path, version
+                );
                 println!("Output format: {}", format);
 
                 // Prepare arguments

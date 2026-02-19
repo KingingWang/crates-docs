@@ -86,8 +86,9 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
                 .unwrap_or(std::ffi::OsStr::new("crates-docs.log"));
 
             // Ensure directory exists
-            std::fs::create_dir_all(log_dir)
-                .map_err(|e| error::Error::Initialization(format!("Failed to create log directory: {e}")))?;
+            std::fs::create_dir_all(log_dir).map_err(|e| {
+                error::Error::Initialization(format!("Failed to create log directory: {e}"))
+            })?;
 
             // Create file log layer
             let file_appender = tracing_appender::rolling::daily(log_dir, log_file_name);
@@ -140,8 +141,9 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
                 .unwrap_or(std::ffi::OsStr::new("crates-docs.log"));
 
             // Ensure directory exists
-            std::fs::create_dir_all(log_dir)
-                .map_err(|e| error::Error::Initialization(format!("Failed to create log directory: {e}")))?;
+            std::fs::create_dir_all(log_dir).map_err(|e| {
+                error::Error::Initialization(format!("Failed to create log directory: {e}"))
+            })?;
 
             // Create file log layer
             let file_appender = tracing_appender::rolling::daily(log_dir, log_file_name);

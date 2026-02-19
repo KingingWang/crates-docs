@@ -264,7 +264,9 @@ impl Tool for HealthCheckToolImpl {
 
         let content = if verbose {
             serde_json::to_string_pretty(&health_status).map_err(|e| {
-                rust_mcp_sdk::schema::CallToolError::from_message(format!("JSON serialization failed: {e}"))
+                rust_mcp_sdk::schema::CallToolError::from_message(format!(
+                    "JSON serialization failed: {e}"
+                ))
             })?
         } else {
             let mut summary = format!(

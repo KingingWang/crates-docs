@@ -111,7 +111,9 @@ impl Default for ServerConfig {
         Self {
             name: "crates-docs".to_string(),
             version: crate::VERSION.to_string(),
-            description: Some("High-performance Rust crate documentation query MCP server".to_string()),
+            description: Some(
+                "High-performance Rust crate documentation query MCP server".to_string(),
+            ),
             host: "127.0.0.1".to_string(),
             port: 8080,
             transport_mode: "hybrid".to_string(),
@@ -160,8 +162,9 @@ impl AppConfig {
         let content = fs::read_to_string(path)
             .map_err(|e| crate::error::Error::Config(format!("Failed to read config file: {e}")))?;
 
-        let config: Self = toml::from_str(&content)
-            .map_err(|e| crate::error::Error::Config(format!("Failed to parse config file: {e}")))?;
+        let config: Self = toml::from_str(&content).map_err(|e| {
+            crate::error::Error::Config(format!("Failed to parse config file: {e}"))
+        })?;
 
         config.validate()?;
         Ok(config)
@@ -173,17 +176,20 @@ impl AppConfig {
     ///
     /// Returns an error if configuration cannot be serialized, directory cannot be created, or file cannot be written
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), crate::error::Error> {
-        let content = toml::to_string_pretty(self)
-            .map_err(|e| crate::error::Error::Config(format!("Failed to serialize configuration: {e}")))?;
+        let content = toml::to_string_pretty(self).map_err(|e| {
+            crate::error::Error::Config(format!("Failed to serialize configuration: {e}"))
+        })?;
 
         // Ensure directory exists
         if let Some(parent) = path.as_ref().parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| crate::error::Error::Config(format!("Failed to create directory: {e}")))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                crate::error::Error::Config(format!("Failed to create directory: {e}"))
+            })?;
         }
 
-        fs::write(path, content)
-            .map_err(|e| crate::error::Error::Config(format!("Failed to write config file: {e}")))?;
+        fs::write(path, content).map_err(|e| {
+            crate::error::Error::Config(format!("Failed to write config file: {e}"))
+        })?;
 
         Ok(())
     }
@@ -202,11 +208,15 @@ impl AppConfig {
         }
 
         if self.server.port == 0 {
-            return Err(crate::error::Error::Config("Server port cannot be 0".to_string()));
+            return Err(crate::error::Error::Config(
+                "Server port cannot be 0".to_string(),
+            ));
         }
 
         if self.server.max_connections == 0 {
-            return Err(crate::error::Error::Config("Maximum connections cannot be 0".to_string()));
+            return Err(crate::error::Error::Config(
+                "Maximum connections cannot be 0".to_string(),
+            ));
         }
 
         // Validate transport mode

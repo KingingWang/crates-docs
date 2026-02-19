@@ -46,7 +46,11 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
 /// Run HTTP server (Streamable HTTP)
 pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
-    tracing::info!("Starting HTTP MCP server on {}:{}...", config.host, config.port);
+    tracing::info!(
+        "Starting HTTP MCP server on {}:{}...",
+        config.host,
+        config.port
+    );
 
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
@@ -89,7 +93,11 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
 /// Run SSE server (Server-Sent Events)
 pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
-    tracing::info!("Starting SSE MCP server on {}:{}...", config.host, config.port);
+    tracing::info!(
+        "Starting SSE MCP server on {}:{}...",
+        config.host,
+        config.port
+    );
 
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
@@ -116,7 +124,11 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     let mcp_server =
         hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
 
-    tracing::info!("SSE MCP server started, listening on {}:{}", config.host, config.port);
+    tracing::info!(
+        "SSE MCP server started, listening on {}:{}",
+        config.host,
+        config.port
+    );
     mcp_server
         .start()
         .await
@@ -128,7 +140,11 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
 /// Run hybrid server (supports both HTTP and SSE)
 pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
-    tracing::info!("Starting hybrid MCP server on {}:{}...", config.host, config.port);
+    tracing::info!(
+        "Starting hybrid MCP server on {}:{}...",
+        config.host,
+        config.port
+    );
 
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
