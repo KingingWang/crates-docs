@@ -8,7 +8,7 @@ use crate::error::Error;
 
 /// Redis cache implementation
 ///
-/// Uses multiplexed connection (MultiplexedConnection) to avoid creating new connections for each operation.
+/// Uses multiplexed connection (`MultiplexedConnection`) to avoid creating new connections for each operation.
 /// Multiplexed connections can be safely cloned and shared across multiple tasks.
 pub struct RedisCache {
     /// Multiplexed connection (cloneable, shared across multiple operations)
