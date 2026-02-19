@@ -1,6 +1,6 @@
-//! MCP 工具模块
+//! MCP tools module
 //!
-//! 提供 Rust crate 文档查询相关的 MCP 工具。
+//! Provides MCP tools for Rust crate documentation queries.
 
 pub mod docs;
 pub mod health;
@@ -9,45 +9,45 @@ use async_trait::async_trait;
 use rust_mcp_sdk::schema::{CallToolError, CallToolResult, Tool as McpTool};
 use std::sync::Arc;
 
-/// 工具 trait
+/// Tool trait
 #[async_trait]
 pub trait Tool: Send + Sync {
-    /// 获取工具定义
+    /// Get tool definition
     fn definition(&self) -> McpTool;
 
-    /// 执行工具
+    /// Execute tool
     async fn execute(
         &self,
         arguments: serde_json::Value,
     ) -> std::result::Result<CallToolResult, CallToolError>;
 }
 
-/// 工具注册器
+/// Tool registry
 pub struct ToolRegistry {
     tools: Vec<Box<dyn Tool>>,
 }
 
 impl ToolRegistry {
-    /// 创建新的工具注册器
+    /// Create a new tool registry
     #[must_use]
     pub fn new() -> Self {
         Self { tools: Vec::new() }
     }
 
-    /// 注册工具
+    /// Register tool
     #[must_use]
     pub fn register<T: Tool + 'static>(mut self, tool: T) -> Self {
         self.tools.push(Box::new(tool));
         self
     }
 
-    /// 获取所有工具定义
+    /// Get all tool definitions
     #[must_use]
     pub fn get_tools(&self) -> Vec<McpTool> {
         self.tools.iter().map(|t| t.definition()).collect()
     }
 
-    /// 执行工具
+    /// Execute tool
     pub async fn execute_tool(
         &self,
         name: &str,
@@ -69,7 +69,7 @@ impl Default for ToolRegistry {
     }
 }
 
-/// 创建默认工具注册器
+/// Create default tool registry
 #[must_use]
 pub fn create_default_registry(service: &Arc<docs::DocService>) -> ToolRegistry {
     ToolRegistry::new()

@@ -1,4 +1,4 @@
-//! MCP 处理器实现
+//! MCP handler implementation
 
 use crate::server::CratesDocsServer;
 use crate::tools::ToolRegistry;
@@ -15,19 +15,19 @@ use rust_mcp_sdk::{
 };
 use std::sync::Arc;
 
-/// MCP 服务器处理器
+/// MCP server handler
 pub struct CratesDocsHandler {
     server: Arc<CratesDocsServer>,
 }
 
 impl CratesDocsHandler {
-    /// 创建新的处理器
+    /// Create a new handler
     #[must_use]
     pub fn new(server: Arc<CratesDocsServer>) -> Self {
         Self { server }
     }
 
-    /// 获取工具注册器
+    /// Get the tool registry
     fn tool_registry(&self) -> &ToolRegistry {
         self.server.tool_registry()
     }
@@ -35,7 +35,7 @@ impl CratesDocsHandler {
 
 #[async_trait]
 impl ServerHandler for CratesDocsHandler {
-    /// 处理列出工具请求
+    /// Handle list tools request
     async fn handle_list_tools_request(
         &self,
         _request: Option<PaginatedRequestParams>,
@@ -50,7 +50,7 @@ impl ServerHandler for CratesDocsHandler {
         })
     }
 
-    /// 处理调用工具请求
+    /// Handle call tool request
     async fn handle_call_tool_request(
         &self,
         params: CallToolRequestParams,
@@ -66,13 +66,13 @@ impl ServerHandler for CratesDocsHandler {
             .await
     }
 
-    /// 处理列出资源请求
+    /// Handle list resources request
     async fn handle_list_resources_request(
         &self,
         _request: Option<PaginatedRequestParams>,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<ListResourcesResult, RpcError> {
-        // 当前不提供资源
+        // Resources are not currently provided
         Ok(ListResourcesResult {
             resources: vec![],
             meta: None,
@@ -80,23 +80,23 @@ impl ServerHandler for CratesDocsHandler {
         })
     }
 
-    /// 处理读取资源请求
+    /// Handle read resource request
     async fn handle_read_resource_request(
         &self,
         _params: ReadResourceRequestParams,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<ReadResourceResult, RpcError> {
-        // 当前不提供资源
-        Err(RpcError::invalid_request().with_message("资源未找到".to_string()))
+        // Resources are not currently provided
+        Err(RpcError::invalid_request().with_message("Resource not found".to_string()))
     }
 
-    /// 处理列出提示请求
+    /// Handle list prompts request
     async fn handle_list_prompts_request(
         &self,
         _request: Option<PaginatedRequestParams>,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<ListPromptsResult, RpcError> {
-        // 当前不提供提示
+        // Prompts are not currently provided
         Ok(ListPromptsResult {
             prompts: vec![],
             meta: None,
@@ -104,31 +104,24 @@ impl ServerHandler for CratesDocsHandler {
         })
     }
 
-    /// 处理获取提示请求
+    /// Handle get prompt request
     async fn handle_get_prompt_request(
         &self,
         _params: GetPromptRequestParams,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<GetPromptResult, RpcError> {
-        // 当前不提供提示
-        Err(RpcError::invalid_request().with_message("提示未找到".to_string()))
+        // Prompts are not currently provided
+        Err(RpcError::invalid_request().with_message("Prompt not found".to_string()))
     }
 }
 
-// /// 将处理器转换为 MCP 服务器处理器
-// impl From<CratesDocsHandler> for rust_mcp_sdk::mcp_server::McpServerHandler {
-//     fn from(handler: CratesDocsHandler) -> Self {
-//         handler.to_mcp_server_handler()
-//     }
-// }
-
-/// 核心处理器实现（提供更多控制）
+/// Core handler implementation (provides more control)
 pub struct CratesDocsHandlerCore {
     server: Arc<CratesDocsServer>,
 }
 
 impl CratesDocsHandlerCore {
-    /// 创建新的核心处理器
+    /// Create a new core handler
     #[must_use]
     pub fn new(server: Arc<CratesDocsServer>) -> Self {
         Self { server }
@@ -137,7 +130,7 @@ impl CratesDocsHandlerCore {
 
 #[async_trait]
 impl ServerHandlerCore for CratesDocsHandlerCore {
-    /// 处理请求
+    /// Handle request
     async fn handle_request(
         &self,
         request: RequestFromClient,
@@ -174,7 +167,7 @@ impl ServerHandlerCore for CratesDocsHandlerCore {
             }
             .into()),
             RequestFromClient::ReadResourceRequest(_params) => {
-                Err(RpcError::invalid_request().with_message("资源未找到".to_string()))
+                Err(RpcError::invalid_request().with_message("Resource not found".to_string()))
             }
             RequestFromClient::ListPromptsRequest(_params) => Ok(ListPromptsResult {
                 prompts: vec![],
@@ -183,38 +176,38 @@ impl ServerHandlerCore for CratesDocsHandlerCore {
             }
             .into()),
             RequestFromClient::GetPromptRequest(_params) => {
-                Err(RpcError::invalid_request().with_message("提示未找到".to_string()))
+                Err(RpcError::invalid_request().with_message("Prompt not found".to_string()))
             }
             RequestFromClient::InitializeRequest(_params) => {
-                // 使用默认初始化处理
+                // Use default initialization handling
                 Err(RpcError::method_not_found()
-                    .with_message("初始化请求应由运行时处理".to_string()))
+                    .with_message("Initialize request should be handled by runtime".to_string()))
             }
             _ => {
-                // 其他请求使用默认处理
-                Err(RpcError::method_not_found().with_message("未实现的请求类型".to_string()))
+                // Other requests use default handling
+                Err(RpcError::method_not_found().with_message("Unimplemented request type".to_string()))
             }
         }
     }
 
-    /// 处理通知
+    /// Handle notification
     async fn handle_notification(
         &self,
         _notification: NotificationFromClient,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<(), RpcError> {
-        // 当前不处理通知
+        // Notifications are not currently handled
         Ok(())
     }
 
-    /// 处理错误
+    /// Handle error
     async fn handle_error(
         &self,
         _error: &RpcError,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<(), RpcError> {
-        // 记录错误但不中断
-        tracing::error!("MCP 错误: {:?}", _error);
+        // Log error but don't interrupt
+        tracing::error!("MCP error: {:?}", _error);
         Ok(())
     }
 }

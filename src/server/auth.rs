@@ -1,42 +1,35 @@
-//! OAuth 认证模块
+//! OAuth authentication module
 //!
-//! 提供 OAuth 2.0 认证支持。
+//! Provides OAuth 2.0 authentication support.
 
 use crate::error::{Error, Result};
 use url::Url;
 
-/// OAuth 配置
+/// OAuth configuration
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct OAuthConfig {
-    /// 是否启用 OAuth
+    /// Whether OAuth is enabled
     pub enabled: bool,
-
-    /// 客户端 ID
+    /// Client ID
     pub client_id: Option<String>,
-
-    /// 客户端密钥
+    /// Client secret
     pub client_secret: Option<String>,
-
-    /// 重定向 URI
+    /// Redirect URI
     pub redirect_uri: Option<String>,
-
-    /// 授权端点
+    /// Authorization endpoint
     pub authorization_endpoint: Option<String>,
-
-    /// 令牌端点
+    /// Token endpoint
     pub token_endpoint: Option<String>,
-
-    /// 范围
+    /// Scopes
     pub scopes: Vec<String>,
-
-    /// 认证提供者类型
+    /// Authentication provider type
     pub provider: OAuthProvider,
 }
 
-/// OAuth 提供者类型
+/// OAuth provider type
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum OAuthProvider {
-    /// 自定义 OAuth 提供者
+    /// Custom OAuth provider
     Custom,
     /// GitHub OAuth
     GitHub,
@@ -66,7 +59,7 @@ impl Default for OAuthConfig {
 }
 
 impl OAuthConfig {
-    /// 创建 GitHub OAuth 配置
+    /// Create GitHub OAuth configuration
     #[must_use]
     pub fn github(client_id: String, client_secret: String, redirect_uri: String) -> Self {
         Self {
@@ -81,7 +74,7 @@ impl OAuthConfig {
         }
     }
 
-    /// 创建 Google OAuth 配置
+    /// Create Google OAuth configuration
     #[must_use]
     pub fn google(client_id: String, client_secret: String, redirect_uri: String) -> Self {
         Self {
@@ -102,7 +95,7 @@ impl OAuthConfig {
         }
     }
 
-    /// 创建 Keycloak OAuth 配置
+    /// Create Keycloak OAuth configuration
     #[must_use]
     pub fn keycloak(
         client_id: String,
@@ -132,144 +125,143 @@ impl OAuthConfig {
         }
     }
 
-    /// 验证配置
+    /// Validate configuration
     pub fn validate(&self) -> Result<()> {
         if !self.enabled {
             return Ok(());
         }
 
         if self.client_id.is_none() {
-            return Err(Error::Config("client_id 是必需的".to_string()));
+            return Err(Error::Config("client_id is required".to_string()));
         }
 
         if self.client_secret.is_none() {
-            return Err(Error::Config("client_secret 是必需的".to_string()));
+            return Err(Error::Config("client_secret is required".to_string()));
         }
 
         if self.redirect_uri.is_none() {
-            return Err(Error::Config("redirect_uri 是必需的".to_string()));
+            return Err(Error::Config("redirect_uri is required".to_string()));
         }
 
         if self.authorization_endpoint.is_none() {
-            return Err(Error::Config("authorization_endpoint 是必需的".to_string()));
+            return Err(Error::Config("authorization_endpoint is required".to_string()));
         }
 
         if self.token_endpoint.is_none() {
-            return Err(Error::Config("token_endpoint 是必需的".to_string()));
+            return Err(Error::Config("token_endpoint is required".to_string()));
         }
 
-        // 验证 URL
+        // Validate URLs
         if let Some(uri) = &self.redirect_uri {
-            Url::parse(uri).map_err(|e| Error::Config(format!("无效的 redirect_uri: {e}")))?;
+            Url::parse(uri).map_err(|e| Error::Config(format!("Invalid redirect_uri: {e}")))?;
         }
 
         if let Some(endpoint) = &self.authorization_endpoint {
             Url::parse(endpoint)
-                .map_err(|e| Error::Config(format!("无效的 authorization_endpoint: {e}")))?;
+                .map_err(|e| Error::Config(format!("Invalid authorization_endpoint: {e}")))?;
         }
 
         if let Some(endpoint) = &self.token_endpoint {
             Url::parse(endpoint)
-                .map_err(|e| Error::Config(format!("无效的 token_endpoint: {e}")))?;
+                .map_err(|e| Error::Config(format!("Invalid token_endpoint: {e}")))?;
         }
 
         Ok(())
     }
 
-    /// 转换为 rust-mcp-sdk 的 `OAuthConfig`
+    /// Convert to rust-mcp-sdk `OAuthConfig`
     #[cfg(feature = "auth")]
     pub fn to_mcp_config(&self) -> Result<()> {
         if !self.enabled {
-            return Err(Error::Config("OAuth 未启用".to_string()));
+            return Err(Error::Config("OAuth is not enabled".to_string()));
         }
 
-        // 暂时返回空结果，等 OAuth 功能完善后再实现
+        // Temporarily return empty result, to be implemented when OAuth feature is complete
         Ok(())
     }
 
-    /// 转换为 rust-mcp-sdk 的 `OAuthConfig`
+    /// Convert to rust-mcp-sdk `OAuthConfig`
     #[cfg(not(feature = "auth"))]
     pub fn to_mcp_config(&self) -> Result<()> {
-        Err(Error::Config("OAuth 功能未启用".to_string()))
+        Err(Error::Config("OAuth feature is not enabled".to_string()))
     }
 }
 
-/// 认证管理器
+/// Authentication manager
 #[derive(Default)]
 pub struct AuthManager {
     config: OAuthConfig,
 }
 
 impl AuthManager {
-    /// 创建新的认证管理器
+    /// Create a new authentication manager
     pub fn new(config: OAuthConfig) -> Result<Self> {
         config.validate()?;
         Ok(Self { config })
     }
 
-    /// 检查是否启用认证
+    /// Check if authentication is enabled
     #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.config.enabled
     }
 
-    /// 获取配置
+    /// Get configuration
     #[must_use]
     pub fn config(&self) -> &OAuthConfig {
         &self.config
     }
 }
 
-/// 简单的内存令牌存储（生产环境应使用 Redis 或数据库）
+/// Simple in-memory token store (production should use Redis or database)
 #[derive(Default)]
 pub struct TokenStore {
     tokens: std::sync::RwLock<std::collections::HashMap<String, TokenInfo>>,
 }
 
-/// 令牌信息
-/// OAuth 令牌信息
+/// OAuth token information
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct TokenInfo {
-    /// 访问令牌
+    /// Access token
     pub access_token: String,
-    /// 刷新令牌（可选）
+    /// Refresh token (optional)
     pub refresh_token: Option<String>,
-    /// 令牌过期时间
+    /// Token expiration time
     pub expires_at: chrono::DateTime<chrono::Utc>,
-    /// 授权范围
+    /// Authorization scopes
     pub scopes: Vec<String>,
-    /// 用户ID（可选）
+    /// User ID (optional)
     pub user_id: Option<String>,
-    /// 用户邮箱（可选）
+    /// User email (optional)
     pub user_email: Option<String>,
 }
 
 impl TokenStore {
-    /// 创建新的令牌存储
+    /// Create a new token store
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// 存储令牌
+    /// Store token
     pub fn store_token(&self, key: String, token: TokenInfo) {
         let mut tokens = self.tokens.write().unwrap();
         tokens.insert(key, token);
     }
 
-    /// 获取令牌
+    /// Get token
     pub fn get_token(&self, key: &str) -> Option<TokenInfo> {
         let tokens = self.tokens.read().unwrap();
         tokens.get(key).cloned()
     }
 
-    /// 删除令牌
+    /// Remove token
     pub fn remove_token(&self, key: &str) {
         let mut tokens = self.tokens.write().unwrap();
         tokens.remove(key);
     }
 
-    /// 清理过期令牌
+    /// Cleanup expired tokens
     pub fn cleanup_expired(&self) {
         let now = chrono::Utc::now();
         let mut tokens = self.tokens.write().unwrap();

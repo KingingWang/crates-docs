@@ -1,4 +1,4 @@
-//! 健康检查工具
+//! Health check tool
 #![allow(missing_docs)]
 
 use crate::tools::Tool;
@@ -7,11 +7,11 @@ use rust_mcp_sdk::macros;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
-/// 健康检查工具参数
+/// Health check tool parameters
 #[macros::mcp_tool(
     name = "health_check",
-    title = "健康检查",
-    description = "检查服务器和外部服务（docs.rs、crates.io）的健康状态。用于诊断连接问题和监控系统可用性。",
+    title = "Health Check",
+    description = "Check the health status of the server and external services (docs.rs, crates.io). Used for diagnosing connection issues and monitoring system availability.",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -24,24 +24,24 @@ use std::time::{Duration, Instant};
 )]
 #[derive(Debug, Clone, Deserialize, Serialize, macros::JsonSchema)]
 pub struct HealthCheckTool {
-    /// 检查类型
+    /// Check type
     #[json_schema(
-        title = "检查类型",
-        description = "要执行的健康检查类型：all（全部检查）、external（外部服务：docs.rs、crates.io）、internal（内部状态）、docs_rs（仅 docs.rs）、crates_io（仅 crates.io）",
+        title = "Check Type",
+        description = "Type of health check to perform: all (all checks), external (external services: docs.rs, crates.io), internal (internal state), docs_rs (docs.rs only), crates_io (crates.io only)",
         default = "all"
     )]
     pub check_type: Option<String>,
 
-    /// 详细输出
+    /// Verbose output
     #[json_schema(
-        title = "详细输出",
-        description = "是否显示详细输出，包括每个检查的响应时间",
+        title = "Verbose Output",
+        description = "Whether to show detailed output including response time for each check",
         default = false
     )]
     pub verbose: Option<bool>,
 }
 
-/// 健康检查结果
+/// Health check result
 #[derive(Debug, Clone, Serialize)]
 struct HealthStatus {
     status: String,
@@ -50,7 +50,7 @@ struct HealthStatus {
     uptime: Duration,
 }
 
-/// 单个健康检查
+/// Single health check
 #[derive(Debug, Clone, Serialize)]
 struct HealthCheck {
     name: String,
@@ -60,13 +60,13 @@ struct HealthCheck {
     error: Option<String>,
 }
 
-/// 健康检查工具实现
+/// Health check tool implementation
 pub struct HealthCheckToolImpl {
     start_time: Instant,
 }
 
 impl HealthCheckToolImpl {
-    /// 创建新的健康检查工具
+    /// Create a new health check tool
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -74,7 +74,7 @@ impl HealthCheckToolImpl {
         }
     }
 
-    /// 检查 docs.rs 服务
+    /// Check docs.rs service
     #[allow(clippy::cast_possible_truncation)]
     async fn check_docs_rs(&self) -> HealthCheck {
         let start = Instant::now();
@@ -94,7 +94,7 @@ impl HealthCheckToolImpl {
                         name: "docs.rs".to_string(),
                         status: "healthy".to_string(),
                         duration_ms: duration.as_millis() as u64,
-                        message: Some("服务正常".to_string()),
+                        message: Some("Service is healthy".to_string()),
                         error: None,
                     }
                 } else {
@@ -103,7 +103,7 @@ impl HealthCheckToolImpl {
                         status: "unhealthy".to_string(),
                         duration_ms: duration.as_millis() as u64,
                         message: None,
-                        error: Some(format!("HTTP 状态码: {}", response.status())),
+                        error: Some(format!("HTTP status code: {}", response.status())),
                     }
                 }
             }
@@ -114,13 +114,13 @@ impl HealthCheckToolImpl {
                     status: "unhealthy".to_string(),
                     duration_ms: duration.as_millis() as u64,
                     message: None,
-                    error: Some(format!("请求失败: {e}")),
+                    error: Some(format!("Request failed: {e}")),
                 }
             }
         }
     }
 
-    /// 检查 crates.io 服务
+    /// Check crates.io service
     #[allow(clippy::cast_possible_truncation)]
     async fn check_crates_io(&self) -> HealthCheck {
         let start = Instant::now();
@@ -140,7 +140,7 @@ impl HealthCheckToolImpl {
                         name: "crates.io".to_string(),
                         status: "healthy".to_string(),
                         duration_ms: duration.as_millis() as u64,
-                        message: Some("API 正常".to_string()),
+                        message: Some("API is healthy".to_string()),
                         error: None,
                     }
                 } else {
@@ -149,7 +149,7 @@ impl HealthCheckToolImpl {
                         status: "unhealthy".to_string(),
                         duration_ms: duration.as_millis() as u64,
                         message: None,
-                        error: Some(format!("HTTP 状态码: {}", response.status())),
+                        error: Some(format!("HTTP status code: {}", response.status())),
                     }
                 }
             }
@@ -160,24 +160,24 @@ impl HealthCheckToolImpl {
                     status: "unhealthy".to_string(),
                     duration_ms: duration.as_millis() as u64,
                     message: None,
-                    error: Some(format!("请求失败: {e}")),
+                    error: Some(format!("Request failed: {e}")),
                 }
             }
         }
     }
 
-    /// 检查内存使用
+    /// Check memory usage
     fn check_memory() -> HealthCheck {
         HealthCheck {
             name: "memory".to_string(),
             status: "healthy".to_string(),
             duration_ms: 0,
-            message: Some("内存使用正常".to_string()),
+            message: Some("Memory usage is normal".to_string()),
             error: None,
         }
     }
 
-    /// 执行所有健康检查
+    /// Perform all health checks
     async fn perform_checks(&self, check_type: &str, verbose: bool) -> HealthStatus {
         let mut checks = Vec::new();
 
@@ -206,12 +206,12 @@ impl HealthCheckToolImpl {
                     status: "unknown".to_string(),
                     duration_ms: 0,
                     message: None,
-                    error: Some(format!("未知的检查类型: {check_type}")),
+                    error: Some(format!("Unknown check type: {check_type}")),
                 });
             }
         }
 
-        // 确定总体状态
+        // Determine overall status
         let overall_status = if checks.iter().all(|c| c.status == "healthy") {
             "healthy".to_string()
         } else if checks.iter().any(|c| c.status == "unhealthy") {
@@ -226,7 +226,7 @@ impl HealthCheckToolImpl {
             checks: if verbose {
                 checks
             } else {
-                // 非详细模式下只返回有问题的检查
+                // In non-verbose mode, only return checks with issues
                 checks
                     .into_iter()
                     .filter(|c| c.status != "healthy")
@@ -253,7 +253,7 @@ impl Tool for HealthCheckToolImpl {
         let params: HealthCheckTool = serde_json::from_value(arguments).map_err(|e| {
             rust_mcp_sdk::schema::CallToolError::invalid_arguments(
                 "health_check",
-                Some(format!("参数解析失败: {e}")),
+                Some(format!("Parameter parsing failed: {e}")),
             )
         })?;
 
@@ -264,17 +264,17 @@ impl Tool for HealthCheckToolImpl {
 
         let content = if verbose {
             serde_json::to_string_pretty(&health_status).map_err(|e| {
-                rust_mcp_sdk::schema::CallToolError::from_message(format!("JSON 序列化失败: {e}"))
+                rust_mcp_sdk::schema::CallToolError::from_message(format!("JSON serialization failed: {e}"))
             })?
         } else {
             let mut summary = format!(
-                "状态: {}\n运行时间: {:.2?}\n时间戳: {}",
+                "Status: {}\nUptime: {:.2?}\nTimestamp: {}",
                 health_status.status, health_status.uptime, health_status.timestamp
             );
 
             if !health_status.checks.is_empty() {
                 use std::fmt::Write;
-                summary.push_str("\n\n检查结果:");
+                summary.push_str("\n\nCheck Results:");
                 for check in &health_status.checks {
                     write!(
                         summary,
@@ -286,7 +286,7 @@ impl Tool for HealthCheckToolImpl {
                         write!(summary, " - {msg}").unwrap();
                     }
                     if let Some(ref err) = check.error {
-                        write!(summary, " [错误: {err}]").unwrap();
+                        write!(summary, " [Error: {err}]").unwrap();
                     }
                 }
             }

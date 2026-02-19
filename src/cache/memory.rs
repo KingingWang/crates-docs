@@ -1,11 +1,11 @@
-//! 内存缓存实现
+//! Memory cache implementation
 //!
-//! 使用 LRU（最近最少使用）淘汰策略的内存缓存。
+//! Memory cache using LRU (Least Recently Used) eviction strategy.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-/// 缓存条目
+/// Cache entry
 struct CacheEntry {
     value: String,
     expires_at: Option<Instant>,
@@ -23,22 +23,22 @@ impl CacheEntry {
     }
 }
 
-/// 内存缓存实现
+/// Memory cache implementation
 ///
-/// 使用 LRU 淘汰策略，当缓存满时移除最近最少使用的条目。
+/// Uses LRU eviction strategy, removes least recently used entries when cache is full.
 pub struct MemoryCache {
-    /// LRU 缓存，使用 Mutex 实现线程安全
+    /// LRU cache, using Mutex for thread safety
     cache: Mutex<lru::LruCache<String, CacheEntry>>,
 }
 
 impl MemoryCache {
-    /// 创建新的内存缓存
+    /// Create a new memory cache
     ///
     /// # Arguments
-    /// * `max_size` - 最大缓存条目数
+    /// * `max_size` - Maximum number of cache entries
     #[must_use]
     pub fn new(max_size: usize) -> Self {
-        // 使用 non-zero 类型确保缓存大小至少为 1
+        // Use non-zero type to ensure cache size is at least 1
         let cap =
             std::num::NonZeroUsize::new(max_size.max(1)).expect("cache size must be at least 1");
         Self {
@@ -46,9 +46,9 @@ impl MemoryCache {
         }
     }
 
-    /// 清理过期条目
+    /// Clean up expired entries
     fn cleanup_expired(cache: &mut lru::LruCache<String, CacheEntry>) {
-        // 收集过期的键
+        // Collect expired keys
         let expired_keys: Vec<String> = cache
             .iter()
             .filter_map(|(k, v)| {
@@ -60,7 +60,7 @@ impl MemoryCache {
             })
             .collect();
 
-        // 移除过期条目
+        // Remove expired entries
         for key in expired_keys {
             cache.pop(&key);
         }
@@ -72,10 +72,10 @@ impl super::Cache for MemoryCache {
     async fn get(&self, key: &str) -> Option<String> {
         let mut cache = self.cache.lock().expect("cache lock poisoned");
 
-        // 先检查并清理过期条目
+        // First check and clean up expired entries
         Self::cleanup_expired(&mut cache);
 
-        // 获取值（LRU 会自动将其移到最近使用的位置）
+        // Get value (LRU automatically moves it to most recently used position)
         cache.get(key).and_then(|entry| {
             if entry.is_expired() {
                 None
@@ -88,10 +88,10 @@ impl super::Cache for MemoryCache {
     async fn set(&self, key: String, value: String, ttl: Option<Duration>) {
         let mut cache = self.cache.lock().expect("cache lock poisoned");
 
-        // 清理过期条目
+        // Clean up expired entries
         Self::cleanup_expired(&mut cache);
 
-        // LRU 会自动处理淘汰
+        // LRU automatically handles eviction
         let entry = CacheEntry::new(value, ttl);
         cache.put(key, entry);
     }

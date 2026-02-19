@@ -1,4 +1,4 @@
-//! 工具函数模块
+//! Utility functions module
 
 use crate::error::{Error, Result};
 use reqwest::Client;
@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 
-/// HTTP 客户端构建器
+/// HTTP client builder
 pub struct HttpClientBuilder {
     timeout: Duration,
     connect_timeout: Duration,
@@ -30,55 +30,55 @@ impl Default for HttpClientBuilder {
 }
 
 impl HttpClientBuilder {
-    /// 创建新的 HTTP 客户端构建器
+    /// Create a new HTTP client builder
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// 设置请求超时
+    /// Set request timeout
     #[must_use]
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
-    /// 设置连接超时
+    /// Set connection timeout
     #[must_use]
     pub fn connect_timeout(mut self, connect_timeout: Duration) -> Self {
         self.connect_timeout = connect_timeout;
         self
     }
 
-    /// 设置连接池大小
+    /// Set connection pool size
     #[must_use]
     pub fn pool_max_idle_per_host(mut self, max_idle: usize) -> Self {
         self.pool_max_idle_per_host = max_idle;
         self
     }
 
-    /// 设置 User-Agent
+    /// Set User-Agent
     #[must_use]
     pub fn user_agent(mut self, user_agent: String) -> Self {
         self.user_agent = user_agent;
         self
     }
 
-    /// 启用/禁用 Gzip 压缩
+    /// Enable/disable Gzip compression
     #[must_use]
     pub fn enable_gzip(mut self, enable: bool) -> Self {
         self.enable_gzip = enable;
         self
     }
 
-    /// 启用/禁用 Brotli 压缩
+    /// Enable/disable Brotli compression
     #[must_use]
     pub fn enable_brotli(mut self, enable: bool) -> Self {
         self.enable_brotli = enable;
         self
     }
 
-    /// 构建 HTTP 客户端
+    /// Build HTTP client
     pub fn build(self) -> Result<Client> {
         let mut builder = Client::builder()
             .timeout(self.timeout)
@@ -86,8 +86,8 @@ impl HttpClientBuilder {
             .pool_max_idle_per_host(self.pool_max_idle_per_host)
             .user_agent(&self.user_agent);
 
-        // reqwest 0.13 默认启用 gzip 和 brotli
-        // 如果需要禁用，可以使用 .no_gzip() 和 .no_brotli()
+        // reqwest 0.13 enables gzip and brotli by default
+        // To disable, use .no_gzip() and .no_brotli()
         if !self.enable_gzip {
             builder = builder.no_gzip();
         }
@@ -102,14 +102,14 @@ impl HttpClientBuilder {
     }
 }
 
-/// 速率限制器
+/// Rate limiter
 pub struct RateLimiter {
     semaphore: Arc<Semaphore>,
     max_permits: usize,
 }
 
 impl RateLimiter {
-    /// 创建新的速率限制器
+    /// Create a new rate limiter
     #[must_use]
     pub fn new(max_permits: usize) -> Self {
         Self {
@@ -118,64 +118,64 @@ impl RateLimiter {
         }
     }
 
-    /// 获取许可（阻塞直到可用）
+    /// Acquire permit (blocks until available)
     pub async fn acquire(&self) -> Result<tokio::sync::SemaphorePermit<'_>> {
         self.semaphore
             .acquire()
             .await
-            .map_err(|e| Error::Other(format!("获取速率限制许可失败: {e}")))
+            .map_err(|e| Error::Other(format!("Failed to acquire rate limit permit: {e}")))
     }
 
-    /// 尝试获取许可（非阻塞）
+    /// Try to acquire permit (non-blocking)
     #[must_use]
     pub fn try_acquire(&self) -> Option<tokio::sync::SemaphorePermit<'_>> {
         self.semaphore.try_acquire().ok()
     }
 
-    /// 获取当前可用许可数
+    /// Get current number of available permits
     #[must_use]
     pub fn available_permits(&self) -> usize {
         self.semaphore.available_permits()
     }
 
-    /// 获取最大许可数
+    /// Get maximum number of permits
     #[must_use]
     pub fn max_permits(&self) -> usize {
         self.max_permits
     }
 }
 
-/// 响应压缩工具
+/// Response compression utilities
 pub mod compression {
     use crate::error::{Error, Result};
     use flate2::write::GzEncoder;
     use flate2::Compression;
     use std::io::Write;
 
-    /// 压缩数据（Gzip）
+    /// Compress data (Gzip)
     pub fn gzip_compress(data: &[u8]) -> Result<Vec<u8>> {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder
             .write_all(data)
-            .map_err(|e| Error::Other(format!("Gzip 压缩失败: {e}")))?;
+            .map_err(|e| Error::Other(format!("Gzip compression failed: {e}")))?;
         encoder
             .finish()
-            .map_err(|e| Error::Other(format!("Gzip 压缩完成失败: {e}")))
+            .map_err(|e| Error::Other(format!("Gzip compression finalize failed: {e}")))
     }
 
-    /// 解压数据（Gzip）
+    /// Decompress data (Gzip)
     pub fn gzip_decompress(data: &[u8]) -> Result<Vec<u8>> {
         let mut decoder = flate2::read::GzDecoder::new(data);
         let mut decompressed = Vec::new();
         std::io::Read::read_to_end(&mut decoder, &mut decompressed)
-            .map_err(|e| Error::Other(format!("Gzip 解压失败: {e}")))?;
+            .map_err(|e| Error::Other(format!("Gzip decompression failed: {e}")))?;
         Ok(decompressed)
     }
 }
 
-/// 字符串工具
+/// String utilities
 pub mod string {
-    /// 截断字符串并添加省略号
+    /// Truncate string and add ellipsis
     #[must_use]
     pub fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
         if s.len() <= max_len {
@@ -189,105 +189,105 @@ pub mod string {
         format!("{}...", &s[..max_len - 3])
     }
 
-    /// 安全地解析数字
+    /// Safely parse number
     pub fn parse_number<T: std::str::FromStr>(s: &str, default: T) -> T {
         s.parse().unwrap_or(default)
     }
 
-    /// 检查字符串是否为空或空白
+    /// Check if string is empty or blank
     #[must_use]
     pub fn is_blank(s: &str) -> bool {
         s.trim().is_empty()
     }
 }
 
-/// 时间工具
+/// Time utilities
 pub mod time {
     use chrono::{DateTime, Utc};
 
-    /// 获取当前时间戳（毫秒）
+    /// Get current timestamp (milliseconds)
     #[must_use]
     pub fn current_timestamp_ms() -> i64 {
         Utc::now().timestamp_millis()
     }
 
-    /// 格式化时间
+    /// Format datetime
     #[must_use]
     pub fn format_datetime(dt: &DateTime<Utc>) -> String {
         dt.format("%Y-%m-%d %H:%M:%S%.3f").to_string()
     }
 
-    /// 计算时间间隔（毫秒）
+    /// Calculate elapsed time (milliseconds)
     #[must_use]
     pub fn elapsed_ms(start: std::time::Instant) -> u128 {
         start.elapsed().as_millis()
     }
 }
 
-/// 验证工具
+/// Validation utilities
 pub mod validation {
     use crate::error::Error;
 
-    /// 验证 crate 名称
+    /// Validate crate name
     pub fn validate_crate_name(name: &str) -> Result<(), Error> {
         if name.is_empty() {
-            return Err(Error::Other("crate 名称不能为空".to_string()));
+            return Err(Error::Other("Crate name cannot be empty".to_string()));
         }
 
         if name.len() > 100 {
-            return Err(Error::Other("crate 名称过长".to_string()));
+            return Err(Error::Other("Crate name is too long".to_string()));
         }
 
-        // 基本验证：只允许字母、数字、下划线、连字符
+        // Basic validation: only allow letters, digits, underscores, hyphens
         if !name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
         {
-            return Err(Error::Other("crate 名称包含无效字符".to_string()));
+            return Err(Error::Other("Crate name contains invalid characters".to_string()));
         }
 
         Ok(())
     }
 
-    /// 验证版本号
+    /// Validate version number
     pub fn validate_version(version: &str) -> Result<(), Error> {
         if version.is_empty() {
-            return Err(Error::Other("版本号不能为空".to_string()));
+            return Err(Error::Other("Version cannot be empty".to_string()));
         }
 
         if version.len() > 50 {
-            return Err(Error::Other("版本号过长".to_string()));
+            return Err(Error::Other("Version is too long".to_string()));
         }
 
-        // 简单验证：应该包含数字和点
+        // Simple validation: should contain digits and dots
         if !version.chars().any(|c| c.is_ascii_digit()) {
-            return Err(Error::Other("版本号必须包含数字".to_string()));
+            return Err(Error::Other("Version must contain digits".to_string()));
         }
 
         Ok(())
     }
 
-    /// 验证搜索查询
+    /// Validate search query
     pub fn validate_search_query(query: &str) -> Result<(), Error> {
         if query.is_empty() {
-            return Err(Error::Other("搜索查询不能为空".to_string()));
+            return Err(Error::Other("Search query cannot be empty".to_string()));
         }
 
         if query.len() > 200 {
-            return Err(Error::Other("搜索查询过长".to_string()));
+            return Err(Error::Other("Search query is too long".to_string()));
         }
 
         Ok(())
     }
 }
 
-/// 性能监控
+/// Performance monitoring
 pub mod metrics {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
     use std::time::Instant;
 
-    /// 性能计数器
+    /// Performance counter
     #[derive(Clone)]
     pub struct PerformanceCounter {
         total_requests: Arc<AtomicU64>,
@@ -297,7 +297,7 @@ pub mod metrics {
     }
 
     impl PerformanceCounter {
-        /// 创建新的性能计数器
+        /// Create a new performance counter
         #[must_use]
         pub fn new() -> Self {
             Self {
@@ -308,14 +308,14 @@ pub mod metrics {
             }
         }
 
-        /// 记录请求开始
+        /// Record request start
         #[must_use]
         pub fn record_request_start(&self) -> Instant {
             self.total_requests.fetch_add(1, Ordering::Relaxed);
             Instant::now()
         }
 
-        /// 记录请求完成
+        /// Record request completion
         #[allow(clippy::cast_possible_truncation)]
         pub fn record_request_complete(&self, start: Instant, success: bool) {
             let duration_ms = start.elapsed().as_millis() as u64;
@@ -329,7 +329,7 @@ pub mod metrics {
             }
         }
 
-        /// 获取统计信息
+        /// Get statistics
         #[must_use]
         pub fn get_stats(&self) -> PerformanceStats {
             let total = self.total_requests.load(Ordering::Relaxed);
@@ -360,7 +360,7 @@ pub mod metrics {
             }
         }
 
-        /// 重置计数器
+        /// Reset counter
         pub fn reset(&self) {
             self.total_requests.store(0, Ordering::Relaxed);
             self.successful_requests.store(0, Ordering::Relaxed);
@@ -375,18 +375,18 @@ pub mod metrics {
         }
     }
 
-    /// 性能统计信息
+    /// Performance statistics
     #[derive(Debug, Clone, serde::Serialize)]
     pub struct PerformanceStats {
-        /// 总请求数
+        /// Total requests
         pub total_requests: u64,
-        /// 成功请求数
+        /// Successful requests
         pub successful_requests: u64,
-        /// 失败请求数
+        /// Failed requests
         pub failed_requests: u64,
-        /// 平均响应时间（毫秒）
+        /// Average response time (milliseconds)
         pub average_response_time_ms: f64,
-        /// 成功率（百分比）
+        /// Success rate (percentage)
         pub success_rate_percent: f64,
     }
 }

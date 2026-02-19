@@ -1,6 +1,6 @@
-//! 传输模块
+//! Transport module
 //!
-//! 提供 Stdio、HTTP 和 SSE 传输支持。
+//! Provides Stdio, HTTP, and SSE transport support.
 
 use crate::error::Result;
 use crate::server::handler::CratesDocsHandler;
@@ -13,18 +13,18 @@ use rust_mcp_sdk::{
 };
 use std::sync::Arc;
 
-/// 运行 Stdio 服务器
+/// Run Stdio server
 pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
-    tracing::info!("启动 Stdio MCP 服务器...");
+    tracing::info!("Starting Stdio MCP server...");
 
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
-    // 创建 Stdio 传输
+    // Create Stdio transport
     let transport = StdioTransport::new(TransportOptions::default())
         .map_err(|e| crate::error::Error::Mcp(e.to_string()))?;
 
-    // 创建 MCP 服务器
+    // Create MCP server
     let mcp_server: Arc<rust_mcp_sdk::mcp_server::ServerRuntime> =
         server_runtime::create_server(McpServerOptions {
             server_details: server_info,
@@ -34,7 +34,7 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
             client_task_store: None,
         });
 
-    tracing::info!("Stdio MCP 服务器已启动，等待连接...");
+    tracing::info!("Stdio MCP server started, waiting for connections...");
     mcp_server
         .start()
         .await
@@ -43,20 +43,20 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
     Ok(())
 }
 
-/// 运行 HTTP 服务器（Streamable HTTP）
+/// Run HTTP server (Streamable HTTP)
 pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
-    tracing::info!("启动 HTTP MCP 服务器在 {}:{}...", config.host, config.port);
+    tracing::info!("Starting HTTP MCP server on {}:{}...", config.host, config.port);
 
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
-    // 创建 Hyper 服务器选项
+    // Create Hyper server options
     let options = HyperServerOptions {
         host: config.host.clone(),
         port: config.port,
         transport_options: Arc::new(TransportOptions::default()),
-        sse_support: false, // 纯 HTTP 模式
+        sse_support: false, // Pure HTTP mode
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
@@ -69,12 +69,12 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
         ..Default::default()
     };
 
-    // 创建 HTTP 服务器
+    // Create HTTP server
     let mcp_server =
         hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
 
     tracing::info!(
-        "HTTP MCP 服务器已启动，监听 {}:{}",
+        "HTTP MCP server started, listening on {}:{}",
         config.host,
         config.port
     );
@@ -86,20 +86,20 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
     Ok(())
 }
 
-/// 运行 SSE 服务器（Server-Sent Events）
+/// Run SSE server (Server-Sent Events)
 pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
-    tracing::info!("启动 SSE MCP 服务器在 {}:{}...", config.host, config.port);
+    tracing::info!("Starting SSE MCP server on {}:{}...", config.host, config.port);
 
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
-    // 创建 Hyper 服务器选项，启用 SSE 支持
+    // Create Hyper server options with SSE support enabled
     let options = HyperServerOptions {
         host: config.host.clone(),
         port: config.port,
         transport_options: Arc::new(TransportOptions::default()),
-        sse_support: true, // 启用 SSE 支持
+        sse_support: true, // Enable SSE support
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
@@ -112,11 +112,11 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
         ..Default::default()
     };
 
-    // 创建 SSE 服务器
+    // Create SSE server
     let mcp_server =
         hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
 
-    tracing::info!("SSE MCP 服务器已启动，监听 {}:{}", config.host, config.port);
+    tracing::info!("SSE MCP server started, listening on {}:{}", config.host, config.port);
     mcp_server
         .start()
         .await
@@ -125,20 +125,20 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     Ok(())
 }
 
-/// 运行混合服务器（同时支持 HTTP 和 SSE）
+/// Run hybrid server (supports both HTTP and SSE)
 pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
-    tracing::info!("启动混合 MCP 服务器在 {}:{}...", config.host, config.port);
+    tracing::info!("Starting hybrid MCP server on {}:{}...", config.host, config.port);
 
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
-    // 创建 Hyper 服务器选项，启用 SSE 支持
+    // Create Hyper server options with SSE support enabled
     let options = HyperServerOptions {
         host: config.host.clone(),
         port: config.port,
         transport_options: Arc::new(TransportOptions::default()),
-        sse_support: true, // 启用 SSE 支持
+        sse_support: true, // Enable SSE support
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
@@ -151,12 +151,12 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
         ..Default::default()
     };
 
-    // 创建混合服务器（HTTP + SSE）
+    // Create hybrid server (HTTP + SSE)
     let mcp_server =
         hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
 
     tracing::info!(
-        "混合 MCP 服务器已启动，监听 {}:{} (HTTP + SSE)",
+        "Hybrid MCP server started, listening on {}:{} (HTTP + SSE)",
         config.host,
         config.port
     );
@@ -168,16 +168,16 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
     Ok(())
 }
 
-/// 传输模式
+/// Transport mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TransportMode {
-    /// Stdio 传输（用于 CLI 集成）
+    /// Stdio transport (for CLI integration)
     Stdio,
-    /// HTTP 传输（Streamable HTTP）
+    /// HTTP transport (Streamable HTTP)
     Http,
-    /// SSE 传输（Server-Sent Events）
+    /// SSE transport (Server-Sent Events)
     Sse,
-    /// 混合模式（同时支持 HTTP 和 SSE）
+    /// Hybrid mode (supports both HTTP and SSE)
     Hybrid,
 }
 
@@ -190,7 +190,7 @@ impl std::str::FromStr for TransportMode {
             "http" => Ok(TransportMode::Http),
             "sse" => Ok(TransportMode::Sse),
             "hybrid" => Ok(TransportMode::Hybrid),
-            _ => Err(format!("未知的传输模式: {s}")),
+            _ => Err(format!("Unknown transport mode: {s}")),
         }
     }
 }
@@ -206,7 +206,7 @@ impl std::fmt::Display for TransportMode {
     }
 }
 
-/// 根据传输模式运行服务器
+/// Run server with the specified transport mode
 pub async fn run_server_with_mode(server: &CratesDocsServer, mode: TransportMode) -> Result<()> {
     match mode {
         TransportMode::Stdio => run_stdio_server(server).await,

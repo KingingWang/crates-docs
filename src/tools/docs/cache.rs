@@ -1,28 +1,28 @@
-//! 文档缓存模块
+//! Document cache module
 
 use crate::cache::Cache;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// 文档缓存服务
+/// Document cache service
 #[derive(Clone)]
 pub struct DocCache {
     cache: Arc<dyn Cache>,
 }
 
 impl DocCache {
-    /// 创建新的文档缓存
+    /// Create a new document cache
     pub fn new(cache: Arc<dyn Cache>) -> Self {
         Self { cache }
     }
 
-    /// 获取缓存的文档
+    /// Get cached document
     pub async fn get_crate_docs(&self, crate_name: &str, version: Option<&str>) -> Option<String> {
         let key = Self::crate_cache_key(crate_name, version);
         self.cache.get(&key).await
     }
 
-    /// 设置缓存的文档
+    /// Set cached document
     pub async fn set_crate_docs(&self, crate_name: &str, version: Option<&str>, content: String) {
         let key = Self::crate_cache_key(crate_name, version);
         self.cache
@@ -30,21 +30,21 @@ impl DocCache {
             .await;
     }
 
-    /// 获取缓存的搜索结果
+    /// Get cached search results
     pub async fn get_search_results(&self, query: &str, limit: u32) -> Option<String> {
         let key = Self::search_cache_key(query, limit);
         self.cache.get(&key).await
     }
 
-    /// 设置缓存的搜索结果
+    /// Set cached search results
     pub async fn set_search_results(&self, query: &str, limit: u32, content: String) {
         let key = Self::search_cache_key(query, limit);
         self.cache
             .set(key, content, Some(Duration::from_secs(300)))
-            .await; // 5分钟缓存
+            .await; // 5 minutes cache
     }
 
-    /// 获取缓存的项目文档
+    /// Get cached item documentation
     pub async fn get_item_docs(
         &self,
         crate_name: &str,
@@ -55,7 +55,7 @@ impl DocCache {
         self.cache.get(&key).await
     }
 
-    /// 设置缓存的项目文档
+    /// Set cached item documentation
     pub async fn set_item_docs(
         &self,
         crate_name: &str,
@@ -66,15 +66,15 @@ impl DocCache {
         let key = Self::item_cache_key(crate_name, item_path, version);
         self.cache
             .set(key, content, Some(Duration::from_secs(1800)))
-            .await; // 30分钟缓存
+            .await; // 30 minutes cache
     }
 
-    /// 清理缓存
+    /// Clear cache
     pub async fn clear(&self) {
         self.cache.clear().await;
     }
 
-    /// 构建 crate 缓存键
+    /// Build crate cache key
     fn crate_cache_key(crate_name: &str, version: Option<&str>) -> String {
         if let Some(ver) = version {
             format!("crate:{crate_name}:{ver}")
@@ -83,12 +83,12 @@ impl DocCache {
         }
     }
 
-    /// 构建搜索缓存键
+    /// Build search cache key
     fn search_cache_key(query: &str, limit: u32) -> String {
         format!("search:{query}:{limit}")
     }
 
-    /// 构建项目缓存键
+    /// Build item cache key
     fn item_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
         if let Some(ver) = version {
             format!("item:{crate_name}:{ver}:{item_path}")

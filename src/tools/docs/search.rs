@@ -1,4 +1,4 @@
-//! 搜索 crate 工具
+//! Search crates tool
 #![allow(missing_docs)]
 
 use crate::tools::Tool;
@@ -8,11 +8,11 @@ use rust_mcp_sdk::schema::CallToolError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// 搜索 crate 的工具参数
+/// Search crates tool parameters
 #[macros::mcp_tool(
     name = "search_crates",
-    title = "搜索 Crates",
-    description = "从 crates.io 搜索 Rust crate。返回匹配的 crate 列表，包括名称、描述、版本、下载量等信息。适用于发现和比较可用的 Rust 库。",
+    title = "Search Crates",
+    description = "Search for Rust crates from crates.io. Returns a list of matching crates, including name, description, version, downloads, etc. Suitable for discovering and comparing available Rust libraries.",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -25,17 +25,17 @@ use std::sync::Arc;
 )]
 #[derive(Debug, Clone, Deserialize, Serialize, macros::JsonSchema)]
 pub struct SearchCratesTool {
-    /// 搜索查询
+    /// Search query
     #[json_schema(
-        title = "搜索查询",
-        description = "搜索关键词，例如：web framework、async、http client、serialization"
+        title = "Search query",
+        description = "Search keywords, e.g.: web framework, async, http client, serialization"
     )]
     pub query: String,
 
-    /// 结果数量限制
+    /// Result count limit
     #[json_schema(
         title = "结果限制",
-        description = "返回的最大结果数量，范围 1-100",
+        description = "Maximum number of results to return, range 1-100",
         minimum = 1,
         maximum = 100,
         default = 10
@@ -45,40 +45,40 @@ pub struct SearchCratesTool {
     /// 输出格式
     #[json_schema(
         title = "输出格式",
-        description = "搜索结果输出格式：markdown（默认）、text（纯文本）、json（原始 JSON）",
+        description = "Search result output format: markdown (default), text (plain text), json (raw JSON)",
         default = "markdown"
     )]
     pub format: Option<String>,
 }
 
-/// 搜索 crate 工具实现
+/// Search crates tool实现
 pub struct SearchCratesToolImpl {
     service: Arc<super::DocService>,
 }
 
 impl SearchCratesToolImpl {
-    /// 创建新的工具实例
+    /// Create a new tool instance
     #[must_use]
     pub fn new(service: Arc<super::DocService>) -> Self {
         Self { service }
     }
 
-    /// 搜索 crate
+    /// Search crates
     async fn search_crates(
         &self,
         query: &str,
         limit: u32,
     ) -> std::result::Result<Vec<CrateInfo>, CallToolError> {
-        // 构建缓存键
+        // Build cache key
         let cache_key = format!("search:{query}:{limit}");
 
-        // 检查缓存
+        // Check cache
         if let Some(cached) = self.service.cache().get(&cache_key).await {
             return serde_json::from_str(&cached)
-                .map_err(|e| CallToolError::from_message(format!("缓存解析失败: {e}")));
+                .map_err(|e| CallToolError::from_message(format!("Cache parsing failed: {e}")));
         }
 
-        // 构建 crates.io API URL
+        // Build crates.io API URL
         let url = format!(
             "https://crates.io/api/v1/crates?q={}&per_page={}",
             urlencoding::encode(query),
@@ -97,7 +97,7 @@ impl SearchCratesToolImpl {
 
         if !response.status().is_success() {
             return Err(CallToolError::from_message(format!(
-                "搜索失败，状态码: {}",
+                "Search failed, status code: {}",
                 response.status()
             )));
         }

@@ -1,6 +1,6 @@
-//! 服务器模块
+//! Server module
 //!
-//! 提供 MCP 服务器的实现，支持多种传输协议。
+//! Provides MCP server implementation with support for multiple transport protocols.
 
 pub mod auth;
 pub mod handler;
@@ -15,58 +15,58 @@ use rust_mcp_sdk::schema::{
 };
 use std::sync::Arc;
 
-/// 服务器配置
+/// Server configuration
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ServerConfig {
-    /// 服务器名称
+    /// Server name
     pub name: String,
 
-    /// 服务器版本
+    /// Server version
     pub version: String,
 
-    /// 服务器描述
+    /// Server description
     pub description: Option<String>,
 
-    /// 服务器图标
+    /// Server icons
     pub icons: Vec<Icon>,
 
-    /// 网站 URL
+    /// Website URL
     pub website_url: Option<String>,
 
-    /// 主机地址
+    /// Host address
     pub host: String,
 
-    /// 端口
+    /// Port
     pub port: u16,
 
-    /// 传输模式
+    /// Transport mode
     pub transport_mode: String,
 
-    /// 启用 SSE 支持
+    /// Enable SSE support
     pub enable_sse: bool,
 
-    /// 启用 OAuth 认证
+    /// Enable OAuth authentication
     pub enable_oauth: bool,
 
-    /// 最大并发连接数
+    /// Maximum concurrent connections
     pub max_connections: usize,
 
-    /// 请求超时时间（秒）
+    /// Request timeout (seconds)
     pub request_timeout_secs: u64,
 
-    /// 响应超时时间（秒）
+    /// Response timeout (seconds)
     pub response_timeout_secs: u64,
 
-    /// 缓存配置
+    /// Cache configuration
     pub cache: crate::cache::CacheConfig,
 
-    /// OAuth 配置
+    /// OAuth configuration
     pub oauth: crate::server::auth::OAuthConfig,
 
-    /// 日志配置
+    /// Logging configuration
     pub logging: crate::config::LoggingConfig,
 
-    /// 性能配置
+    /// Performance configuration
     pub performance: crate::config::PerformanceConfig,
 }
 
@@ -75,7 +75,7 @@ impl Default for ServerConfig {
         Self {
             name: "crates-docs".to_string(),
             version: crate::VERSION.to_string(),
-            description: Some("高性能 Rust crate 文档查询 MCP 服务器".to_string()),
+            description: Some("High-performance Rust crate documentation query MCP server".to_string()),
             icons: vec![
                 Icon {
                     src: "https://docs.rs/static/favicon-32x32.png".to_string(),
@@ -107,7 +107,7 @@ impl Default for ServerConfig {
     }
 }
 
-/// MCP 服务器
+/// MCP server
 #[derive(Clone)]
 pub struct CratesDocsServer {
     config: ServerConfig,
@@ -116,17 +116,17 @@ pub struct CratesDocsServer {
 }
 
 impl CratesDocsServer {
-    /// 创建新的服务器实例（同步）
+    /// Create a new server instance (synchronous)
     ///
-    /// 注意：此方法只支持内存缓存。如需使用 Redis，请使用 `new_async` 方法。
+    /// Note: This method only supports memory cache. For Redis, use the `new_async` method.
     pub fn new(config: ServerConfig) -> Result<Self> {
         let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
         let cache: Arc<dyn Cache> = Arc::from(cache_box);
 
-        // 创建文档服务
+        // Create document service
         let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
 
-        // 创建工具注册器
+        // Create tool registry
         let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
 
         Ok(Self {
@@ -136,22 +136,22 @@ impl CratesDocsServer {
         })
     }
 
-    /// 创建新的服务器实例（异步）
+    /// Create a new server instance (asynchronous)
     ///
-    /// 支持内存缓存和 Redis 缓存（需要 cache-redis feature）。
+    /// Supports memory cache and Redis cache (requires cache-redis feature).
     #[allow(unused_variables)]
     #[allow(clippy::unused_async)]
     pub async fn new_async(config: ServerConfig) -> Result<Self> {
-        // 根据缓存类型和 feature 决定使用哪种创建方法
+        // Decide which creation method to use based on cache type and feature
         #[cfg(feature = "cache-redis")]
         {
             let cache_box: Box<dyn Cache> = crate::cache::create_cache_async(&config.cache).await?;
             let cache: Arc<dyn Cache> = Arc::from(cache_box);
 
-            // 创建文档服务
+            // Create document service
             let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
 
-            // 创建工具注册器
+            // Create tool registry
             let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
 
             Ok(Self {
@@ -163,14 +163,14 @@ impl CratesDocsServer {
 
         #[cfg(not(feature = "cache-redis"))]
         {
-            // 没有 cache-redis feature，回退到同步创建
+            // No cache-redis feature, fall back to synchronous creation
             let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
             let cache: Arc<dyn Cache> = Arc::from(cache_box);
 
-            // 创建文档服务
+            // Create document service
             let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
 
-            // 创建工具注册器
+            // Create tool registry
             let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
 
             Ok(Self {
@@ -181,25 +181,25 @@ impl CratesDocsServer {
         }
     }
 
-    /// 获取服务器配置
+    /// Get server configuration
     #[must_use]
     pub fn config(&self) -> &ServerConfig {
         &self.config
     }
 
-    /// 获取工具注册器
+    /// Get tool registry
     #[must_use]
     pub fn tool_registry(&self) -> &Arc<ToolRegistry> {
         &self.tool_registry
     }
 
-    /// 获取缓存
+    /// Get cache
     #[must_use]
     pub fn cache(&self) -> &Arc<dyn Cache> {
         &self.cache
     }
 
-    /// 获取服务器信息
+    /// Get server information
     #[must_use]
     pub fn server_info(&self) -> InitializeResult {
         InitializeResult {
@@ -222,24 +222,24 @@ impl CratesDocsServer {
             },
             protocol_version: ProtocolVersion::V2025_11_25.into(),
             instructions: Some(
-                "使用此服务器查询 Rust crate 文档。支持查找 crate、搜索 crate 和健康检查。"
+                "Use this server to query Rust crate documentation. Supports crate lookup, crate search, and health check."
                     .to_string(),
             ),
             meta: None,
         }
     }
 
-    /// 运行 Stdio 服务器
+    /// Run Stdio server
     pub async fn run_stdio(&self) -> Result<()> {
         transport::run_stdio_server(self).await
     }
 
-    /// 运行 HTTP 服务器
+    /// Run HTTP server
     pub async fn run_http(&self) -> Result<()> {
         transport::run_http_server(self).await
     }
 
-    /// 运行 SSE 服务器
+    /// Run SSE server
     pub async fn run_sse(&self) -> Result<()> {
         transport::run_sse_server(self).await
     }

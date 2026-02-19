@@ -1,44 +1,44 @@
-//! Redis 缓存实现
+//! Redis cache implementation
 //!
-//! 提供 Redis 后端的缓存支持。
+//! Provides Redis backend cache support.
 
 use std::time::Duration;
 
 use crate::error::Error;
 
-/// Redis 缓存实现
+/// Redis cache implementation
 ///
-/// 使用多路复用连接（MultiplexedConnection），避免每次操作都创建新连接。
-/// 多路复用连接可以安全地克隆并在多个任务间共享。
+/// Uses multiplexed connection (MultiplexedConnection) to avoid creating new connections for each operation.
+/// Multiplexed connections can be safely cloned and shared across multiple tasks.
 pub struct RedisCache {
-    /// 多路复用连接（可克隆，在多个操作间共享）
+    /// Multiplexed connection (cloneable, shared across multiple operations)
     conn: redis::aio::MultiplexedConnection,
 }
 
 impl RedisCache {
-    /// 创建新的 Redis 缓存实例
+    /// Create a new Redis cache instance
     ///
-    /// 使用多路复用连接，复用连接以提高性能。
+    /// Uses multiplexed connection, reusing connections for better performance.
     ///
     /// # Errors
     ///
-    /// 如果连接 Redis 失败，返回错误
+    /// Returns an error if Redis connection fails
     pub async fn new(url: &str) -> Result<Self, Error> {
         let client =
-            redis::Client::open(url).map_err(|e| Error::Cache(format!("Redis 连接失败: {e}")))?;
+            redis::Client::open(url).map_err(|e| Error::Cache(format!("Redis connection failed: {e}")))?;
 
-        // 创建多路复用连接（可在多个操作间共享）
+        // Create multiplexed connection (can be shared across multiple operations)
         let conn = client
             .get_multiplexed_async_connection()
             .await
-            .map_err(|e| Error::Cache(format!("Redis 连接创建失败: {e}")))?;
+            .map_err(|e| Error::Cache(format!("Redis connection creation failed: {e}")))?;
 
-        // 简单的 ping 测试
+        // Simple ping test
         let mut ping_conn = conn.clone();
         let _: String = redis::cmd("PING")
             .query_async(&mut ping_conn)
             .await
-            .map_err(|e| Error::Cache(format!("Redis ping 失败: {e}")))?;
+            .map_err(|e| Error::Cache(format!("Redis ping failed: {e}")))?;
 
         Ok(Self { conn })
     }
@@ -70,7 +70,7 @@ impl super::Cache for RedisCache {
                 .await
         };
 
-        // 忽略错误，在实际应用中可能需要记录日志
+        // Ignore errors, in production may need to log
         let _ = result;
     }
 

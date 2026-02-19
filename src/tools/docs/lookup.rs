@@ -1,4 +1,4 @@
-//! 查找 crate 文档工具
+//! Lookup crate documentation tool
 #![allow(clippy::no_effect_replace)]
 #![allow(missing_docs)]
 
@@ -9,11 +9,11 @@ use rust_mcp_sdk::schema::CallToolError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// 查找 crate 文档工具
+/// Lookup crate documentation tool
 #[rust_mcp_sdk::macros::mcp_tool(
     name = "lookup_crate",
-    title = "查找 Crate 文档",
-    description = "从 docs.rs 获取 Rust crate 的完整文档。返回 crate 的主要文档页面内容，包括模块、结构体、函数等概述。适用于了解一个 crate 的整体功能和用法。",
+    title = "Lookup Crate Documentation",
+    description = "Get complete documentation for a Rust crate from docs.rs. Returns the main documentation page content, including modules, structs, functions, etc. Suitable for understanding the overall functionality and usage of a crate.",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -26,48 +26,48 @@ use std::sync::Arc;
 )]
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupCrateTool {
-    /// crate 名称
+    /// Crate name
     #[json_schema(
         title = "Crate 名称",
-        description = "要查找的 crate 名称，例如：serde、tokio、reqwest"
+        description = "要查找的 Crate name，例如：serde、tokio、reqwest"
     )]
     pub crate_name: String,
 
-    /// 版本号（可选，默认为最新版本）
+    /// Version (optional, defaults to latest)
     #[json_schema(
         title = "版本号",
-        description = "指定 crate 版本号，例如：1.0.0。不指定则使用最新版本"
+        description = "Specify crate version, e.g.: 1.0.0. Uses latest version if not specified"
     )]
     pub version: Option<String>,
 
-    /// 输出格式：markdown、text 或 html
+    /// Output format: markdown, text, or html
     #[json_schema(
         title = "输出格式",
-        description = "文档输出格式：markdown（默认）、text（纯文本）、html",
+        description = "Documentation output format: markdown (default), text (plain text), html",
         default = "markdown"
     )]
     pub format: Option<String>,
 }
 
-/// 查找 crate 文档工具实现
+/// Lookup crate documentation tool实现
 pub struct LookupCrateToolImpl {
     service: Arc<DocService>,
 }
 
 impl LookupCrateToolImpl {
-    /// 创建新的查找工具实例
+    /// Create a new lookup tool instance
     #[must_use]
     pub fn new(service: Arc<DocService>) -> Self {
         Self { service }
     }
 
-    /// 获取 crate 文档
+    /// Get crate documentation
     async fn fetch_crate_docs(
         &self,
         crate_name: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        // 尝试从缓存获取
+        // Try to get from cache
         if let Some(cached) = self
             .service
             .doc_cache()
@@ -77,25 +77,25 @@ impl LookupCrateToolImpl {
             return Ok(cached);
         }
 
-        // 构建 URL
+        // Build URL
         let url = if let Some(ver) = version {
             format!("https://docs.rs/{crate_name}/{ver}/")
         } else {
             format!("https://docs.rs/{crate_name}/")
         };
 
-        // 发送 HTTP 请求（复用 DocService 的客户端）
+        // Send HTTP request (reusing DocService client)
         let response = self
             .service
             .client()
             .get(&url)
             .send()
             .await
-            .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
+            .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CallToolError::from_message(format!(
-                "获取文档失败: HTTP {} - {}",
+                "Failed to get documentation: HTTP {} - {}",
                 response.status(),
                 response.text().await.unwrap_or_default()
             )));
@@ -124,25 +124,25 @@ impl LookupCrateToolImpl {
         crate_name: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        // 构建 URL
+        // Build URL
         let url = if let Some(ver) = version {
             format!("https://docs.rs/{crate_name}/{ver}/")
         } else {
             format!("https://docs.rs/{crate_name}/")
         };
 
-        // 发送 HTTP 请求（复用 DocService 的客户端）
+        // Send HTTP request (reusing DocService client)
         let response = self
             .service
             .client()
             .get(&url)
             .send()
             .await
-            .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
+            .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CallToolError::from_message(format!(
-                "获取文档失败: HTTP {} - {}",
+                "Failed to get documentation: HTTP {} - {}",
                 response.status(),
                 response.text().await.unwrap_or_default()
             )));
@@ -413,10 +413,10 @@ impl Default for LookupCrateToolImpl {
 )]
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupItemTool {
-    /// crate 名称
+    /// Crate name
     #[json_schema(
         title = "Crate 名称",
-        description = "要查找的 crate 名称，例如：serde、tokio、std"
+        description = "要查找的 Crate name，例如：serde、tokio、std"
     )]
     pub crate_name: String,
 
@@ -427,17 +427,17 @@ pub struct LookupItemTool {
     )]
     pub item_path: String,
 
-    /// 版本号（可选，默认为最新版本）
+    /// Version (optional, defaults to latest)
     #[json_schema(
         title = "版本号",
         description = "指定 crate 版本号。不指定则使用最新版本"
     )]
     pub version: Option<String>,
 
-    /// 输出格式：markdown、text 或 html
+    /// Output format: markdown, text, or html
     #[json_schema(
         title = "输出格式",
-        description = "文档输出格式：markdown（默认）、text（纯文本）、html",
+        description = "Documentation output format: markdown (default), text (plain text), html",
         default = "markdown"
     )]
     pub format: Option<String>,
@@ -462,7 +462,7 @@ impl LookupItemToolImpl {
         item_path: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        // 尝试从缓存获取
+        // Try to get from cache
         if let Some(cached) = self
             .service
             .doc_cache()
@@ -488,14 +488,14 @@ impl LookupItemToolImpl {
             )
         };
 
-        // 发送 HTTP 请求（复用 DocService 的客户端）
+        // Send HTTP request (reusing DocService client)
         let response = self
             .service
             .client()
             .get(&url)
             .send()
             .await
-            .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
+            .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CallToolError::from_message(format!(
@@ -545,14 +545,14 @@ impl LookupItemToolImpl {
             )
         };
 
-        // 发送 HTTP 请求（复用 DocService 的客户端）
+        // Send HTTP request (reusing DocService client)
         let response = self
             .service
             .client()
             .get(&url)
             .send()
             .await
-            .map_err(|e| CallToolError::from_message(format!("HTTP 请求失败: {e}")))?;
+            .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CallToolError::from_message(format!(

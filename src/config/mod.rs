@@ -1,4 +1,4 @@
-//! 配置模块
+//! Configuration module
 
 use crate::cache::CacheConfig;
 use crate::server::auth::OAuthConfig;
@@ -6,103 +6,103 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-/// 应用程序配置
+/// Application configuration
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct AppConfig {
-    /// 服务器配置
+    /// Server configuration
     pub server: ServerConfig,
 
-    /// 缓存配置
+    /// Cache configuration
     pub cache: CacheConfig,
 
-    /// OAuth 配置
+    /// OAuth configuration
     pub oauth: OAuthConfig,
 
-    /// 日志配置
+    /// Logging configuration
     pub logging: LoggingConfig,
 
-    /// 性能配置
+    /// Performance configuration
     pub performance: PerformanceConfig,
 }
 
-/// 服务器配置
+/// Server configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
-    /// 服务器名称
+    /// Server name
     pub name: String,
 
-    /// 服务器版本
+    /// Server version
     pub version: String,
 
-    /// 服务器描述
+    /// Server description
     pub description: Option<String>,
 
-    /// 主机地址
+    /// Host address
     pub host: String,
 
-    /// 端口
+    /// Port
     pub port: u16,
 
-    /// 传输模式
+    /// Transport mode
     pub transport_mode: String,
 
-    /// 启用 SSE 支持
+    /// Enable SSE support
     pub enable_sse: bool,
 
-    /// 启用 OAuth 认证
+    /// Enable OAuth authentication
     pub enable_oauth: bool,
 
-    /// 最大并发连接数
+    /// Maximum concurrent connections
     pub max_connections: usize,
 
-    /// 请求超时时间（秒）
+    /// Request timeout (seconds)
     pub request_timeout_secs: u64,
 
-    /// 响应超时时间（秒）
+    /// Response timeout (seconds)
     pub response_timeout_secs: u64,
 }
 
-/// 日志配置
+/// Logging configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LoggingConfig {
-    /// 日志级别
+    /// Log level
     pub level: String,
 
-    /// 日志文件路径
+    /// Log file path
     pub file_path: Option<String>,
 
-    /// 是否启用控制台日志
+    /// Whether to enable console logging
     pub enable_console: bool,
 
-    /// 是否启用文件日志
+    /// Whether to enable file logging
     pub enable_file: bool,
 
-    /// 日志文件最大大小（MB）
+    /// Maximum log file size (MB)
     pub max_file_size_mb: u64,
 
-    /// 保留的日志文件数量
+    /// Number of log files to retain
     pub max_files: usize,
 }
 
-/// 性能配置
+/// Performance configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PerformanceConfig {
-    /// HTTP 客户端连接池大小
+    /// HTTP client connection pool size
     pub http_client_pool_size: usize,
 
-    /// 缓存最大大小（条目数）
+    /// Maximum cache size (number of entries)
     pub cache_max_size: usize,
 
-    /// 缓存默认 TTL（秒）
+    /// Default cache TTL (seconds)
     pub cache_default_ttl_secs: u64,
 
-    /// 请求速率限制（每秒请求数）
+    /// Request rate limit (requests per second)
     pub rate_limit_per_second: u32,
 
-    /// 并发请求限制
+    /// Concurrent request limit
     pub concurrent_request_limit: usize,
 
-    /// 启用响应压缩
+    /// Enable response compression
     pub enable_response_compression: bool,
 }
 
@@ -111,7 +111,7 @@ impl Default for ServerConfig {
         Self {
             name: "crates-docs".to_string(),
             version: crate::VERSION.to_string(),
-            description: Some("高性能 Rust crate 文档查询 MCP 服务器".to_string()),
+            description: Some("High-performance Rust crate documentation query MCP server".to_string()),
             host: "127.0.0.1".to_string(),
             port: 8080,
             transport_mode: "hybrid".to_string(),
@@ -151,96 +151,96 @@ impl Default for PerformanceConfig {
 }
 
 impl AppConfig {
-    /// 从文件加载配置
+    /// Load configuration from file
     ///
     /// # Errors
     ///
-    /// 如果文件不存在、无法读取或格式无效，返回错误
+    /// Returns an error if file does not exist, cannot be read, or format is invalid
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, crate::error::Error> {
         let content = fs::read_to_string(path)
-            .map_err(|e| crate::error::Error::Config(format!("读取配置文件失败: {e}")))?;
+            .map_err(|e| crate::error::Error::Config(format!("Failed to read config file: {e}")))?;
 
         let config: Self = toml::from_str(&content)
-            .map_err(|e| crate::error::Error::Config(format!("解析配置文件失败: {e}")))?;
+            .map_err(|e| crate::error::Error::Config(format!("Failed to parse config file: {e}")))?;
 
         config.validate()?;
         Ok(config)
     }
 
-    /// 保存配置到文件
+    /// Save configuration to file
     ///
     /// # Errors
     ///
-    /// 如果无法序列化配置、创建目录或写入文件，返回错误
+    /// Returns an error if configuration cannot be serialized, directory cannot be created, or file cannot be written
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), crate::error::Error> {
         let content = toml::to_string_pretty(self)
-            .map_err(|e| crate::error::Error::Config(format!("序列化配置失败: {e}")))?;
+            .map_err(|e| crate::error::Error::Config(format!("Failed to serialize configuration: {e}")))?;
 
-        // 确保目录存在
+        // Ensure directory exists
         if let Some(parent) = path.as_ref().parent() {
             fs::create_dir_all(parent)
-                .map_err(|e| crate::error::Error::Config(format!("创建目录失败: {e}")))?;
+                .map_err(|e| crate::error::Error::Config(format!("Failed to create directory: {e}")))?;
         }
 
         fs::write(path, content)
-            .map_err(|e| crate::error::Error::Config(format!("写入配置文件失败: {e}")))?;
+            .map_err(|e| crate::error::Error::Config(format!("Failed to write config file: {e}")))?;
 
         Ok(())
     }
 
-    /// 验证配置
+    /// Validate configuration
     ///
     /// # Errors
     ///
-    /// 如果配置无效（如空主机名、无效端口等），返回错误
+    /// Returns an error if configuration is invalid (e.g., empty hostname, invalid port, etc.)
     pub fn validate(&self) -> Result<(), crate::error::Error> {
-        // 验证服务器配置
+        // Validate server configuration
         if self.server.host.is_empty() {
             return Err(crate::error::Error::Config(
-                "服务器主机不能为空".to_string(),
+                "Server host cannot be empty".to_string(),
             ));
         }
 
         if self.server.port == 0 {
-            return Err(crate::error::Error::Config("服务器端口不能为0".to_string()));
+            return Err(crate::error::Error::Config("Server port cannot be 0".to_string()));
         }
 
         if self.server.max_connections == 0 {
-            return Err(crate::error::Error::Config("最大连接数不能为0".to_string()));
+            return Err(crate::error::Error::Config("Maximum connections cannot be 0".to_string()));
         }
 
-        // 验证传输模式
+        // Validate transport mode
         let valid_modes = ["stdio", "http", "sse", "hybrid"];
         if !valid_modes.contains(&self.server.transport_mode.as_str()) {
             return Err(crate::error::Error::Config(format!(
-                "无效的传输模式: {}，有效值: {:?}",
+                "Invalid transport mode: {}, valid values: {:?}",
                 self.server.transport_mode, valid_modes
             )));
         }
 
-        // 验证日志级别
+        // Validate log level
         let valid_levels = ["trace", "debug", "info", "warn", "error"];
         if !valid_levels.contains(&self.logging.level.as_str()) {
             return Err(crate::error::Error::Config(format!(
-                "无效的日志级别: {}，有效值: {:?}",
+                "Invalid log level: {}, valid values: {:?}",
                 self.logging.level, valid_levels
             )));
         }
 
-        // 验证性能配置
+        // Validate performance configuration
         if self.performance.http_client_pool_size == 0 {
             return Err(crate::error::Error::Config(
-                "HTTP客户端连接池大小不能为0".to_string(),
+                "HTTP client connection pool size cannot be 0".to_string(),
             ));
         }
 
         if self.performance.cache_max_size == 0 {
             return Err(crate::error::Error::Config(
-                "缓存最大大小不能为0".to_string(),
+                "Maximum cache size cannot be 0".to_string(),
             ));
         }
 
-        // 验证 OAuth 配置
+        // Validate OAuth configuration
         if self.server.enable_oauth {
             self.oauth.validate()?;
         }
@@ -248,15 +248,15 @@ impl AppConfig {
         Ok(())
     }
 
-    /// 从环境变量加载配置
+    /// Load configuration from environment variables
     ///
     /// # Errors
     ///
-    /// 如果环境变量格式无效或配置验证失败，返回错误
+    /// Returns an error if environment variable format is invalid or configuration validation fails
     pub fn from_env() -> Result<Self, crate::error::Error> {
         let mut config = Self::default();
 
-        // 从环境变量覆盖配置
+        // Override configuration from environment variables
         if let Ok(name) = std::env::var("CRATES_DOCS_NAME") {
             config.server.name = name;
         }
@@ -268,7 +268,7 @@ impl AppConfig {
         if let Ok(port) = std::env::var("CRATES_DOCS_PORT") {
             config.server.port = port
                 .parse()
-                .map_err(|e| crate::error::Error::Config(format!("无效的端口: {e}")))?;
+                .map_err(|e| crate::error::Error::Config(format!("Invalid port: {e}")))?;
         }
 
         if let Ok(mode) = std::env::var("CRATES_DOCS_TRANSPORT_MODE") {
@@ -283,19 +283,19 @@ impl AppConfig {
         Ok(config)
     }
 
-    /// 合并配置（环境变量优先于文件配置）
+    /// Merge configuration (environment variables take precedence over file configuration)
     #[must_use]
     pub fn merge(file_config: Option<Self>, env_config: Option<Self>) -> Self {
         let mut config = Self::default();
 
-        // 首先应用文件配置
+        // First apply file configuration
         if let Some(file) = file_config {
             config = file;
         }
 
-        // 然后应用环境变量配置（覆盖文件配置）
+        // Then apply environment variable configuration (overrides file configuration)
         if let Some(env) = env_config {
-            // 合并服务器配置
+            // Merge server configuration
             if env.server.name != "crates-docs" {
                 config.server.name = env.server.name;
             }
@@ -309,7 +309,7 @@ impl AppConfig {
                 config.server.transport_mode = env.server.transport_mode;
             }
 
-            // 合并日志配置
+            // Merge logging configuration
             if env.logging.level != "info" {
                 config.logging.level = env.logging.level;
             }

@@ -1,6 +1,6 @@
-//! 缓存模块
+//! Cache module
 //!
-//! 提供内存缓存和 Redis 缓存支持。
+//! Provides memory cache and Redis cache support.
 
 #[cfg(feature = "cache-memory")]
 pub mod memory;
@@ -10,38 +10,38 @@ pub mod redis;
 
 use std::time::Duration;
 
-/// 缓存 trait
+/// Cache trait
 #[async_trait::async_trait]
 pub trait Cache: Send + Sync {
-    /// 获取缓存值
+    /// Get cache value
     async fn get(&self, key: &str) -> Option<String>;
 
-    /// 设置缓存值
+    /// Set cache value
     async fn set(&self, key: String, value: String, ttl: Option<Duration>);
 
-    /// 删除缓存值
+    /// Delete cache value
     async fn delete(&self, key: &str);
 
-    /// 清空缓存
+    /// Clear cache
     async fn clear(&self);
 
-    /// 检查键是否存在
+    /// Check if key exists
     async fn exists(&self, key: &str) -> bool;
 }
 
-/// 缓存配置
+/// Cache configuration
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct CacheConfig {
-    /// 缓存类型：memory 或 redis
+    /// Cache type: memory or redis
     pub cache_type: String,
 
-    /// 内存缓存大小（条目数）
+    /// Memory cache size (number of entries)
     pub memory_size: Option<usize>,
 
-    /// Redis 连接 URL
+    /// Redis connection URL
     pub redis_url: Option<String>,
 
-    /// 默认 TTL（秒）
+    /// Default TTL (seconds)
     pub default_ttl: Option<u64>,
 }
 
@@ -51,16 +51,16 @@ impl Default for CacheConfig {
             cache_type: "memory".to_string(),
             memory_size: Some(1000),
             redis_url: None,
-            default_ttl: Some(3600), // 1小时
+            default_ttl: Some(3600), // 1 hour
         }
     }
 }
 
-/// 创建缓存实例
+/// Create cache instance
 ///
 /// # Errors
 ///
-/// 如果缓存类型不支持或配置无效，返回错误
+/// Returns an error if cache type is not supported or configuration is invalid
 pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error::Error> {
     match config.cache_type.as_str() {
         "memory" => {
@@ -79,8 +79,8 @@ pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error
         "redis" => {
             #[cfg(feature = "cache-redis")]
             {
-                // 注意：Redis 缓存需要异步初始化，这里返回一个占位符
-                // 在实际使用中，应该使用 create_cache_async 函数
+                // Note: Redis cache requires async initialization, this returns a placeholder
+                // In practice, use the create_cache_async function
                 Err(crate::error::Error::Config(
                     "Redis cache requires async initialization. Use create_cache_async instead."
                         .to_string(),
@@ -100,11 +100,11 @@ pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error
     }
 }
 
-/// 异步创建缓存实例
+/// Create cache instance asynchronously
 ///
 /// # Errors
 ///
-/// 如果缓存类型不支持或配置无效，返回错误
+/// Returns an error if cache type is not supported or configuration is invalid
 #[cfg(feature = "cache-redis")]
 pub async fn create_cache_async(
     config: &CacheConfig,
