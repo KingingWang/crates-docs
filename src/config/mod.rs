@@ -60,6 +60,13 @@ pub struct ServerConfig {
 
     /// Response timeout (seconds)
     pub response_timeout_secs: u64,
+
+    /// Allowed hosts for CORS (e.g., `["localhost", "127.0.0.1"]`)
+    pub allowed_hosts: Vec<String>,
+
+    /// Allowed origins for CORS (e.g., `["http://localhost:*"]`)
+    /// Use `"*"` only in development, specify exact origins in production
+    pub allowed_origins: Vec<String>,
 }
 
 /// Logging configuration
@@ -122,6 +129,9 @@ impl Default for ServerConfig {
             max_connections: 100,
             request_timeout_secs: 30,
             response_timeout_secs: 60,
+            // Secure defaults: only allow localhost by default
+            allowed_hosts: vec!["localhost".to_string(), "127.0.0.1".to_string()],
+            allowed_origins: vec!["http://localhost:*".to_string()],
         }
     }
 }

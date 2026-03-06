@@ -380,6 +380,8 @@ async fn load_config(
         max_connections: config.server.max_connections,
         request_timeout_secs: config.server.request_timeout_secs,
         response_timeout_secs: config.server.response_timeout_secs,
+        allowed_hosts: config.server.allowed_hosts,
+        allowed_origins: config.server.allowed_origins,
         cache: config.cache,
         oauth: config.oauth,
         logging: config.logging,

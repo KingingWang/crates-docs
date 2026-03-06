@@ -55,7 +55,7 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
-    // Create Hyper server options
+    // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
         host: config.host.clone(),
         port: config.port,
@@ -64,12 +64,8 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
-        allowed_hosts: Some(vec![
-            "localhost".to_string(),
-            "127.0.0.1".to_string(),
-            "0.0.0.0".to_string(),
-        ]),
-        allowed_origins: Some(vec!["*".to_string()]),
+        allowed_hosts: Some(config.allowed_hosts.clone()),
+        allowed_origins: Some(config.allowed_origins.clone()),
         ..Default::default()
     };
 
@@ -102,7 +98,7 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
-    // Create Hyper server options with SSE support enabled
+    // Create Hyper server options with SSE support and security settings from config
     let options = HyperServerOptions {
         host: config.host.clone(),
         port: config.port,
@@ -111,12 +107,8 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
-        allowed_hosts: Some(vec![
-            "localhost".to_string(),
-            "127.0.0.1".to_string(),
-            "0.0.0.0".to_string(),
-        ]),
-        allowed_origins: Some(vec!["*".to_string()]),
+        allowed_hosts: Some(config.allowed_hosts.clone()),
+        allowed_origins: Some(config.allowed_origins.clone()),
         ..Default::default()
     };
 
@@ -149,7 +141,7 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
-    // Create Hyper server options with SSE support enabled
+    // Create Hyper server options with SSE support and security settings from config
     let options = HyperServerOptions {
         host: config.host.clone(),
         port: config.port,
@@ -158,12 +150,8 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
-        allowed_hosts: Some(vec![
-            "localhost".to_string(),
-            "127.0.0.1".to_string(),
-            "0.0.0.0".to_string(),
-        ]),
-        allowed_origins: Some(vec!["*".to_string()]),
+        allowed_hosts: Some(config.allowed_hosts.clone()),
+        allowed_origins: Some(config.allowed_origins.clone()),
         ..Default::default()
     };
 

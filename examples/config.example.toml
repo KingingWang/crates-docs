@@ -24,6 +24,17 @@ request_timeout_secs = 30
 # 响应超时时间（秒）
 response_timeout_secs = 60
 
+# 安全配置
+# 允许的主机列表 (Host 请求头验证)
+# 生产环境建议保持默认值或添加您的域名
+allowed_hosts = ["localhost", "127.0.0.1"]
+
+# 允许的来源列表 (CORS)
+# 开发环境可使用通配符模式，生产环境请指定具体域名
+# 示例: allowed_origins = ["https://your-domain.com"]
+# 注意: 使用 "*" 会允许所有来源，存在安全风险
+allowed_origins = ["http://localhost:*"]
+
 [cache]
 # 缓存类型: memory, redis
 cache_type = "memory"
