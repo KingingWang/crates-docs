@@ -46,6 +46,19 @@ impl MemoryCache {
         }
     }
 
+    /// Safely acquire the cache lock, handling lock poisoning gracefully.
+    ///
+    /// When a thread panics while holding the lock, the lock becomes "poisoned".
+    /// Instead of panicking, we recover the data and log a warning.
+    fn acquire_lock(&self) -> std::sync::MutexGuard<'_, lru::LruCache<String, CacheEntry>> {
+        self.cache.lock().unwrap_or_else(|poisoned| {
+            tracing::warn!(
+                "Cache lock was poisoned, recovering data. This indicates a previous panic while holding the lock."
+            );
+            poisoned.into_inner()
+        })
+    }
+
     /// Clean up expired entries
     fn cleanup_expired(cache: &mut lru::LruCache<String, CacheEntry>) {
         // Collect expired keys
@@ -70,7 +83,7 @@ impl MemoryCache {
 #[async_trait::async_trait]
 impl super::Cache for MemoryCache {
     async fn get(&self, key: &str) -> Option<String> {
-        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        let mut cache = self.acquire_lock();
 
         // First check and clean up expired entries
         Self::cleanup_expired(&mut cache);
@@ -86,7 +99,7 @@ impl super::Cache for MemoryCache {
     }
 
     async fn set(&self, key: String, value: String, ttl: Option<Duration>) {
-        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        let mut cache = self.acquire_lock();
 
         // Clean up expired entries
         Self::cleanup_expired(&mut cache);
@@ -97,17 +110,17 @@ impl super::Cache for MemoryCache {
     }
 
     async fn delete(&self, key: &str) {
-        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        let mut cache = self.acquire_lock();
         cache.pop(key);
     }
 
     async fn clear(&self) {
-        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        let mut cache = self.acquire_lock();
         cache.clear();
     }
 
     async fn exists(&self, key: &str) -> bool {
-        let mut cache = self.cache.lock().expect("cache lock poisoned");
+        let mut cache = self.acquire_lock();
         Self::cleanup_expired(&mut cache);
         cache.contains(key)
     }

@@ -1,6 +1,6 @@
 [package]
 name = "crates-docs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "高性能 Rust crate 文档查询 MCP 服务器，支持 Stdio/HTTP/SSE 传输和 OAuth 认证"
 authors = ["KingingWang <KingingWang@foxmail.com>"]
@@ -34,7 +34,7 @@ rust-mcp-extra = { version = "0.2.3", optional = true }
 
 # HTTP 客户端
 reqwest = { version = "0.13", features = ["json"] }
-tokio = { version = "1.40", features = ["full"] }
+tokio = { version = "1.50", features = ["full"] }
 
 # 序列化和配置
 serde = { version = "1.0", features = ["derive"] }
@@ -46,7 +46,7 @@ thiserror = "2.0"
 # 缓存系统
 moka = { version = "0.12", optional = true, features = ["sync"] }
 redis = { version = "1.0", optional = true, features = ["tokio-comp"] }
-lru = "0.12"
+lru = "0.16"
 
 # 日志
 tracing = "0.1"
@@ -73,7 +73,8 @@ chrono = "0.4"
 tokio = { version = "1.40", features = ["full", "test-util"] }
 reqwest = { version = "0.13", features = ["json"] }
 serde_json = "1.0"
-tempfile = "3.10"
+tempfile = "3.26"
+temp-env = "0.3"
 
 [[bin]]
 name = "crates-docs"

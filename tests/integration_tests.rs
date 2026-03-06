@@ -74,25 +74,22 @@ fn test_config_loading() {
     let validation_result = config.validate();
     assert!(validation_result.is_ok());
 
-    // 测试环境变量配置 - 使用 unsafe 块
-    unsafe {
-        std::env::set_var("CRATES_DOCS_HOST", "127.0.0.1");
-        std::env::set_var("CRATES_DOCS_PORT", "9090");
-    }
+    // 测试环境变量配置 - 使用 temp-env 安全地设置临时环境变量
+    temp_env::with_vars(
+        [
+            ("CRATES_DOCS_HOST", Some("127.0.0.1")),
+            ("CRATES_DOCS_PORT", Some("9090")),
+        ],
+        || {
+            let env_config = AppConfig::from_env();
+            assert!(env_config.is_ok());
 
-    let env_config = AppConfig::from_env();
-    assert!(env_config.is_ok());
-
-    // 验证环境变量是否生效
-    let config = env_config.unwrap();
-    assert_eq!(config.server.host, "127.0.0.1");
-    assert_eq!(config.server.port, 9090);
-
-    // 清理环境变量 - 使用 unsafe 块
-    unsafe {
-        std::env::remove_var("CRATES_DOCS_HOST");
-        std::env::remove_var("CRATES_DOCS_PORT");
-    }
+            // 验证环境变量是否生效
+            let config = env_config.unwrap();
+            assert_eq!(config.server.host, "127.0.0.1");
+            assert_eq!(config.server.port, 9090);
+        },
+    );
 }
 
 /// 测试工具注册表
