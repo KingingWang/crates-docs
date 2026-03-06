@@ -136,7 +136,7 @@ fn test_server_creation() {
     // 测试服务器信息
     let server_info = server.server_info();
     assert_eq!(server_info.server_info.name, "crates-docs");
-    assert_eq!(server_info.server_info.version, "0.1.0");
+    assert_eq!(server_info.server_info.version, env!("CARGO_PKG_VERSION"));
 
     // 测试工具列表 - 注意：ServerCapabilitiesTools 结构体可能没有 is_empty 方法
     // 我们只检查 capabilities.tools 是否存在
