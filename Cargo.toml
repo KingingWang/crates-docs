@@ -1,13 +1,13 @@
 [package]
 name = "crates-docs"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "高性能 Rust crate 文档查询 MCP 服务器，支持 Stdio/HTTP/SSE 传输和 OAuth 认证"
 authors = ["KingingWang <KingingWang@foxmail.com>"]
 license = "MIT"
 repository = "https://github.com/KingingWang/crates-docs"
 readme = "README.md"
-keywords = ["mcp", "rust", "docs", "documentation", "crates", "server"]
+keywords = ["mcp", "docs", "documentation", "crates", "server"]
 categories = ["api-bindings", "web-programming", "network-programming"]
 
 [features]
