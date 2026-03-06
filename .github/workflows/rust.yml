@@ -357,3 +357,107 @@ jobs:
           ${{ secrets.DOCKER_USERNAME }}/crates-docs:${{ steps.version.outputs.version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+  # 二进制文件发布到 GitHub Release
+  release:
+    name: Build and Release Binaries
+    runs-on: ${{ matrix.os }}
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [check, security, test, docs]
+    
+    permissions:
+      contents: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: false
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: false
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-13
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+    
+    - name: Cache cargo
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+    
+    - name: Install cross
+      if: matrix.cross
+      run: cargo install cross --git https://github.com/cross-rs/cross
+    
+    - name: Install musl tools (Linux musl)
+      if: endsWith(matrix.target, '-musl')
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools
+    
+    - name: Build binary (native)
+      if: ${{ !matrix.cross }}
+      run: cargo build --release --target ${{ matrix.target }}
+    
+    - name: Build binary (cross)
+      if: matrix.cross
+      run: cross build --release --target ${{ matrix.target }}
+    
+    - name: Extract version
+      id: version
+      shell: bash
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Tag version: $VERSION"
+    
+    - name: Prepare binary (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        BINARY_NAME="crates-docs-v${{ steps.version.outputs.version }}-${{ matrix.target }}"
+        mv target/${{ matrix.target }}/release/crates-docs "$BINARY_NAME"
+        chmod +x "$BINARY_NAME"
+        echo "binary_name=$BINARY_NAME" >> $GITHUB_OUTPUT
+    
+    - name: Prepare binary (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        BINARY_NAME="crates-docs-v${{ steps.version.outputs.version }}-${{ matrix.target }}.exe"
+        mv target/${{ matrix.target }}/release/crates-docs.exe "$BINARY_NAME"
+        echo "binary_name=$BINARY_NAME" >> $GITHUB_OUTPUT
+    
+    - name: Upload release asset
+      uses: softprops/action-gh-release@v2
+      with:
+        files: crates-docs-v${{ steps.version.outputs.version }}-${{ matrix.target }}*
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
