@@ -585,7 +585,7 @@ docker compose up -d
 ### MCP 端点
 
 - `POST /mcp` - MCP Streamable HTTP 端点
-- `GET /mcp/sse` - MCP SSE 端点
+- `GET /sse` - MCP SSE 端点
 
 ## 故障排除
 

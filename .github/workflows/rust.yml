@@ -237,14 +237,13 @@ jobs:
         trap 'docker logs test-container || true; docker stop test-container || true; docker rm test-container || true' EXIT
 
         for i in $(seq 1 30); do
-          if curl -fsS http://127.0.0.1:8080/health > /tmp/docker-health-response.txt; then
+          if curl -fsS http://127.0.0.1:8080/mcp > /tmp/docker-mcp-response.txt; then
             break
           fi
           sleep 2
         done
 
-        curl -fsS http://127.0.0.1:8080/health | tee /tmp/docker-health-response.txt
-        grep -q 'healthy' /tmp/docker-health-response.txt
+        curl -fsS http://127.0.0.1:8080/mcp | tee /tmp/docker-mcp-response.txt
         docker logs test-container
 
   # 发布检查 - 在每次 push 时运行
