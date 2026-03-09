@@ -60,8 +60,15 @@ cargo build --release
 # 构建 Docker 镜像
 docker build -t crates-docs .
 
-# 运行容器
+# 运行容器（默认读取容器内 /app/config.toml，并监听 0.0.0.0:8080）
 docker run -p 8080:8080 crates-docs
+
+# 使用宿主机配置文件覆盖默认配置
+# 注意：容器内固定使用 /app/config.toml
+# 如需自定义，请挂载到该路径
+docker run -p 8080:8080 \
+  -v $(pwd)/examples/config.example.toml:/app/config.toml:ro \
+  crates-docs
 ```
 
 #### 从 crates.io 安装（发布后）
@@ -536,9 +543,15 @@ services:
     build: .
     ports:
       - "8080:8080"
+    environment:
+      CRATES_DOCS_HOST: 0.0.0.0
+      CRATES_DOCS_PORT: 8080
+      CRATES_DOCS_TRANSPORT_MODE: hybrid
     volumes:
-      - ./config.toml:/app/config.toml
-  
+      - ./config.toml:/app/config.toml:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+
   redis:
     image: redis:7-alpine
     ports:
@@ -548,7 +561,7 @@ services:
 启动服务：
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ## API 端点

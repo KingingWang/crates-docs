@@ -7,11 +7,14 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./examples/config.example.toml:/app/config.toml
+      - ./examples/config.example.toml:/app/config.toml:ro
       - ./logs:/app/logs
       - ./data:/app/data
     environment:
-      - RUST_LOG=info
+      RUST_LOG: info
+      CRATES_DOCS_HOST: 0.0.0.0
+      CRATES_DOCS_PORT: 8080
+      CRATES_DOCS_TRANSPORT_MODE: hybrid
     restart: unless-stopped
     networks:
       - crates-docs-network

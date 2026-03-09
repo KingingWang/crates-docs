@@ -35,8 +35,8 @@ WORKDIR /app
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/target/release/crates-docs /app/crates-docs
 
-# 复制配置文件示例
-COPY examples/config.example.toml /app/config.example.toml
+# 复制默认运行配置
+COPY examples/config.example.toml /app/config.toml
 
 # 创建日志和数据目录
 RUN mkdir -p /app/logs /app/data && chown -R appuser:appuser /app
@@ -49,6 +49,9 @@ EXPOSE 8080
 
 # 设置环境变量
 ENV RUST_LOG=info
+ENV CRATES_DOCS_HOST=0.0.0.0
+ENV CRATES_DOCS_PORT=8080
+ENV CRATES_DOCS_TRANSPORT_MODE=hybrid
 
-# 启动命令（默认使用配置文件）
-CMD ["/app/crates-docs", "serve", "--config", "/app/config.example.toml"]
+# 启动命令（默认使用容器内标准配置路径）
+CMD ["/app/crates-docs", "serve", "--config", "/app/config.toml"]

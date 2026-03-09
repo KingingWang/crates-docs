@@ -8,7 +8,8 @@ version = "0.1.0"
 # 服务器描述
 description = "高性能 Rust crate 文档查询 MCP 服务器"
 # 监听主机
-host = "127.0.0.1"
+# 容器部署时建议使用 0.0.0.0，对外暴露服务；本地仅自用可改回 127.0.0.1
+host = "0.0.0.0"
 # 监听端口
 port = 8080
 # 传输模式: stdio, http, sse, hybrid
@@ -26,8 +27,8 @@ response_timeout_secs = 60
 
 # 安全配置
 # 允许的主机列表 (Host 请求头验证)
-# 生产环境建议保持默认值或添加您的域名
-allowed_hosts = ["localhost", "127.0.0.1"]
+# 容器/反向代理部署时请按需补充实际域名或服务名
+allowed_hosts = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 # 允许的来源列表 (CORS)
 # 开发环境可使用通配符模式，生产环境请指定具体域名
