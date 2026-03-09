@@ -234,10 +234,18 @@ jobs:
     - name: Test Docker image
       run: |
         docker run -d --name test-container -p 8080:8080 crates-docs:test
-        sleep 5
+        trap 'docker logs test-container || true; docker stop test-container || true; docker rm test-container || true' EXIT
+
+        for i in $(seq 1 30); do
+          if curl -fsS http://127.0.0.1:8080/health > /tmp/docker-health-response.txt; then
+            break
+          fi
+          sleep 2
+        done
+
+        curl -fsS http://127.0.0.1:8080/health | tee /tmp/docker-health-response.txt
+        grep -q 'healthy' /tmp/docker-health-response.txt
         docker logs test-container
-        docker stop test-container
-        docker rm test-container
 
   # 发布检查 - 在每次 push 时运行
   publish-check:
@@ -346,12 +354,30 @@ jobs:
         VERSION=${GITHUB_REF#refs/tags/v}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Tag version: $VERSION"
+
+    - name: Verify version matches Cargo.toml
+      run: |
+        CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+        TAG_VERSION="${{ steps.version.outputs.version }}"
+
+        echo "Cargo.toml version: $CARGO_VERSION"
+        echo "Tag version: $TAG_VERSION"
+
+        if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+          echo "Error: Version mismatch!"
+          echo "  Cargo.toml version: $CARGO_VERSION"
+          echo "  Tag version: $TAG_VERSION"
+          exit 1
+        fi
+
+        echo "Version check passed!"
         
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
+        platforms: linux/amd64,linux/arm64
         tags: |
           ${{ secrets.DOCKER_USERNAME }}/crates-docs:latest
           ${{ secrets.DOCKER_USERNAME }}/crates-docs:${{ steps.version.outputs.version }}
