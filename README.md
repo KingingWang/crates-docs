@@ -369,6 +369,8 @@ cargo run -- health --verbose
 cargo run -- health --check-type external
 ```
 
+> 注意：当前 [`health`](src/main.rs:599) CLI 子命令仍是占位实现，主要用于命令结构演示；真正的健康检查能力目前在 MCP 工具 [`health_check`](src/tools/health.rs:12) 中实现。
+
 ## 配置
 
 ### 配置文件示例
@@ -378,9 +380,9 @@ cargo run -- health --check-type external
 ```toml
 [server]
 name = "crates-docs"
-version = "0.1.0"
+version = "0.1.5"
 description = "高性能 Rust crate 文档查询 MCP 服务器"
-host = "127.0.0.1"
+host = "0.0.0.0"
 port = 8080
 transport_mode = "hybrid"
 enable_sse = true
@@ -388,20 +390,22 @@ enable_oauth = false
 max_connections = 100
 request_timeout_secs = 30
 response_timeout_secs = 60
+allowed_hosts = ["localhost", "127.0.0.1", "0.0.0.0"]
+allowed_origins = ["http://localhost:*"]
 
 [cache]
 cache_type = "memory"  # 或 "redis"
-memory_size = 1000     # 内存缓存条目数（使用 LRU 淘汰策略）
-redis_url = "redis://localhost:6379"
-default_ttl = 3600     # 默认缓存时间（秒）
+memory_size = 1000
+# redis_url = "redis://localhost:6379"
+default_ttl = 3600
 
 [oauth]
 enabled = false
-client_id = ""
-client_secret = ""
-redirect_uri = ""
-authorization_endpoint = ""
-token_endpoint = ""
+# client_id = "your-client-id"
+# client_secret = "your-client-secret"
+# redirect_uri = "http://localhost:8080/oauth/callback"
+# authorization_endpoint = "https://provider.com/oauth/authorize"
+# token_endpoint = "https://provider.com/oauth/token"
 scopes = ["openid", "profile", "email"]
 provider = "Custom"
 
@@ -570,27 +574,13 @@ docker compose up -d
 
 ### 健康检查
 
-```bash
-GET /health
-```
+当前 README 中曾使用 `GET /health` 作为示意，但从现有代码看，项目已明确实现并可确认的网络端点主要是 MCP 传输端点，而不是独立的 HTTP 健康检查路由。也就是说：
 
-响应：
+- CLI 健康检查命令见 [`health_command()`](src/main.rs:599)
+- MCP 工具健康检查实现见 [`health_check`](src/tools/health.rs:12)
+- HTTP/SSE 服务端点由传输层启动，见 [`run_http_server()`](src/server/transport.rs:47)、[`run_sse_server()`](src/server/transport.rs:90)、[`run_hybrid_server()`](src/server/transport.rs:133)
 
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "checks": [
-    {
-      "name": "docs.rs",
-      "status": "healthy",
-      "duration_ms": 123,
-      "message": "服务正常"
-    }
-  ],
-  "uptime": "1h 30m 15s"
-}
-```
+因此，这里更准确的 API 描述应聚焦 MCP 端点：
 
 ### MCP 端点
 
