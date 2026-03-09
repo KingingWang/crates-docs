@@ -40,6 +40,8 @@
 ## 快速开始
 
 ### 安装
+#### 下载二进制文件
+从github release中获取二进制文件
 
 #### 从源码构建
 
@@ -71,7 +73,7 @@ docker run -p 8080:8080 \
   crates-docs
 ```
 
-#### 从 crates.io 安装（发布后）
+#### 从 crates.io 安装
 
 ```bash
 cargo install crates-docs
