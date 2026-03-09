@@ -1,6 +1,6 @@
 [package]
 name = "crates-docs"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 description = "高性能 Rust crate 文档查询 MCP 服务器，支持 Stdio/HTTP/SSE 传输和 OAuth 认证"
 authors = ["KingingWang <KingingWang@foxmail.com>"]
