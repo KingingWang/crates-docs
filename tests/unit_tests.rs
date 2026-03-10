@@ -1010,7 +1010,7 @@ fn test_logging_config_default() {
 
     let config = LoggingConfig::default();
     assert!(config.enable_console);
-    assert!(config.enable_file);
+    assert!(!config.enable_file);  // 默认禁用文件日志
     assert_eq!(config.level, "info");
 }
 
