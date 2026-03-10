@@ -380,7 +380,7 @@ cargo run -- health --check-type external
 ```toml
 [server]
 name = "crates-docs"
-version = "0.1.5"
+version = "0.1.6"
 description = "高性能 Rust crate 文档查询 MCP 服务器"
 host = "0.0.0.0"
 port = 8080

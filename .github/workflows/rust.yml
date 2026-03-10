@@ -237,13 +237,14 @@ jobs:
         trap 'docker logs test-container || true; docker stop test-container || true; docker rm test-container || true' EXIT
 
         for i in $(seq 1 30); do
-          if curl -fsS http://127.0.0.1:8080/mcp > /tmp/docker-mcp-response.txt; then
+          if curl -fsSI http://127.0.0.1:8080/mcp > /tmp/docker-mcp-headers.txt; then
             break
           fi
           sleep 2
         done
 
-        curl -fsS http://127.0.0.1:8080/mcp | tee /tmp/docker-mcp-response.txt
+        curl -fsSI http://127.0.0.1:8080/mcp | tee /tmp/docker-mcp-headers.txt
+        grep -Eq '^HTTP/[0-9.]+ (200|204|400|405|406)' /tmp/docker-mcp-headers.txt
         docker logs test-container
 
   # 发布检查 - 在每次 push 时运行
