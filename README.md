@@ -123,6 +123,26 @@ crates-docs serve
 }
 ```
 
+### Cherry Studio
+
+1. 打开 Cherry Studio 设置
+2. 找到 `MCP 服务器` 选项
+3. 点击 `添加服务器`
+4. 填写参数：
+
+| 字段 | 值 |
+|------|------|
+| 名称 | `crates-docs` |
+| 类型 | `STDIO` |
+| 命令 | `/path/to/crates-docs` |
+| 参数1 | `serve --mode stdio` |
+| 参数2 | `--mode` |
+| 参数3 | `stdio` |
+
+5. 点击保存
+
+> **注意**：将 `/path/to/crates-docs` 替换为实际的可执行文件路径。
+
 ### HTTP 模式
 
 适合远程访问或网络服务：
@@ -261,8 +281,11 @@ default_ttl = 3600
 
 [logging]
 level = "info"
-file_path = "./logs/crates-docs.log"
+enable_console = true
+enable_file = false  # 默认仅控制台输出
 ```
+
+> **启用文件日志**：设置 `enable_file = true` 并配置 `file_path` 可写入日志文件。
 
 ### 环境变量
 
@@ -270,7 +293,14 @@ file_path = "./logs/crates-docs.log"
 export CRATES_DOCS_HOST="0.0.0.0"
 export CRATES_DOCS_PORT="8080"
 export CRATES_DOCS_TRANSPORT_MODE="hybrid"
+
+# 日志配置（默认仅控制台输出）
+export CRATES_DOCS_LOG_LEVEL="info"
+export CRATES_DOCS_ENABLE_CONSOLE="true"
+export CRATES_DOCS_ENABLE_FILE="true"  # 启用文件日志（需可写文件系统）
 ```
+
+> **文件日志**：默认禁用。设置 `CRATES_DOCS_ENABLE_FILE=true` 并配置 `file_path` 可写入日志文件。
 
 ## 传输协议
 

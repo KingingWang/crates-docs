@@ -142,7 +142,7 @@ impl Default for LoggingConfig {
             level: "info".to_string(),
             file_path: Some("./logs/crates-docs.log".to_string()),
             enable_console: true,
-            enable_file: true,
+            enable_file: false, // 默认仅输出到控制台
             max_file_size_mb: 100,
             max_files: 10,
         }
@@ -297,6 +297,14 @@ impl AppConfig {
 
         if let Ok(level) = std::env::var("CRATES_DOCS_LOG_LEVEL") {
             config.logging.level = level;
+        }
+
+        if let Ok(enable_console) = std::env::var("CRATES_DOCS_ENABLE_CONSOLE") {
+            config.logging.enable_console = enable_console.parse().unwrap_or(true);
+        }
+
+        if let Ok(enable_file) = std::env::var("CRATES_DOCS_ENABLE_FILE") {
+            config.logging.enable_file = enable_file.parse().unwrap_or(true);
         }
 
         config.validate()?;
