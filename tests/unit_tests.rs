@@ -1279,3 +1279,415 @@ fn test_name_constant() {
     let name = crates_docs::NAME;
     assert_eq!(name, "crates-docs");
 }
+
+// ============================================================================
+// 额外覆盖率测试
+// ============================================================================
+
+#[test]
+fn test_cache_config_default_values() {
+    let config = crates_docs::cache::CacheConfig::default();
+    assert_eq!(config.cache_type, "memory");
+    assert_eq!(config.memory_size, Some(1000));
+    assert_eq!(config.default_ttl, Some(3600));
+    assert!(config.redis_url.is_none());
+}
+
+#[test]
+fn test_config_from_file_invalid_toml() {
+    use crates_docs::config::AppConfig;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bad.toml");
+    std::fs::write(&path, "this = [invalid toml").unwrap();
+
+    let result = AppConfig::from_file(&path);
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Failed to parse config file"));
+}
+
+#[test]
+fn test_config_from_file_missing_file() {
+    use crates_docs::config::AppConfig;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("missing.toml");
+    let result = AppConfig::from_file(&path);
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Failed to read config file"));
+}
+
+#[test]
+fn test_config_save_to_file_nested_directory() {
+    use crates_docs::config::AppConfig;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("nested/config/app.toml");
+    let config = AppConfig::default();
+
+    config.save_to_file(&path).unwrap();
+    assert!(path.exists());
+
+    let loaded = AppConfig::from_file(&path).unwrap();
+    assert_eq!(loaded.server.host, config.server.host);
+    assert_eq!(loaded.server.port, config.server.port);
+}
+
+#[test]
+fn test_config_validate_with_oauth_enabled_and_invalid_oauth() {
+    let mut config = crates_docs::config::AppConfig::default();
+    config.server.enable_oauth = true;
+    config.oauth.enabled = true;
+    config.oauth.client_id = None;
+    config.oauth.client_secret = Some("secret".to_string());
+    config.oauth.redirect_uri = Some("http://localhost/callback".to_string());
+    config.oauth.authorization_endpoint = Some("https://example.com/auth".to_string());
+    config.oauth.token_endpoint = Some("https://example.com/token".to_string());
+
+    let result = config.validate();
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("client_id is required"));
+}
+
+#[test]
+fn test_config_from_env_invalid_port() {
+    use crates_docs::config::AppConfig;
+
+    temp_env::with_vars([("CRATES_DOCS_PORT", Some("not-a-number"))], || {
+        let result = AppConfig::from_env();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid port"));
+    });
+}
+
+#[test]
+fn test_config_from_env_overrides_additional_fields() {
+    use crates_docs::config::AppConfig;
+
+    temp_env::with_vars(
+        [
+            ("CRATES_DOCS_NAME", Some("custom-server")),
+            ("CRATES_DOCS_HOST", Some("0.0.0.0")),
+            ("CRATES_DOCS_PORT", Some("9000")),
+            ("CRATES_DOCS_TRANSPORT_MODE", Some("http")),
+            ("CRATES_DOCS_LOG_LEVEL", Some("debug")),
+            ("CRATES_DOCS_ENABLE_CONSOLE", Some("false")),
+            ("CRATES_DOCS_ENABLE_FILE", Some("false")),
+        ],
+        || {
+            let config = AppConfig::from_env().unwrap();
+            assert_eq!(config.server.name, "custom-server");
+            assert_eq!(config.server.host, "0.0.0.0");
+            assert_eq!(config.server.port, 9000);
+            assert_eq!(config.server.transport_mode, "http");
+            assert_eq!(config.logging.level, "debug");
+            assert!(!config.logging.enable_console);
+            assert!(!config.logging.enable_file);
+        },
+    );
+}
+
+#[test]
+fn test_config_merge_env_overrides_file() {
+    use crates_docs::config::AppConfig;
+
+    let mut file = AppConfig::default();
+    file.server.name = "file-server".to_string();
+    file.server.host = "10.0.0.1".to_string();
+    file.server.port = 7000;
+    file.server.transport_mode = "sse".to_string();
+    file.logging.level = "warn".to_string();
+
+    let mut env = AppConfig::default();
+    env.server.name = "env-server".to_string();
+    env.server.host = "0.0.0.0".to_string();
+    env.server.port = 9000;
+    env.server.transport_mode = "http".to_string();
+    env.logging.level = "debug".to_string();
+
+    let merged = AppConfig::merge(Some(file), Some(env));
+    assert_eq!(merged.server.name, "env-server");
+    assert_eq!(merged.server.host, "0.0.0.0");
+    assert_eq!(merged.server.port, 9000);
+    assert_eq!(merged.server.transport_mode, "http");
+    assert_eq!(merged.logging.level, "debug");
+}
+
+#[test]
+fn test_oauth_config_validate_missing_redirect_uri() {
+    use crates_docs::server::auth::{OAuthConfig, OAuthProvider};
+
+    let config = OAuthConfig {
+        enabled: true,
+        client_id: Some("client_id".to_string()),
+        client_secret: Some("secret".to_string()),
+        redirect_uri: None,
+        authorization_endpoint: Some("https://example.com/auth".to_string()),
+        token_endpoint: Some("https://example.com/token".to_string()),
+        scopes: vec![],
+        provider: OAuthProvider::Custom,
+    };
+
+    let result = config.validate();
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("redirect_uri is required"));
+}
+
+#[test]
+fn test_oauth_config_validate_invalid_urls() {
+    use crates_docs::server::auth::{OAuthConfig, OAuthProvider};
+
+    let mut config = OAuthConfig {
+        enabled: true,
+        client_id: Some("client_id".to_string()),
+        client_secret: Some("secret".to_string()),
+        redirect_uri: Some("not-a-url".to_string()),
+        authorization_endpoint: Some("https://example.com/auth".to_string()),
+        token_endpoint: Some("https://example.com/token".to_string()),
+        scopes: vec![],
+        provider: OAuthProvider::Custom,
+    };
+    assert!(config
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid redirect_uri"));
+
+    config.redirect_uri = Some("http://localhost/callback".to_string());
+    config.authorization_endpoint = Some("bad-url".to_string());
+    assert!(config
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid authorization_endpoint"));
+
+    config.authorization_endpoint = Some("https://example.com/auth".to_string());
+    config.token_endpoint = Some("bad-url".to_string());
+    assert!(config
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid token_endpoint"));
+}
+
+#[test]
+fn test_auth_manager_new_and_accessors() {
+    use crates_docs::server::auth::{AuthManager, OAuthConfig};
+
+    let disabled = OAuthConfig::default();
+    let manager = AuthManager::new(disabled.clone()).unwrap();
+    assert!(!manager.is_enabled());
+    assert_eq!(manager.config().enabled, disabled.enabled);
+
+    let enabled = OAuthConfig::github(
+        "client".to_string(),
+        "secret".to_string(),
+        "http://localhost/callback".to_string(),
+    );
+    let manager = AuthManager::new(enabled.clone()).unwrap();
+    assert!(manager.is_enabled());
+    assert_eq!(manager.config().client_id, enabled.client_id);
+}
+
+#[test]
+fn test_oauth_to_mcp_config_without_feature() {
+    let config = crates_docs::server::auth::OAuthConfig::default();
+    let result = config.to_mcp_config();
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("OAuth feature is not enabled"));
+}
+
+#[test]
+fn test_doc_service_accessors_and_default() {
+    use crates_docs::cache::{create_cache, CacheConfig};
+    use crates_docs::tools::docs::DocService;
+    use std::sync::Arc;
+
+    let cache = create_cache(&CacheConfig::default()).unwrap();
+    let cache: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
+    let service = DocService::new(cache.clone());
+
+    let _client = service.client();
+    assert!(Arc::ptr_eq(service.cache(), &cache));
+    let _doc_cache = service.doc_cache();
+
+    let default_service = DocService::default();
+    let _ = default_service.client();
+    let _ = default_service.cache();
+    let _ = default_service.doc_cache();
+}
+
+#[test]
+fn test_tool_registry_default_and_unknown_tool() {
+    use crates_docs::tools::docs::DocService;
+    use crates_docs::tools::{create_default_registry, ToolRegistry};
+    use std::sync::Arc;
+
+    let empty_registry = ToolRegistry::default();
+    assert!(empty_registry.get_tools().is_empty());
+
+    let service = Arc::new(DocService::default());
+    let registry = create_default_registry(&service);
+    let tools = registry.get_tools();
+    assert_eq!(tools.len(), 4);
+    assert!(tools.iter().any(|t| t.name == "lookup_crate"));
+    assert!(tools.iter().any(|t| t.name == "lookup_item"));
+    assert!(tools.iter().any(|t| t.name == "search_crates"));
+    assert!(tools.iter().any(|t| t.name == "health_check"));
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let err = rt
+        .block_on(async {
+            registry
+                .execute_tool("does_not_exist", serde_json::Value::Null)
+                .await
+        })
+        .unwrap_err();
+    assert!(err.to_string().contains("does_not_exist"));
+}
+
+#[test]
+fn test_health_check_tool_invalid_arguments() {
+    use crates_docs::tools::health::HealthCheckToolImpl;
+    use crates_docs::tools::Tool;
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let tool = HealthCheckToolImpl::new();
+    let err = rt
+        .block_on(async { tool.execute(serde_json::json!({"verbose": "bad"})).await })
+        .unwrap_err();
+    assert!(err.to_string().contains("health_check"));
+}
+
+#[test]
+fn test_lookup_and_search_tools_invalid_arguments() {
+    use crates_docs::tools::docs::lookup::{LookupCrateToolImpl, LookupItemToolImpl};
+    use crates_docs::tools::docs::search::SearchCratesToolImpl;
+    use crates_docs::tools::docs::DocService;
+    use crates_docs::tools::Tool;
+    use std::sync::Arc;
+
+    let service = Arc::new(DocService::default());
+    let crate_tool = LookupCrateToolImpl::new(service.clone());
+    let item_tool = LookupItemToolImpl::new(service.clone());
+    let search_tool = SearchCratesToolImpl::new(service);
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let err = rt
+        .block_on(async { crate_tool.execute(serde_json::json!({"version": 1})).await })
+        .unwrap_err();
+    assert!(err.to_string().contains("lookup_crate"));
+
+    let err = rt
+        .block_on(async {
+            item_tool
+                .execute(serde_json::json!({"crate_name": "serde"}))
+                .await
+        })
+        .unwrap_err();
+    assert!(err.to_string().contains("lookup_item"));
+
+    let err = rt
+        .block_on(async { search_tool.execute(serde_json::json!({"limit": "x"})).await })
+        .unwrap_err();
+    assert!(err.to_string().contains("search_crates"));
+}
+
+#[test]
+fn test_server_new_async_and_accessors() {
+    use crates_docs::server::CratesDocsServer;
+
+    let config = crates_docs::ServerConfig::default();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let server = rt
+        .block_on(async { CratesDocsServer::new_async(config.clone()).await })
+        .unwrap();
+
+    assert_eq!(server.config().name, config.name);
+    assert!(server.tool_registry().get_tools().len() >= 4);
+    assert!(!server.server_info().server_info.name.is_empty());
+
+    let cache = server.cache();
+    rt.block_on(async {
+        cache
+            .set("server-cache-key".to_string(), "value".to_string(), None)
+            .await;
+        assert_eq!(
+            cache.get("server-cache-key").await,
+            Some("value".to_string())
+        );
+    });
+}
+
+#[test]
+fn test_server_info_content() {
+    let server = crates_docs::CratesDocsServer::new(crates_docs::ServerConfig::default()).unwrap();
+    let info = server.server_info();
+
+    assert_eq!(info.server_info.name, "crates-docs");
+    assert_eq!(
+        info.server_info.title.as_deref(),
+        Some("Crates Docs MCP Server")
+    );
+    assert!(info.server_info.description.is_some());
+    assert_eq!(info.server_info.icons.len(), 2);
+    assert!(info.capabilities.tools.is_some());
+    assert!(info
+        .instructions
+        .unwrap()
+        .contains("Rust crate documentation"));
+}
+
+#[test]
+fn test_http_client_builder_new_and_disable_compression() {
+    use crates_docs::utils::HttpClientBuilder;
+    use std::time::Duration;
+
+    let client = HttpClientBuilder::new()
+        .timeout(Duration::from_secs(1))
+        .connect_timeout(Duration::from_secs(1))
+        .pool_max_idle_per_host(1)
+        .user_agent("coverage-test-agent".to_string())
+        .enable_gzip(false)
+        .enable_brotli(false)
+        .build();
+
+    assert!(client.is_ok());
+}
+
+#[test]
+fn test_rate_limiter_try_acquire_exhaustion() {
+    use crates_docs::utils::RateLimiter;
+
+    let limiter = RateLimiter::new(1);
+    let permit = limiter.try_acquire();
+    assert!(permit.is_some());
+    assert!(limiter.try_acquire().is_none());
+    drop(permit);
+    assert!(limiter.try_acquire().is_some());
+}
+
+#[test]
+fn test_performance_counter_default() {
+    use crates_docs::utils::metrics::PerformanceCounter;
+
+    let counter = PerformanceCounter::default();
+    let stats = counter.get_stats();
+    assert_eq!(stats.total_requests, 0);
+    assert_eq!(stats.success_rate_percent, 0.0);
+}
