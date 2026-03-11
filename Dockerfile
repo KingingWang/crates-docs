@@ -1,11 +1,8 @@
 # 使用 Rust 官方镜像作为构建环境
-FROM rust:1.88-slim AS builder
+FROM rust:1.88-alpine AS builder
 
 # 安装构建依赖
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconfig
 
 # 创建工作目录
 WORKDIR /app
@@ -16,18 +13,15 @@ COPY src ./src
 COPY build.rs ./
 
 # 构建项目
+ENV OPENSSL_STATIC=1
 RUN cargo build --release
 
 # 使用轻量级运行时镜像
-FROM debian:bookworm-slim
+FROM alpine:latest
 
 # 安装运行时依赖
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# 创建非 root 用户
-RUN useradd -m -u 1000 -s /bin/bash appuser
+RUN apk add --no-cache ca-certificates && \
+    adduser -D -H -u 1000 -s /bin/sh appuser
 
 # 创建工作目录
 WORKDIR /app
