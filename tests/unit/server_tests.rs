@@ -1,7 +1,6 @@
 //! 服务器模块单元测试
 
 use crates_docs::server::{CratesDocsServer, ServerConfig};
-use std::sync::Arc;
 
 // ============================================================================
 // ServerConfig 测试
@@ -107,7 +106,6 @@ fn test_transport_mode_from_str() {
 #[test]
 fn test_transport_mode_display() {
     use crates_docs::server::transport::TransportMode;
-    use std::fmt::Display;
 
     assert_eq!(format!("{}", TransportMode::Stdio), "stdio");
     assert_eq!(format!("{}", TransportMode::Http), "http");

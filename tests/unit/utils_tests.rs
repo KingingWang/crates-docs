@@ -147,7 +147,7 @@ fn test_parse_number() {
     use crates_docs::utils::string::parse_number;
     // parse_number 接受字符串和默认值，返回解析结果或默认值
     assert_eq!(parse_number("42", 0), 42);
-    assert_eq!(parse_number("3.14", 0.0), 3.14);
+    assert_eq!(parse_number("2.5", 0.0), 2.5);
     // 无法解析时返回默认值
     assert_eq!(parse_number("not a number", 99), 99);
     assert_eq!(parse_number("", 99), 99);

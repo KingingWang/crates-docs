@@ -30,8 +30,7 @@ fn test_error_from_url_error() {
 
 #[test]
 fn test_error_from_boxed_error() {
-    let boxed: Box<dyn std::error::Error + Send + Sync> =
-        Box::new(io::Error::new(io::ErrorKind::Other, "test error"));
+    let boxed: Box<dyn std::error::Error + Send + Sync> = Box::new(io::Error::other("test error"));
     let err: Error = boxed.into();
     assert!(err.to_string().contains("test error"));
 }
@@ -74,7 +73,7 @@ fn test_error_variants_display() {
     let err = Error::Json(serde_json::from_str::<serde_json::Value>("bad").unwrap_err());
     assert!(!err.to_string().is_empty());
 
-    let err = Error::Io(io::Error::new(io::ErrorKind::Other, "io error"));
+    let err = Error::Io(io::Error::other("io error"));
     assert!(!err.to_string().is_empty());
 
     let err = Error::Url(url::ParseError::EmptyHost);
