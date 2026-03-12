@@ -7,7 +7,7 @@ use crates_docs::{
 use std::sync::Arc;
 
 // ============================================================================
-// HTML 处理测试
+// DocCache 测试
 // ============================================================================
 
 /// 测试 HTML 清理功能 - 移除 script 标签
@@ -1502,14 +1502,14 @@ fn test_auth_manager_new_and_accessors() {
 }
 
 #[test]
-fn test_oauth_to_mcp_config_without_feature() {
+fn test_oauth_to_mcp_config() {
     let config = crates_docs::server::auth::OAuthConfig::default();
     let result = config.to_mcp_config();
+    // 无论是否启用 auth feature，默认配置（enabled=false）应该返回错误
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("OAuth feature is not enabled"));
+    // 错误消息可能是 "OAuth is not enabled" 或 "OAuth feature is not enabled"
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("OAuth") && err_msg.contains("not enabled"));
 }
 
 #[test]

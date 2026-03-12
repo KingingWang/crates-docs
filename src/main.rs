@@ -560,9 +560,9 @@ async fn test_command(
         "health_check" => {
             println!("Testing health check");
 
-            // Prepare arguments - health_check may also need camelCase
+            // Prepare arguments - use snake_case field names matching struct definition
             let arguments = serde_json::json!({
-                "checkType": "all",
+                "check_type": "all",
                 "verbose": true
             });
 
