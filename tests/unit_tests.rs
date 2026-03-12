@@ -882,19 +882,20 @@ fn test_config_save_and_load() {
 fn test_config_from_env() {
     use crates_docs::config::AppConfig;
 
-    // 设置环境变量 - 使用正确的环境变量名称
-    std::env::set_var("CRATES_DOCS_HOST", "0.0.0.0");
-    std::env::set_var("CRATES_DOCS_PORT", "9090");
+    // 使用 temp_env 安全地隔离环境变量
+    temp_env::with_vars(
+        [
+            ("CRATES_DOCS_HOST", Some("0.0.0.0")),
+            ("CRATES_DOCS_PORT", Some("9090")),
+        ],
+        || {
+            let result = AppConfig::from_env();
+            assert!(result.is_ok());
 
-    let result = AppConfig::from_env();
-    assert!(result.is_ok());
-
-    // 注意：from_env 的实现可能不同，这里只是测试函数能正常工作
-    let _config = result.unwrap();
-
-    // 清理环境变量
-    std::env::remove_var("CRATES_DOCS_HOST");
-    std::env::remove_var("CRATES_DOCS_PORT");
+            // 注意：from_env 的实现可能不同，这里只是测试函数能正常工作
+            let _config = result.unwrap();
+        },
+    );
 }
 
 /// 测试配置合并
