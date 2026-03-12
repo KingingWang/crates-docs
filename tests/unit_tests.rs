@@ -882,9 +882,9 @@ fn test_config_save_and_load() {
 fn test_config_from_env() {
     use crates_docs::config::AppConfig;
 
-    // 设置环境变量
-    std::env::set_var("CRATES_DOCS_SERVER_HOST", "0.0.0.0");
-    std::env::set_var("CRATES_DOCS_SERVER_PORT", "9090");
+    // 设置环境变量 - 使用正确的环境变量名称
+    std::env::set_var("CRATES_DOCS_HOST", "0.0.0.0");
+    std::env::set_var("CRATES_DOCS_PORT", "9090");
 
     let result = AppConfig::from_env();
     assert!(result.is_ok());
@@ -893,8 +893,8 @@ fn test_config_from_env() {
     let _config = result.unwrap();
 
     // 清理环境变量
-    std::env::remove_var("CRATES_DOCS_SERVER_HOST");
-    std::env::remove_var("CRATES_DOCS_SERVER_PORT");
+    std::env::remove_var("CRATES_DOCS_HOST");
+    std::env::remove_var("CRATES_DOCS_PORT");
 }
 
 /// 测试配置合并
