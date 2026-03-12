@@ -2,9 +2,8 @@
 
 use crates_docs::{
     cache::{create_cache, CacheConfig},
-    config::AppConfig,
-    server::{CratesDocsServer, ServerConfig},
     tools::docs::DocService,
+    AppConfig, CratesDocsServer,
 };
 use std::sync::Arc;
 
@@ -121,7 +120,7 @@ async fn test_tool_registry() {
 #[test]
 fn test_server_creation() {
     // 创建服务器配置
-    let config = ServerConfig::default();
+    let config = AppConfig::default();
 
     // 创建服务器
     let server_result = CratesDocsServer::new(config);

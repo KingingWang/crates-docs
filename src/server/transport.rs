@@ -48,8 +48,8 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
     tracing::info!(
         "Starting HTTP MCP server on {}:{}...",
-        config.host,
-        config.port
+        config.server.host,
+        config.server.port
     );
 
     let server_info = server.server_info();
@@ -57,15 +57,15 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
 
     // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
-        host: config.host.clone(),
-        port: config.port,
+        host: config.server.host.clone(),
+        port: config.server.port,
         transport_options: Arc::new(TransportOptions::default()),
         sse_support: false, // Pure HTTP mode
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
-        allowed_hosts: Some(config.allowed_hosts.clone()),
-        allowed_origins: Some(config.allowed_origins.clone()),
+        allowed_hosts: Some(config.server.allowed_hosts.clone()),
+        allowed_origins: Some(config.server.allowed_origins.clone()),
         ..Default::default()
     };
 
@@ -75,8 +75,8 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
 
     tracing::info!(
         "HTTP MCP server started, listening on {}:{}",
-        config.host,
-        config.port
+        config.server.host,
+        config.server.port
     );
     mcp_server
         .start()
@@ -91,8 +91,8 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
     tracing::info!(
         "Starting SSE MCP server on {}:{}...",
-        config.host,
-        config.port
+        config.server.host,
+        config.server.port
     );
 
     let server_info = server.server_info();
@@ -100,15 +100,15 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
 
     // Create Hyper server options with SSE support and security settings from config
     let options = HyperServerOptions {
-        host: config.host.clone(),
-        port: config.port,
+        host: config.server.host.clone(),
+        port: config.server.port,
         transport_options: Arc::new(TransportOptions::default()),
         sse_support: true, // Enable SSE support
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
-        allowed_hosts: Some(config.allowed_hosts.clone()),
-        allowed_origins: Some(config.allowed_origins.clone()),
+        allowed_hosts: Some(config.server.allowed_hosts.clone()),
+        allowed_origins: Some(config.server.allowed_origins.clone()),
         ..Default::default()
     };
 
@@ -118,8 +118,8 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
 
     tracing::info!(
         "SSE MCP server started, listening on {}:{}",
-        config.host,
-        config.port
+        config.server.host,
+        config.server.port
     );
     mcp_server
         .start()
@@ -134,8 +134,8 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
     let config = server.config();
     tracing::info!(
         "Starting hybrid MCP server on {}:{}...",
-        config.host,
-        config.port
+        config.server.host,
+        config.server.port
     );
 
     let server_info = server.server_info();
@@ -143,15 +143,15 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
 
     // Create Hyper server options with SSE support and security settings from config
     let options = HyperServerOptions {
-        host: config.host.clone(),
-        port: config.port,
+        host: config.server.host.clone(),
+        port: config.server.port,
         transport_options: Arc::new(TransportOptions::default()),
         sse_support: true, // Enable SSE support
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
-        allowed_hosts: Some(config.allowed_hosts.clone()),
-        allowed_origins: Some(config.allowed_origins.clone()),
+        allowed_hosts: Some(config.server.allowed_hosts.clone()),
+        allowed_origins: Some(config.server.allowed_origins.clone()),
         ..Default::default()
     };
 
@@ -161,8 +161,8 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
 
     tracing::info!(
         "Hybrid MCP server started, listening on {}:{} (HTTP + SSE)",
-        config.host,
-        config.port
+        config.server.host,
+        config.server.port
     );
     mcp_server
         .start()

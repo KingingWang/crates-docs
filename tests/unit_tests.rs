@@ -1613,13 +1613,13 @@ fn test_lookup_and_search_tools_invalid_arguments() {
 fn test_server_new_async_and_accessors() {
     use crates_docs::server::CratesDocsServer;
 
-    let config = crates_docs::ServerConfig::default();
+    let config = crates_docs::AppConfig::default();
     let rt = tokio::runtime::Runtime::new().unwrap();
     let server = rt
         .block_on(async { CratesDocsServer::new_async(config.clone()).await })
         .unwrap();
 
-    assert_eq!(server.config().name, config.name);
+    assert_eq!(server.config().server.name, config.server.name);
     assert!(server.tool_registry().get_tools().len() >= 4);
     assert!(!server.server_info().server_info.name.is_empty());
 
@@ -1637,7 +1637,7 @@ fn test_server_new_async_and_accessors() {
 
 #[test]
 fn test_server_info_content() {
-    let server = crates_docs::CratesDocsServer::new(crates_docs::ServerConfig::default()).unwrap();
+    let server = crates_docs::CratesDocsServer::new(crates_docs::AppConfig::default()).unwrap();
     let info = server.server_info();
 
     assert_eq!(info.server_info.name, "crates-docs");

@@ -7,122 +7,21 @@ pub mod handler;
 pub mod transport;
 
 use crate::cache::Cache;
+use crate::config::AppConfig;
 use crate::error::Result;
 use crate::tools::ToolRegistry;
 use rust_mcp_sdk::schema::{
-    Icon, IconTheme, Implementation, InitializeResult, ProtocolVersion, ServerCapabilities,
-    ServerCapabilitiesTools,
+    Implementation, InitializeResult, ProtocolVersion, ServerCapabilities, ServerCapabilitiesTools,
 };
 use std::sync::Arc;
 
-/// Server configuration
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct ServerConfig {
-    /// Server name
-    pub name: String,
-
-    /// Server version
-    pub version: String,
-
-    /// Server description
-    pub description: Option<String>,
-
-    /// Server icons
-    pub icons: Vec<Icon>,
-
-    /// Website URL
-    pub website_url: Option<String>,
-
-    /// Host address
-    pub host: String,
-
-    /// Port
-    pub port: u16,
-
-    /// Transport mode
-    pub transport_mode: String,
-
-    /// Enable SSE support
-    pub enable_sse: bool,
-
-    /// Enable OAuth authentication
-    pub enable_oauth: bool,
-
-    /// Maximum concurrent connections
-    pub max_connections: usize,
-
-    /// Request timeout (seconds)
-    pub request_timeout_secs: u64,
-
-    /// Response timeout (seconds)
-    pub response_timeout_secs: u64,
-
-    /// Allowed hosts for CORS (e.g., `["localhost", "127.0.0.1"]`)
-    pub allowed_hosts: Vec<String>,
-
-    /// Allowed origins for CORS (e.g., `["http://localhost:*"]`)
-    /// Use `"*"` only in development, specify exact origins in production
-    pub allowed_origins: Vec<String>,
-
-    /// Cache configuration
-    pub cache: crate::cache::CacheConfig,
-
-    /// OAuth configuration
-    pub oauth: crate::server::auth::OAuthConfig,
-
-    /// Logging configuration
-    pub logging: crate::config::LoggingConfig,
-
-    /// Performance configuration
-    pub performance: crate::config::PerformanceConfig,
-}
-
-impl Default for ServerConfig {
-    fn default() -> Self {
-        Self {
-            name: "crates-docs".to_string(),
-            version: crate::VERSION.to_string(),
-            description: Some(
-                "High-performance Rust crate documentation query MCP server".to_string(),
-            ),
-            icons: vec![
-                Icon {
-                    src: "https://docs.rs/static/favicon-32x32.png".to_string(),
-                    mime_type: Some("image/png".to_string()),
-                    sizes: vec!["32x32".to_string()],
-                    theme: Some(IconTheme::Light),
-                },
-                Icon {
-                    src: "https://docs.rs/static/favicon-32x32.png".to_string(),
-                    mime_type: Some("image/png".to_string()),
-                    sizes: vec!["32x32".to_string()],
-                    theme: Some(IconTheme::Dark),
-                },
-            ],
-            website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
-            host: "127.0.0.1".to_string(),
-            port: 8080,
-            transport_mode: "hybrid".to_string(),
-            enable_sse: true,
-            enable_oauth: false,
-            max_connections: 100,
-            request_timeout_secs: 30,
-            response_timeout_secs: 60,
-            // Secure defaults: only allow localhost by default
-            allowed_hosts: vec!["localhost".to_string(), "127.0.0.1".to_string()],
-            allowed_origins: vec!["http://localhost:*".to_string()],
-            cache: crate::cache::CacheConfig::default(),
-            oauth: crate::server::auth::OAuthConfig::default(),
-            logging: crate::config::LoggingConfig::default(),
-            performance: crate::config::PerformanceConfig::default(),
-        }
-    }
-}
+/// Re-export `ServerConfig` from config module for backward compatibility
+pub use crate::config::ServerConfig;
 
 /// MCP server
 #[derive(Clone)]
 pub struct CratesDocsServer {
-    config: ServerConfig,
+    config: AppConfig,
     tool_registry: Arc<ToolRegistry>,
     cache: Arc<dyn Cache>,
 }
@@ -131,7 +30,7 @@ impl CratesDocsServer {
     /// Create a new server instance (synchronous)
     ///
     /// Note: This method only supports memory cache. For Redis, use the `new_async` method.
-    pub fn new(config: ServerConfig) -> Result<Self> {
+    pub fn new(config: AppConfig) -> Result<Self> {
         let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
         let cache: Arc<dyn Cache> = Arc::from(cache_box);
 
@@ -153,7 +52,7 @@ impl CratesDocsServer {
     /// Supports memory cache and Redis cache (requires cache-redis feature).
     #[allow(unused_variables)]
     #[allow(clippy::unused_async)]
-    pub async fn new_async(config: ServerConfig) -> Result<Self> {
+    pub async fn new_async(config: AppConfig) -> Result<Self> {
         // Decide which creation method to use based on cache type and feature
         #[cfg(feature = "cache-redis")]
         {
@@ -195,7 +94,7 @@ impl CratesDocsServer {
 
     /// Get server configuration
     #[must_use]
-    pub fn config(&self) -> &ServerConfig {
+    pub fn config(&self) -> &AppConfig {
         &self.config
     }
 
@@ -216,12 +115,12 @@ impl CratesDocsServer {
     pub fn server_info(&self) -> InitializeResult {
         InitializeResult {
             server_info: Implementation {
-                name: self.config.name.clone(),
-                version: self.config.version.clone(),
+                name: self.config.server.name.clone(),
+                version: self.config.server.version.clone(),
                 title: Some("Crates Docs MCP Server".to_string()),
-                description: self.config.description.clone(),
-                icons: self.config.icons.clone(),
-                website_url: self.config.website_url.clone(),
+                description: self.config.server.description.clone(),
+                icons: self.config.server.icons.clone(),
+                website_url: self.config.server.website_url.clone(),
             },
             capabilities: ServerCapabilities {
                 tools: Some(ServerCapabilitiesTools { list_changed: None }),

@@ -2,6 +2,7 @@
 
 use crate::cache::CacheConfig;
 use crate::server::auth::OAuthConfig;
+use rust_mcp_sdk::schema::{Icon, IconTheme};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -37,6 +38,13 @@ pub struct ServerConfig {
     /// Server description
     pub description: Option<String>,
 
+    /// Server icons
+    #[serde(default = "default_icons")]
+    pub icons: Vec<Icon>,
+
+    /// Website URL
+    pub website_url: Option<String>,
+
     /// Host address
     pub host: String,
 
@@ -67,6 +75,24 @@ pub struct ServerConfig {
     /// Allowed origins for CORS (e.g., `["http://localhost:*"]`)
     /// Use `"*"` only in development, specify exact origins in production
     pub allowed_origins: Vec<String>,
+}
+
+/// Default icons for the server
+fn default_icons() -> Vec<Icon> {
+    vec![
+        Icon {
+            src: "https://docs.rs/static/favicon-32x32.png".to_string(),
+            mime_type: Some("image/png".to_string()),
+            sizes: vec!["32x32".to_string()],
+            theme: Some(IconTheme::Light),
+        },
+        Icon {
+            src: "https://docs.rs/static/favicon-32x32.png".to_string(),
+            mime_type: Some("image/png".to_string()),
+            sizes: vec!["32x32".to_string()],
+            theme: Some(IconTheme::Dark),
+        },
+    ]
 }
 
 /// Logging configuration
@@ -121,6 +147,8 @@ impl Default for ServerConfig {
             description: Some(
                 "High-performance Rust crate documentation query MCP server".to_string(),
             ),
+            icons: default_icons(),
+            website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
             host: "127.0.0.1".to_string(),
             port: 8080,
             transport_mode: "hybrid".to_string(),

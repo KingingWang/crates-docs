@@ -3,7 +3,6 @@
 use clap::{Parser, Subcommand};
 use crates_docs::server::transport;
 use crates_docs::CratesDocsServer;
-use rust_mcp_sdk::schema::{Icon, IconTheme};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -211,7 +210,7 @@ async fn serve_command(
     .await?;
 
     // Get the actual transport mode (for logging and startup)
-    let transport_mode = config.transport_mode.clone();
+    let transport_mode = config.server.transport_mode.clone();
 
     // Initialize logging system (prefer config file, debug mode uses debug level)
     if debug {
@@ -246,8 +245,8 @@ async fn serve_command(
         "http" => {
             tracing::info!(
                 "Using HTTP transport mode, listening on {}:{}",
-                server.config().host,
-                server.config().port
+                server.config().server.host,
+                server.config().server.port
             );
             transport::run_http_server(&server)
                 .await
@@ -256,8 +255,8 @@ async fn serve_command(
         "sse" => {
             tracing::info!(
                 "Using SSE transport mode, listening on {}:{}",
-                server.config().host,
-                server.config().port
+                server.config().server.host,
+                server.config().server.port
             );
             transport::run_sse_server(&server)
                 .await
@@ -266,8 +265,8 @@ async fn serve_command(
         "hybrid" => {
             tracing::info!(
                 "Using hybrid transport mode (HTTP + SSE), listening on {}:{}",
-                server.config().host,
-                server.config().port
+                server.config().server.host,
+                server.config().server.port
             );
             transport::run_hybrid_server(&server)
                 .await
@@ -292,7 +291,7 @@ async fn load_config(
     oauth_client_id: Option<String>,
     oauth_client_secret: Option<String>,
     oauth_redirect_uri: Option<String>,
-) -> Result<crates_docs::ServerConfig, Box<dyn std::error::Error>> {
+) -> Result<crates_docs::config::AppConfig, Box<dyn std::error::Error>> {
     let mut config = if config_path.exists() {
         tracing::info!("Loading configuration from file: {}", config_path.display());
         crates_docs::config::AppConfig::from_file(config_path)
@@ -352,43 +351,7 @@ async fn load_config(
         .validate()
         .map_err(|e| format!("Configuration validation failed: {}", e))?;
 
-    // Convert config::AppConfig to server::ServerConfig (pass all configuration)
-    let server_config = crates_docs::ServerConfig {
-        name: config.server.name,
-        version: config.server.version,
-        description: config.server.description,
-        icons: vec![
-            Icon {
-                src: "https://docs.rs/static/favicon-32x32.png".to_string(),
-                mime_type: Some("image/png".to_string()),
-                sizes: vec!["32x32".to_string()],
-                theme: Some(IconTheme::Light),
-            },
-            Icon {
-                src: "https://docs.rs/static/favicon-32x32.png".to_string(),
-                mime_type: Some("image/png".to_string()),
-                sizes: vec!["32x32".to_string()],
-                theme: Some(IconTheme::Dark),
-            },
-        ],
-        website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
-        host: config.server.host,
-        port: config.server.port,
-        transport_mode: config.server.transport_mode,
-        enable_sse: config.server.enable_sse,
-        enable_oauth: config.server.enable_oauth,
-        max_connections: config.server.max_connections,
-        request_timeout_secs: config.server.request_timeout_secs,
-        response_timeout_secs: config.server.response_timeout_secs,
-        allowed_hosts: config.server.allowed_hosts,
-        allowed_origins: config.server.allowed_origins,
-        cache: config.cache,
-        oauth: config.oauth,
-        logging: config.logging,
-        performance: config.performance,
-    };
-
-    Ok(server_config)
+    Ok(config)
 }
 
 /// Generate configuration file command

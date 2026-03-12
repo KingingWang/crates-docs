@@ -15,9 +15,10 @@ pub mod server;
 pub mod tools;
 pub mod utils;
 
+pub use crate::config::{AppConfig, ServerConfig};
 /// Re-export common types
 pub use crate::error::{Error, Result};
-pub use crate::server::{CratesDocsServer, ServerConfig};
+pub use crate::server::CratesDocsServer;
 
 /// Server version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -1,6 +1,6 @@
 //! 服务器模块单元测试
 
-use crates_docs::server::{CratesDocsServer, ServerConfig};
+use crates_docs::{AppConfig, CratesDocsServer};
 
 // ============================================================================
 // ServerConfig 测试
@@ -8,12 +8,12 @@ use crates_docs::server::{CratesDocsServer, ServerConfig};
 
 #[test]
 fn test_server_config_default() {
-    let config = ServerConfig::default();
-    assert_eq!(config.name, "crates-docs");
-    assert!(!config.version.is_empty());
-    assert_eq!(config.host, "127.0.0.1");
-    assert_eq!(config.port, 8080);
-    assert_eq!(config.transport_mode, "hybrid");
+    let config = AppConfig::default();
+    assert_eq!(config.server.name, "crates-docs");
+    assert!(!config.server.version.is_empty());
+    assert_eq!(config.server.host, "127.0.0.1");
+    assert_eq!(config.server.port, 8080);
+    assert_eq!(config.server.transport_mode, "hybrid");
 }
 
 // ============================================================================
@@ -22,29 +22,29 @@ fn test_server_config_default() {
 
 #[test]
 fn test_server_new() {
-    let config = ServerConfig::default();
+    let config = AppConfig::default();
     let server = CratesDocsServer::new(config.clone()).unwrap();
-    assert_eq!(server.config().name, config.name);
+    assert_eq!(server.config().server.name, config.server.name);
     assert!(server.tool_registry().get_tools().len() >= 4);
 }
 
 #[tokio::test]
 async fn test_server_new_async() {
-    let config = ServerConfig::default();
+    let config = AppConfig::default();
     let server = CratesDocsServer::new_async(config.clone()).await.unwrap();
-    assert_eq!(server.config().name, config.name);
+    assert_eq!(server.config().server.name, config.server.name);
     assert!(server.tool_registry().get_tools().len() >= 4);
 }
 
 #[test]
 fn test_server_new_async_and_accessors() {
-    let config = ServerConfig::default();
+    let config = AppConfig::default();
     let rt = tokio::runtime::Runtime::new().unwrap();
     let server = rt
         .block_on(async { CratesDocsServer::new_async(config.clone()).await })
         .unwrap();
 
-    assert_eq!(server.config().name, config.name);
+    assert_eq!(server.config().server.name, config.server.name);
     assert!(server.tool_registry().get_tools().len() >= 4);
     assert!(!server.server_info().server_info.name.is_empty());
 
@@ -62,7 +62,7 @@ fn test_server_new_async_and_accessors() {
 
 #[test]
 fn test_server_info_content() {
-    let server = CratesDocsServer::new(ServerConfig::default()).unwrap();
+    let server = CratesDocsServer::new(AppConfig::default()).unwrap();
     let info = server.server_info();
 
     assert_eq!(info.server_info.name, "crates-docs");
