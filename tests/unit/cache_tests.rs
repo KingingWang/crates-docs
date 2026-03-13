@@ -136,6 +136,7 @@ fn test_create_cache_unsupported_type() {
     }
 }
 
+#[cfg(feature = "cache-redis")]
 #[test]
 fn test_create_cache_redis_sync_error() {
     let config = CacheConfig {
@@ -145,8 +146,30 @@ fn test_create_cache_redis_sync_error() {
         redis_url: Some("redis://invalid:6379".to_string()),
         key_prefix: String::new(),
     };
-    // Redis cache without async should fail or fall back
+
     let result = create_cache(&config);
-    // 由于没有 cache-redis feature，应该返回错误
-    assert!(result.is_err() || result.is_ok());
+    assert!(result.is_err());
+
+    if let Err(e) = result {
+        assert!(e.to_string().contains("async initialization"));
+    }
+}
+
+#[cfg(not(feature = "cache-redis"))]
+#[test]
+fn test_create_cache_redis_sync_error() {
+    let config = CacheConfig {
+        cache_type: "redis".to_string(),
+        memory_size: Some(100),
+        default_ttl: Some(3600),
+        redis_url: Some("redis://invalid:6379".to_string()),
+        key_prefix: String::new(),
+    };
+
+    let result = create_cache(&config);
+    assert!(result.is_err());
+
+    if let Err(e) = result {
+        assert!(e.to_string().contains("feature is not enabled"));
+    }
 }

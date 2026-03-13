@@ -169,12 +169,28 @@ fn test_auth_manager_new_and_accessors() {
     assert_eq!(manager.config().client_id, enabled.client_id);
 }
 
+#[cfg(feature = "auth")]
 #[test]
 fn test_oauth_to_mcp_config_without_feature() {
     let config = OAuthConfig::default();
     let result = config.to_mcp_config();
-    // 在没有 auth feature 时应该返回错误
-    assert!(result.is_err() || result.is_ok());
+    // 默认 enabled=false，应返回错误
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(e.to_string().contains("OAuth is not enabled"));
+    }
+}
+
+#[cfg(not(feature = "auth"))]
+#[test]
+fn test_oauth_to_mcp_config_without_feature() {
+    let config = OAuthConfig::default();
+    let result = config.to_mcp_config();
+    // feature 未启用，应返回错误
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(e.to_string().contains("OAuth feature is not enabled"));
+    }
 }
 
 // ============================================================================

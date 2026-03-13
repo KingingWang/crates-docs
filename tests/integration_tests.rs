@@ -118,11 +118,17 @@ async fn test_tool_registry() {
     let doc_service = Arc::new(DocService::new(cache_arc));
 
     // 创建工具注册表
-    let _registry = crates_docs::tools::create_default_registry(&doc_service);
+    let registry = crates_docs::tools::create_default_registry(&doc_service);
 
-    // 测试工具执行（模拟）
-    // 注意：由于需要网络请求，这里只测试工具注册和基本功能
-    // 工具注册表创建成功
+    // 验证预期工具已注册
+    let tools = registry.get_tools();
+    assert_eq!(tools.len(), 4);
+    let tool_names: std::collections::HashSet<String> =
+        tools.iter().map(|t| t.name.clone()).collect();
+    assert!(tool_names.contains("lookup_crate"));
+    assert!(tool_names.contains("lookup_item"));
+    assert!(tool_names.contains("search_crates"));
+    assert!(tool_names.contains("health_check"));
 }
 
 /// 测试服务器创建
