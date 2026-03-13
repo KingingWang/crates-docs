@@ -5,6 +5,7 @@
 [![Docker](https://img.shields.io/docker/v/kingingwang/crates-docs/latest?label=docker)](https://hub.docker.com/r/kingingwang/crates-docs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/KingingWang/crates-docs/workflows/CI/badge.svg)](https://github.com/KingingWang/crates-docs/actions)
+[![codecov](https://codecov.io/gh/kingingwang/crates-docs/branch/main/graph/badge.svg)](https://codecov.io/gh/kingingwang/crates-docs)
 
 一个高性能的 Rust crate 文档查询 MCP 服务器，支持多种传输协议。
 
