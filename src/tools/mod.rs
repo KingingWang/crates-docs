@@ -7,6 +7,7 @@ pub mod health;
 
 use async_trait::async_trait;
 use rust_mcp_sdk::schema::{CallToolError, CallToolResult, Tool as McpTool};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Tool trait
@@ -22,44 +23,63 @@ pub trait Tool: Send + Sync {
     ) -> std::result::Result<CallToolResult, CallToolError>;
 }
 
-/// Tool registry
+/// Tool registry using `HashMap` for O(1) lookup
 pub struct ToolRegistry {
-    tools: Vec<Box<dyn Tool>>,
+    tools: HashMap<String, Box<dyn Tool>>,
 }
 
 impl ToolRegistry {
     /// Create a new tool registry
     #[must_use]
     pub fn new() -> Self {
-        Self { tools: Vec::new() }
+        Self {
+            tools: HashMap::new(),
+        }
     }
 
     /// Register tool
     #[must_use]
     pub fn register<T: Tool + 'static>(mut self, tool: T) -> Self {
-        self.tools.push(Box::new(tool));
+        let boxed_tool: Box<dyn Tool> = Box::new(tool);
+        let name = boxed_tool.definition().name.clone();
+        self.tools.insert(name, boxed_tool);
         self
     }
 
     /// Get all tool definitions
     #[must_use]
     pub fn get_tools(&self) -> Vec<McpTool> {
-        self.tools.iter().map(|t| t.definition()).collect()
+        self.tools.values().map(|t| t.definition()).collect()
     }
 
-    /// Execute tool
+    /// Execute tool by name
     pub async fn execute_tool(
         &self,
         name: &str,
         arguments: serde_json::Value,
     ) -> std::result::Result<CallToolResult, CallToolError> {
-        for tool in &self.tools {
-            if tool.definition().name == name {
-                return tool.execute(arguments).await;
-            }
+        match self.tools.get(name) {
+            Some(tool) => tool.execute(arguments).await,
+            None => Err(CallToolError::unknown_tool(name.to_string())),
         }
+    }
 
-        Err(CallToolError::unknown_tool(name.to_string()))
+    /// Check if a tool exists
+    #[must_use]
+    pub fn has_tool(&self, name: &str) -> bool {
+        self.tools.contains_key(name)
+    }
+
+    /// Get the number of registered tools
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.tools.len()
+    }
+
+    /// Check if the registry is empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.tools.is_empty()
     }
 }
 
