@@ -1,7 +1,9 @@
 //! Document query tools module
 
 pub mod cache;
-pub mod lookup;
+pub mod html;
+pub mod lookup_crate;
+pub mod lookup_item;
 pub mod search;
 
 use crate::cache::Cache;
@@ -55,7 +57,7 @@ impl Default for DocService {
     }
 }
 
-/// 重新导出工具
-pub use lookup::LookupCrateTool;
-pub use lookup::LookupItemTool;
+/// Re-export tools
+pub use lookup_crate::LookupCrateTool;
+pub use lookup_item::LookupItemTool;
 pub use search::SearchCratesTool;

@@ -73,8 +73,10 @@ impl Default for ToolRegistry {
 #[must_use]
 pub fn create_default_registry(service: &Arc<docs::DocService>) -> ToolRegistry {
     ToolRegistry::new()
-        .register(docs::lookup::LookupCrateToolImpl::new(service.clone()))
+        .register(docs::lookup_crate::LookupCrateToolImpl::new(
+            service.clone(),
+        ))
         .register(docs::search::SearchCratesToolImpl::new(service.clone()))
-        .register(docs::lookup::LookupItemToolImpl::new(service.clone()))
+        .register(docs::lookup_item::LookupItemToolImpl::new(service.clone()))
         .register(health::HealthCheckToolImpl::new())
 }

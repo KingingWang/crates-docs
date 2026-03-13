@@ -1,6 +1,7 @@
 //! 工具模块单元测试
 
-use crates_docs::tools::docs::lookup::{LookupCrateToolImpl, LookupItemToolImpl};
+use crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl;
+use crates_docs::tools::docs::lookup_item::LookupItemToolImpl;
 use crates_docs::tools::docs::search::SearchCratesToolImpl;
 use crates_docs::tools::docs::DocService;
 use crates_docs::tools::health::HealthCheckToolImpl;
@@ -14,7 +15,7 @@ use std::sync::Arc;
 
 #[test]
 fn test_lookup_crate_tool_params() {
-    use crates_docs::tools::docs::lookup::LookupCrateTool;
+    use crates_docs::tools::docs::lookup_crate::LookupCrateTool;
 
     let params = LookupCrateTool {
         crate_name: "serde".to_string(),
@@ -29,7 +30,7 @@ fn test_lookup_crate_tool_params() {
 
 #[test]
 fn test_lookup_item_tool_params() {
-    use crates_docs::tools::docs::lookup::LookupItemTool;
+    use crates_docs::tools::docs::lookup_item::LookupItemTool;
 
     let params = LookupItemTool {
         crate_name: "serde".to_string(),
@@ -173,7 +174,7 @@ fn test_doc_service_accessors_and_default() {
 
 #[test]
 fn test_lookup_crate_tool_definition() {
-    use crates_docs::tools::docs::lookup::LookupCrateTool;
+    use crates_docs::tools::docs::lookup_crate::LookupCrateTool;
 
     let definition = LookupCrateTool::tool();
     assert_eq!(definition.name, "lookup_crate");
@@ -182,7 +183,7 @@ fn test_lookup_crate_tool_definition() {
 
 #[test]
 fn test_lookup_item_tool_definition() {
-    use crates_docs::tools::docs::lookup::LookupItemTool;
+    use crates_docs::tools::docs::lookup_item::LookupItemTool;
 
     let definition = LookupItemTool::tool();
     assert_eq!(definition.name, "lookup_item");

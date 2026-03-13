@@ -329,7 +329,7 @@ fn test_error_display() {
 /// 测试 LookupCrateTool 参数
 #[test]
 fn test_lookup_crate_tool_params() {
-    use crates_docs::tools::docs::lookup::LookupCrateTool;
+    use crates_docs::tools::docs::lookup_crate::LookupCrateTool;
 
     let params = LookupCrateTool {
         crate_name: "serde".to_string(),
@@ -345,7 +345,7 @@ fn test_lookup_crate_tool_params() {
 /// 测试 LookupItemTool 参数
 #[test]
 fn test_lookup_item_tool_params() {
-    use crates_docs::tools::docs::lookup::LookupItemTool;
+    use crates_docs::tools::docs::lookup_item::LookupItemTool;
 
     let params = LookupItemTool {
         crate_name: "serde".to_string(),
@@ -1577,7 +1577,8 @@ fn test_health_check_tool_invalid_arguments() {
 
 #[test]
 fn test_lookup_and_search_tools_invalid_arguments() {
-    use crates_docs::tools::docs::lookup::{LookupCrateToolImpl, LookupItemToolImpl};
+    use crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl;
+    use crates_docs::tools::docs::lookup_item::LookupItemToolImpl;
     use crates_docs::tools::docs::search::SearchCratesToolImpl;
     use crates_docs::tools::docs::DocService;
     use crates_docs::tools::Tool;
