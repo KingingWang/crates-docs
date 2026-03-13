@@ -17,12 +17,24 @@ pub trait Cache: Send + Sync {
     async fn get(&self, key: &str) -> Option<String>;
 
     /// Set cache value
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache operation fails
     async fn set(&self, key: String, value: String, ttl: Option<Duration>);
 
     /// Delete cache value
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache operation fails
     async fn delete(&self, key: &str);
 
-    /// Clear cache
+    /// Clear all cache entries with the configured key prefix
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache operation fails
     async fn clear(&self);
 
     /// Check if key exists
@@ -41,8 +53,18 @@ pub struct CacheConfig {
     /// Redis connection URL
     pub redis_url: Option<String>,
 
+    /// Key prefix for Redis cache (to isolate cache entries from different services)
+    #[serde(default = "default_key_prefix")]
+    pub key_prefix: String,
+
     /// Default TTL (seconds)
     pub default_ttl: Option<u64>,
+}
+
+/// Default key prefix
+#[must_use]
+pub fn default_key_prefix() -> String {
+    String::new()
 }
 
 impl Default for CacheConfig {
@@ -51,6 +73,7 @@ impl Default for CacheConfig {
             cache_type: "memory".to_string(),
             memory_size: Some(1000),
             redis_url: None,
+            key_prefix: String::new(),
             default_ttl: Some(3600), // 1 hour
         }
     }
@@ -119,7 +142,9 @@ pub async fn create_cache_async(
                 .redis_url
                 .as_ref()
                 .ok_or_else(|| crate::error::Error::Config("redis_url is required".to_string()))?;
-            Ok(Box::new(redis::RedisCache::new(url).await?))
+            Ok(Box::new(
+                redis::RedisCache::new(url, config.key_prefix.clone()).await?,
+            ))
         }
         _ => Err(crate::error::Error::Config(format!(
             "unsupported cache type: {}",

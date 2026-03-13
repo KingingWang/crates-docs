@@ -30,6 +30,7 @@ async fn test_doc_cache_crate_docs() {
         memory_size: Some(100),
         default_ttl: Some(3600),
         redis_url: None,
+        key_prefix: String::new(),
     };
     let cache = create_cache(&config).expect("创建缓存失败");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
@@ -67,6 +68,7 @@ async fn test_doc_cache_item_docs() {
         memory_size: Some(100),
         default_ttl: Some(3600),
         redis_url: None,
+        key_prefix: String::new(),
     };
     let cache = create_cache(&config).expect("创建缓存失败");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
@@ -120,6 +122,7 @@ fn test_create_cache_unsupported_type() {
         memory_size: Some(100),
         default_ttl: Some(3600),
         redis_url: None,
+        key_prefix: String::new(),
     };
     let result = create_cache(&config);
     assert!(result.is_err());
@@ -136,6 +139,7 @@ fn test_create_cache_redis_sync_error() {
         memory_size: Some(100),
         default_ttl: Some(3600),
         redis_url: Some("redis://invalid:6379".to_string()),
+        key_prefix: String::new(),
     };
     // Redis cache without async should fail or fall back
     let result = create_cache(&config);

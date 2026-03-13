@@ -22,6 +22,7 @@ pub async fn run_test_command(
         memory_size: Some(1000),
         default_ttl: Some(3600),
         redis_url: None,
+        key_prefix: String::new(),
     };
 
     let cache = crates_docs::cache::create_cache(&cache_config)?;

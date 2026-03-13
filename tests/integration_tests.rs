@@ -16,6 +16,7 @@ async fn test_cache_functionality() {
         memory_size: Some(100),
         default_ttl: Some(3600),
         redis_url: None,
+        key_prefix: String::new(),
     };
 
     let cache = create_cache(&config).expect("创建缓存失败");
@@ -100,6 +101,7 @@ async fn test_tool_registry() {
         memory_size: Some(100),
         default_ttl: Some(3600),
         redis_url: None,
+        key_prefix: String::new(),
     };
 
     let cache = create_cache(&config).expect("创建缓存失败");
