@@ -121,7 +121,8 @@ impl LookupCrateToolImpl {
         self.service
             .doc_cache()
             .set_crate_docs(crate_name, version, docs.clone())
-            .await;
+            .await
+            .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
 
         Ok(docs)
     }

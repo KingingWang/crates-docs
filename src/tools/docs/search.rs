@@ -121,7 +121,8 @@ impl SearchCratesToolImpl {
                 cache_value,
                 Some(std::time::Duration::from_secs(300)),
             )
-            .await;
+            .await
+            .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
 
         Ok(crates)
     }

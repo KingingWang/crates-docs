@@ -21,21 +21,26 @@ pub trait Cache: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if the cache operation fails
-    async fn set(&self, key: String, value: String, ttl: Option<Duration>);
+    async fn set(
+        &self,
+        key: String,
+        value: String,
+        ttl: Option<Duration>,
+    ) -> crate::error::Result<()>;
 
     /// Delete cache value
     ///
     /// # Errors
     ///
     /// Returns an error if the cache operation fails
-    async fn delete(&self, key: &str);
+    async fn delete(&self, key: &str) -> crate::error::Result<()>;
 
     /// Clear all cache entries with the configured key prefix
     ///
     /// # Errors
     ///
     /// Returns an error if the cache operation fails
-    async fn clear(&self);
+    async fn clear(&self) -> crate::error::Result<()>;
 
     /// Check if key exists
     async fn exists(&self, key: &str) -> bool;

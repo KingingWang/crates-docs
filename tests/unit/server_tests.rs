@@ -52,7 +52,8 @@ fn test_server_new_async_and_accessors() {
     rt.block_on(async {
         cache
             .set("server-cache-key".to_string(), "value".to_string(), None)
-            .await;
+            .await
+            .expect("cache set should succeed");
         assert_eq!(
             cache.get("server-cache-key").await,
             Some("value".to_string())

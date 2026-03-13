@@ -23,11 +23,20 @@ impl DocCache {
     }
 
     /// Set cached document
-    pub async fn set_crate_docs(&self, crate_name: &str, version: Option<&str>, content: String) {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache operation fails
+    pub async fn set_crate_docs(
+        &self,
+        crate_name: &str,
+        version: Option<&str>,
+        content: String,
+    ) -> crate::error::Result<()> {
         let key = Self::crate_cache_key(crate_name, version);
         self.cache
             .set(key, content, Some(Duration::from_secs(3600)))
-            .await;
+            .await
     }
 
     /// Get cached search results
@@ -37,11 +46,20 @@ impl DocCache {
     }
 
     /// Set cached search results
-    pub async fn set_search_results(&self, query: &str, limit: u32, content: String) {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache operation fails
+    pub async fn set_search_results(
+        &self,
+        query: &str,
+        limit: u32,
+        content: String,
+    ) -> crate::error::Result<()> {
         let key = Self::search_cache_key(query, limit);
         self.cache
             .set(key, content, Some(Duration::from_secs(300)))
-            .await; // 5 minutes cache
+            .await // 5 minutes cache
     }
 
     /// Get cached item documentation
@@ -56,22 +74,30 @@ impl DocCache {
     }
 
     /// Set cached item documentation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache operation fails
     pub async fn set_item_docs(
         &self,
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
         content: String,
-    ) {
+    ) -> crate::error::Result<()> {
         let key = Self::item_cache_key(crate_name, item_path, version);
         self.cache
             .set(key, content, Some(Duration::from_secs(1800)))
-            .await; // 30 minutes cache
+            .await // 30 minutes cache
     }
 
     /// Clear cache
-    pub async fn clear(&self) {
-        self.cache.clear().await;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache operation fails
+    pub async fn clear(&self) -> crate::error::Result<()> {
+        self.cache.clear().await
     }
 
     /// Build crate cache key
@@ -119,14 +145,16 @@ mod tests {
         // 测试 crate 文档缓存
         doc_cache
             .set_crate_docs("serde", Some("1.0"), "Test docs".to_string())
-            .await;
+            .await
+            .expect("set_crate_docs should succeed");
         let cached = doc_cache.get_crate_docs("serde", Some("1.0")).await;
         assert_eq!(cached, Some("Test docs".to_string()));
 
         // 测试搜索结果缓存
         doc_cache
             .set_search_results("web framework", 10, "Search results".to_string())
-            .await;
+            .await
+            .expect("set_search_results should succeed");
         let search_cached = doc_cache.get_search_results("web framework", 10).await;
         assert_eq!(search_cached, Some("Search results".to_string()));
 
@@ -138,14 +166,15 @@ mod tests {
                 Some("1.0"),
                 "Item docs".to_string(),
             )
-            .await;
+            .await
+            .expect("set_item_docs should succeed");
         let item_cached = doc_cache
             .get_item_docs("serde", "serde::Serialize", Some("1.0"))
             .await;
         assert_eq!(item_cached, Some("Item docs".to_string()));
 
         // 测试清理
-        doc_cache.clear().await;
+        doc_cache.clear().await.expect("clear should succeed");
         let cleared = doc_cache.get_crate_docs("serde", Some("1.0")).await;
         assert_eq!(cleared, None);
     }

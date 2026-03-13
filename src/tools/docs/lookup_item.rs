@@ -130,7 +130,8 @@ impl LookupItemToolImpl {
         self.service
             .doc_cache()
             .set_item_docs(crate_name, item_path, version, docs.clone())
-            .await;
+            .await
+            .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
 
         Ok(docs)
     }

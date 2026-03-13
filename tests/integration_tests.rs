@@ -24,7 +24,8 @@ async fn test_cache_functionality() {
     // 测试基本缓存操作
     cache
         .set("test_key".to_string(), "test_value".to_string(), None)
-        .await;
+        .await
+        .expect("set should succeed");
     let value = cache.get("test_key").await;
     assert_eq!(value, Some("test_value".to_string()));
 
@@ -35,7 +36,8 @@ async fn test_cache_functionality() {
             "expiring_value".to_string(),
             Some(std::time::Duration::from_secs(1)),
         )
-        .await;
+        .await
+        .expect("set should succeed");
     let value = cache.get("expiring_key").await;
     assert_eq!(value, Some("expiring_value".to_string()));
 
@@ -45,18 +47,23 @@ async fn test_cache_functionality() {
     assert_eq!(value, None);
 
     // 测试删除
-    cache.delete("test_key").await;
+    cache
+        .delete("test_key")
+        .await
+        .expect("delete should succeed");
     let value = cache.get("test_key").await;
     assert_eq!(value, None);
 
     // 测试清空
     cache
         .set("key1".to_string(), "value1".to_string(), None)
-        .await;
+        .await
+        .expect("set should succeed");
     cache
         .set("key2".to_string(), "value2".to_string(), None)
-        .await;
-    cache.clear().await;
+        .await
+        .expect("set should succeed");
+    cache.clear().await.expect("clear should succeed");
     assert_eq!(cache.get("key1").await, None);
     assert_eq!(cache.get("key2").await, None);
 }

@@ -91,7 +91,12 @@ impl super::Cache for RedisCache {
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    async fn set(&self, key: String, value: String, ttl: Option<Duration>) {
+    async fn set(
+        &self,
+        key: String,
+        value: String,
+        ttl: Option<Duration>,
+    ) -> crate::error::Result<()> {
         let mut conn = self.conn.clone();
         let full_key = self.build_key(&key);
 
@@ -115,13 +120,10 @@ impl super::Cache for RedisCache {
                 .await
         };
 
-        // Log errors instead of silently ignoring them
-        if let Err(e) = result {
-            tracing::error!("Redis SET failed for key '{}': {}", key, e);
-        }
+        result.map_err(|e| Error::Cache(format!("Redis SET failed for key '{key}': {e}")))
     }
 
-    async fn delete(&self, key: &str) {
+    async fn delete(&self, key: &str) -> crate::error::Result<()> {
         let mut conn = self.conn.clone();
         let full_key = self.build_key(key);
 
@@ -130,13 +132,10 @@ impl super::Cache for RedisCache {
             .query_async(&mut conn)
             .await;
 
-        // Log errors instead of silently ignoring them
-        if let Err(e) = result {
-            tracing::error!("Redis DEL failed for key '{}': {}", key, e);
-        }
+        result.map_err(|e| Error::Cache(format!("Redis DEL failed for key '{key}': {e}")))
     }
 
-    async fn clear(&self) {
+    async fn clear(&self) -> crate::error::Result<()> {
         // Use SCAN to find and delete keys with our prefix
         // This is safer than FLUSHDB which would delete ALL keys in the database
         let mut conn = self.conn.clone();
@@ -166,7 +165,9 @@ impl super::Cache for RedisCache {
                         match del_result {
                             Ok(deleted) => total_deleted += deleted,
                             Err(e) => {
-                                tracing::error!("Redis DEL during clear failed: {}", e);
+                                return Err(Error::Cache(format!(
+                                    "Redis DEL during clear failed: {e}"
+                                )));
                             }
                         }
                     }
@@ -178,8 +179,7 @@ impl super::Cache for RedisCache {
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Redis SCAN during clear failed: {}", e);
-                    break;
+                    return Err(Error::Cache(format!("Redis SCAN during clear failed: {e}")));
                 }
             }
         }
@@ -191,6 +191,8 @@ impl super::Cache for RedisCache {
                 self.key_prefix
             );
         }
+
+        Ok(())
     }
 
     async fn exists(&self, key: &str) -> bool {
@@ -224,27 +226,33 @@ mod tests {
         // Test set and get
         cache
             .set("test_key".to_string(), "test_value".to_string(), None)
-            .await;
+            .await
+            .expect("set should succeed");
         let value = cache.get("test_key").await;
         assert_eq!(value, Some("test_value".to_string()));
 
         // Test delete
-        cache.delete("test_key").await;
+        cache
+            .delete("test_key")
+            .await
+            .expect("delete should succeed");
         let value = cache.get("test_key").await;
         assert_eq!(value, None);
 
         // Test exists
         cache
             .set("exists_key".to_string(), "exists_value".to_string(), None)
-            .await;
+            .await
+            .expect("set should succeed");
         assert!(cache.exists("exists_key").await);
         assert!(!cache.exists("non_exists_key").await);
 
         // Test clear (should only clear keys with our prefix)
         cache
             .set("clear_test".to_string(), "value".to_string(), None)
-            .await;
-        cache.clear().await;
+            .await
+            .expect("set should succeed");
+        cache.clear().await.expect("clear should succeed");
         assert_eq!(cache.get("clear_test").await, None);
     }
 

@@ -98,7 +98,12 @@ impl super::Cache for MemoryCache {
         })
     }
 
-    async fn set(&self, key: String, value: String, ttl: Option<Duration>) {
+    async fn set(
+        &self,
+        key: String,
+        value: String,
+        ttl: Option<Duration>,
+    ) -> crate::error::Result<()> {
         let mut cache = self.acquire_lock();
 
         // Clean up expired entries
@@ -107,16 +112,19 @@ impl super::Cache for MemoryCache {
         // LRU automatically handles eviction
         let entry = CacheEntry::new(value, ttl);
         cache.put(key, entry);
+        Ok(())
     }
 
-    async fn delete(&self, key: &str) {
+    async fn delete(&self, key: &str) -> crate::error::Result<()> {
         let mut cache = self.acquire_lock();
         cache.pop(key);
+        Ok(())
     }
 
-    async fn clear(&self) {
+    async fn clear(&self) -> crate::error::Result<()> {
         let mut cache = self.acquire_lock();
         cache.clear();
+        Ok(())
     }
 
     async fn exists(&self, key: &str) -> bool {
@@ -139,18 +147,20 @@ mod tests {
         // 测试设置和获取
         cache
             .set("key1".to_string(), "value1".to_string(), None)
-            .await;
+            .await
+            .expect("set should succeed");
         assert_eq!(cache.get("key1").await, Some("value1".to_string()));
 
         // 测试删除
-        cache.delete("key1").await;
+        cache.delete("key1").await.expect("delete should succeed");
         assert_eq!(cache.get("key1").await, None);
 
         // 测试清空
         cache
             .set("key2".to_string(), "value2".to_string(), None)
-            .await;
-        cache.clear().await;
+            .await
+            .expect("set should succeed");
+        cache.clear().await.expect("clear should succeed");
         assert_eq!(cache.get("key2").await, None);
     }
 
@@ -165,7 +175,8 @@ mod tests {
                 "value1".to_string(),
                 Some(Duration::from_millis(100)),
             )
-            .await;
+            .await
+            .expect("set should succeed");
         assert_eq!(cache.get("key1").await, Some("value1".to_string()));
 
         // 等待过期
@@ -180,10 +191,12 @@ mod tests {
         // 填满缓存
         cache
             .set("key1".to_string(), "value1".to_string(), None)
-            .await;
+            .await
+            .expect("set should succeed");
         cache
             .set("key2".to_string(), "value2".to_string(), None)
-            .await;
+            .await
+            .expect("set should succeed");
 
         // 访问 key1，使其成为最近使用
         let _ = cache.get("key1").await;
@@ -191,7 +204,8 @@ mod tests {
         // 添加第三个条目，应该淘汰 key2（最少使用）
         cache
             .set("key3".to_string(), "value3".to_string(), None)
-            .await;
+            .await
+            .expect("set should succeed");
 
         // key1 应该还在（因为刚被访问）
         assert_eq!(cache.get("key1").await, Some("value1".to_string()));
@@ -207,7 +221,8 @@ mod tests {
 
         cache
             .set("key1".to_string(), "value1".to_string(), None)
-            .await;
+            .await
+            .expect("set should succeed");
         assert!(cache.exists("key1").await);
         assert!(!cache.exists("key2").await);
     }

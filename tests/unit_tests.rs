@@ -79,7 +79,8 @@ async fn test_doc_cache_crate_docs() {
     // 设置缓存
     doc_cache
         .set_crate_docs("serde", None, "Serde documentation".to_string())
-        .await;
+        .await
+        .expect("set_crate_docs should succeed");
 
     // 测试缓存命中
     let result = doc_cache.get_crate_docs("serde", None).await;
@@ -88,7 +89,8 @@ async fn test_doc_cache_crate_docs() {
     // 测试带版本的缓存
     doc_cache
         .set_crate_docs("tokio", Some("1.0.0"), "Tokio 1.0 docs".to_string())
-        .await;
+        .await
+        .expect("set_crate_docs should succeed");
     let result = doc_cache.get_crate_docs("tokio", Some("1.0.0")).await;
     assert_eq!(result, Some("Tokio 1.0 docs".to_string()));
 
@@ -125,7 +127,8 @@ async fn test_doc_cache_item_docs() {
             None,
             "Serialize trait docs".to_string(),
         )
-        .await;
+        .await
+        .expect("set_item_docs should succeed");
 
     // 测试缓存命中
     let result = doc_cache
@@ -141,7 +144,8 @@ async fn test_doc_cache_item_docs() {
             Some("1.75.0"),
             "HashMap docs".to_string(),
         )
-        .await;
+        .await
+        .expect("set_item_docs should succeed");
     let result = doc_cache
         .get_item_docs("std", "std::collections::HashMap", Some("1.75.0"))
         .await;
@@ -1632,7 +1636,8 @@ fn test_server_new_async_and_accessors() {
     rt.block_on(async {
         cache
             .set("server-cache-key".to_string(), "value".to_string(), None)
-            .await;
+            .await
+            .expect("cache set should succeed");
         assert_eq!(
             cache.get("server-cache-key").await,
             Some("value".to_string())
