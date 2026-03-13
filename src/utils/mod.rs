@@ -175,18 +175,42 @@ pub mod compression {
 
 /// String utilities
 pub mod string {
-    /// Truncate string and add ellipsis
+    /// Truncate string and add ellipsis (UTF-8 safe)
+    ///
+    /// # Arguments
+    /// * `s` - The string to truncate
+    /// * `max_len` - Maximum number of characters (not bytes) to keep, including ellipsis
+    ///
+    /// # Examples
+    /// ```
+    /// use crates_docs::utils::string::truncate_with_ellipsis;
+    /// // Basic ASCII truncation
+    /// assert_eq!(truncate_with_ellipsis("hello world", 8), "hello...");
+    /// assert_eq!(truncate_with_ellipsis("short", 10), "short");
+    /// // UTF-8 safe: works with multi-byte characters
+    /// assert_eq!(truncate_with_ellipsis("你好世界", 3), "...");
+    /// assert_eq!(truncate_with_ellipsis("你好世界", 4), "你好世界"); // 4 chars <= max_len, no truncation
+    /// assert_eq!(truncate_with_ellipsis("你好世界", 5), "你好世界"); // 4 chars <= max_len, no truncation
+    /// assert_eq!(truncate_with_ellipsis("你好世界你好", 4), "你...");   // 4 chars > max_len-3, truncate
+    /// ```
     #[must_use]
     pub fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {
-        if s.len() <= max_len {
-            return s.to_string();
-        }
-
+        // If max_len is 3 or less, just return ellipsis
         if max_len <= 3 {
             return "...".to_string();
         }
 
-        format!("{}...", &s[..max_len - 3])
+        // Collect characters to properly handle UTF-8
+        let chars: Vec<char> = s.chars().collect();
+
+        // If string is short enough, return it as-is
+        if chars.len() <= max_len {
+            return s.to_string();
+        }
+
+        // Truncate to max_len - 3 characters and add ellipsis
+        let truncated: String = chars.iter().take(max_len - 3).collect();
+        format!("{truncated}...")
     }
 
     /// Safely parse number
