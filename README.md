@@ -10,12 +10,54 @@
 
 ## 特性
 
-- 🚀 **高性能**: 异步 Rust + LRU 智能缓存
+- 🚀 **高性能**: 异步 Rust + LRU/TTL 内存缓存，可选 Redis 扩展
 - 📦 **多架构 Docker 镜像**: 支持 `linux/amd64` 和 `linux/arm64`
-- 🔧 **多种传输协议**: Stdio、HTTP (Streamable HTTP)、SSE
+- 🔧 **多种传输协议**: Stdio、HTTP (Streamable HTTP)、SSE、Hybrid
 - 📚 **完整文档查询**: crate 搜索、文档查找、特定项目查询
 - 🛡️ **安全可靠**: 速率限制、连接池、请求验证
 - 📊 **健康监控**: 内置健康检查和性能监控
+- 🏗️ **模块化架构**: 清晰的模块划分，易于扩展和维护
+
+## 项目结构
+
+```
+src/
+├── lib.rs              # 库入口，导出公共 API
+├── main.rs             # 程序入口
+├── cache/              # 缓存层
+│   ├── mod.rs          # Cache trait 定义
+│   ├── memory.rs       # 内存缓存实现（LRU + TTL）
+│   └── redis.rs        # Redis 缓存实现
+├── cli/                # 命令行接口
+│   ├── mod.rs          # CLI 定义和路由
+│   ├── commands.rs     # 子命令定义
+│   ├── serve_cmd.rs    # serve 命令实现
+│   ├── test_cmd.rs     # test 命令实现
+│   ├── config_cmd.rs   # config 命令实现
+│   ├── health_cmd.rs   # health 命令实现
+│   └── version_cmd.rs  # version 命令实现
+├── config/             # 配置管理
+│   └── mod.rs          # 配置结构和加载逻辑
+├── error/              # 错误处理
+│   └── mod.rs          # 错误类型定义
+├── server/             # 服务器核心
+│   ├── mod.rs          # 服务器定义
+│   ├── auth.rs         # OAuth 认证
+│   ├── handler.rs      # MCP 请求处理
+│   └── transport.rs    # 传输层实现
+├── tools/              # MCP 工具
+│   ├── mod.rs          # 工具注册表
+│   ├── health.rs       # 健康检查工具
+│   └── docs/           # 文档查询工具
+│       ├── mod.rs      # 文档服务
+│       ├── cache.rs    # 文档缓存
+│       ├── html.rs     # HTML 处理
+│       ├── lookup_crate.rs  # crate 文档查找
+│       ├── lookup_item.rs   # 项目文档查找
+│       └── search.rs        # crate 搜索
+└── utils/              # 工具函数
+    └── mod.rs          # 通用工具
+```
 
 ## 快速开始
 
@@ -25,7 +67,7 @@
 # 从 Docker Hub 拉取镜像
 docker pull kingingwang/crates-docs:latest
 
-# 运行容器（默认监听 0.0.0.0:8080）
+# 运行容器（官方镜像内置配置默认监听 0.0.0.0:8080）
 docker run -d --name crates-docs -p 8080:8080 kingingwang/crates-docs:latest
 
 # 使用自定义配置
@@ -135,7 +177,7 @@ crates-docs serve
 | 名称 | `crates-docs` |
 | 类型 | `STDIO` |
 | 命令 | `/path/to/crates-docs` |
-| 参数1 | `serve --mode stdio` |
+| 参数1 | `serve` |
 | 参数2 | `--mode` |
 | 参数3 | `stdio` |
 
@@ -253,17 +295,29 @@ crates-docs serve --mode http --port 8080  # HTTP 模式
 
 # 生成配置
 crates-docs config --output config.toml
+crates-docs config --output config.toml --force
 
 # 测试工具
 crates-docs test --tool lookup_crate --crate-name serde
 crates-docs test --tool search_crates --query "async"
+
+# CLI 健康检查入口
+crates-docs health
+crates-docs health --check-type external --verbose
+
+# 版本信息
+crates-docs version
 ```
+
+> 全局参数见 [`Cli`](src/cli/mod.rs:27)，常用项包括 `--config`、`--debug`、`--verbose`。
+>
+> 当前 [`run_health_command()`](src/cli/health_cmd.rs:4) 仍是 CLI 级占位输出；需要真实探测 docs.rs / crates.io 状态时，应优先使用 MCP 工具 [`health_check`](src/tools/health.rs:11)。
 
 ## 配置
 
 ### 配置文件
 
-创建 `config.toml`：
+下面示例展示的是常见网络部署配置；使用 [`run_config_command()`](src/cli/config_cmd.rs:6) 生成文件时，实际内容来自 [`AppConfig::default()`](src/config/mod.rs:11)，默认监听地址仍是 `127.0.0.1`。
 
 ```toml
 [server]
@@ -283,24 +337,34 @@ default_ttl = 3600
 level = "info"
 enable_console = true
 enable_file = false  # 默认仅控制台输出
+
+[performance]
+http_client_pool_size = 10
+cache_max_size = 1000
+enable_response_compression = true
 ```
 
 > **启用文件日志**：设置 `enable_file = true` 并配置 `file_path` 可写入日志文件。
+>
+> **默认监听地址说明**：直接使用二进制且未提供配置文件时，[`ServerConfig::default()`](src/config/mod.rs:143) 的默认 `host` 是 `127.0.0.1`；官方 Docker 镜像通过内置配置和环境变量使用 `0.0.0.0`，便于容器对外提供服务。
 
 ### 环境变量
 
 ```bash
+export CRATES_DOCS_NAME="crates-docs"
 export CRATES_DOCS_HOST="0.0.0.0"
 export CRATES_DOCS_PORT="8080"
 export CRATES_DOCS_TRANSPORT_MODE="hybrid"
 
-# 日志配置（默认仅控制台输出）
+# 日志配置
 export CRATES_DOCS_LOG_LEVEL="info"
 export CRATES_DOCS_ENABLE_CONSOLE="true"
-export CRATES_DOCS_ENABLE_FILE="true"  # 启用文件日志（需可写文件系统）
+export CRATES_DOCS_ENABLE_FILE="true"
 ```
 
-> **文件日志**：默认禁用。设置 `CRATES_DOCS_ENABLE_FILE=true` 并配置 `file_path` 可写入日志文件。
+> [`AppConfig::from_env()`](src/config/mod.rs:304) 当前支持的环境变量包括 `CRATES_DOCS_NAME`、`CRATES_DOCS_HOST`、`CRATES_DOCS_PORT`、`CRATES_DOCS_TRANSPORT_MODE`、`CRATES_DOCS_LOG_LEVEL`、`CRATES_DOCS_ENABLE_CONSOLE`、`CRATES_DOCS_ENABLE_FILE`。
+>
+> **文件日志**：默认禁用。设置 `CRATES_DOCS_ENABLE_FILE=true` 后，日志仍写入配置中的 `file_path`（默认 `./logs/crates-docs.log`）；当前不支持通过环境变量覆盖 `file_path`。
 
 ## 传输协议
 
@@ -318,6 +382,34 @@ export CRATES_DOCS_ENABLE_FILE="true"  # 启用文件日志（需可写文件系
 
 > 注意：这些是 MCP 协议端点，不是普通的 HTTP API。需要使用 MCP 客户端进行交互。
 
+## 缓存策略
+
+### 内存缓存（默认）
+
+- 当前实现位于 [`MemoryCache`](src/cache/memory.rs:29)
+- 使用 LRU 淘汰策略
+- 支持 TTL 过期
+- 适用于单实例部署
+
+### Redis 缓存
+
+- 支持分布式部署
+- 支持持久化
+- 通过 feature flag 启用：`cache-redis`
+
+```bash
+cargo build --release --features cache-redis
+```
+
+配置示例：
+
+```toml
+[cache]
+cache_type = "redis"
+redis_url = "redis://localhost:6379"
+default_ttl = 3600
+```
+
 ## 部署
 
 ### Docker
@@ -328,7 +420,7 @@ docker pull kingingwang/crates-docs:latest
 docker run -d -p 8080:8080 kingingwang/crates-docs:latest
 
 # 或使用特定版本
-docker pull kingingwang/crates-docs:0.1.6
+docker pull kingingwang/crates-docs:0.3.0
 ```
 
 ### Systemd
@@ -362,13 +454,38 @@ sudo systemctl start crates-docs
 # 构建
 cargo build --release
 
-# 测试
+# 运行所有测试
 cargo test --all-features
 
-# 代码检查
-cargo clippy -- -D warnings
+# 运行 clippy 检查
+cargo clippy --all-features --all-targets -- -D warnings
+
+# 格式化检查
+cargo fmt --check
+
+# 运行完整 CI 流程
+cargo clippy --all-features --all-targets -- -D warnings && \
+cargo test --all-features && \
 cargo fmt --check
 ```
+
+### Feature Flags
+
+| Feature | 描述 |
+|---------|------|
+| `default` | 默认启用：`server`、`stdio`、`macros`、`cache-memory`、`logging` |
+| `server` | 启用 rust-mcp-sdk 服务端能力 |
+| `client` | 启用 rust-mcp-sdk 客户端能力 |
+| `stdio` | 启用 Stdio 传输 |
+| `hyper-server` | 启用 HTTP 服务器 |
+| `streamable-http` | 启用 Streamable HTTP |
+| `sse` | 启用 SSE 传输 |
+| `macros` | 启用 MCP 宏支持 |
+| `auth` | 启用 OAuth 认证支持 |
+| `cache-memory` | 启用内存缓存相关支持 |
+| `cache-redis` | 启用 Redis 缓存 |
+| `tls` | 启用 TLS/SSL 支持 |
+| `logging` | 启用日志相关支持 |
 
 ## 故障排除
 
@@ -388,7 +505,7 @@ curl -I https://crates.io/
 
 ### 日志
 
-日志文件：`./logs/crates-docs.log`
+启用文件日志时，默认日志文件路径为 `./logs/crates-docs.log`。
 
 ```toml
 [logging]
@@ -409,11 +526,19 @@ MIT License
 4. 推送分支 (`git push origin feature/amazing-feature`)
 5. 创建 Pull Request
 
+### 开发指南
+
+- 所有代码必须通过 `cargo clippy --all-features --all-targets -- -D warnings`
+- 所有测试必须通过 `cargo test --all-features`
+- 新功能需要添加相应的单元测试
+- 遵循现有的代码风格和文档规范
+
 ## 致谢
 
 - [rust-mcp-sdk](https://github.com/rust-mcp-stack/rust-mcp-sdk) - MCP SDK
 - [docs.rs](https://docs.rs) - Rust 文档服务
 - [crates.io](https://crates.io) - Rust 包注册表
+- [lru](https://crates.io/crates/lru) - 内存缓存淘汰策略实现
 
 ## 支持
 

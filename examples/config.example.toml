@@ -4,7 +4,7 @@
 # 服务器名称
 name = "crates-docs"
 # 服务器版本
-version = "0.1.0"
+version = "0.3.0"
 # 服务器描述
 description = "高性能 Rust crate 文档查询 MCP 服务器"
 # 监听主机
