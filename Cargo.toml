@@ -1,6 +1,6 @@
 [package]
 name = "crates-docs"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 description = "高性能 Rust crate 文档查询 MCP 服务器，支持 Stdio/HTTP/SSE 传输和 OAuth 认证"
 authors = ["KingingWang <KingingWang@foxmail.com>"]
@@ -27,9 +27,9 @@ logging = []
 
 [dependencies]
 # MCP 核心依赖
-rust-mcp-sdk = { version = "0.8.3", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http", "sse"] }
-rust-mcp-macros = "0.8.1"
-rust-mcp-schema = "0.9.5"
+rust-mcp-sdk = { version = "0.9", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http", "sse"] }
+rust-mcp-macros = "0.9.0"
+rust-mcp-schema = "0.10"
 rust-mcp-extra = { version = "0.2.3", optional = true }
 
 # HTTP 客户端
