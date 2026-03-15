@@ -2,6 +2,7 @@
 
 mod auth_tests;
 mod cache_tests;
+mod cli_tests;
 mod config_tests;
 mod error_tests;
 mod lib_tests;

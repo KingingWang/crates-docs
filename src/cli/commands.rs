@@ -50,19 +50,19 @@ pub enum Commands {
 
     /// Test tool
     Test {
-        /// Tool to test [lookup_crate, search_crates, lookup_item, health_check]
+        /// Tool to test [`lookup_crate`], [`search_crates`], [`lookup_item`], [`health_check`]
         #[arg(short, long, default_value = "lookup_crate")]
         tool: String,
 
-        /// Crate name (for lookup_crate and lookup_item)
+        /// Crate name (for [`lookup_crate`] and [`lookup_item`])
         #[arg(long)]
         crate_name: Option<String>,
 
-        /// Item path (for lookup_item)
+        /// Item path (for [`lookup_item`])
         #[arg(long)]
         item_path: Option<String>,
 
-        /// Search query (for search_crates)
+        /// Search query (for [`search_crates`])
         #[arg(long)]
         query: Option<String>,
 
@@ -70,18 +70,18 @@ pub enum Commands {
         #[arg(long)]
         version: Option<String>,
 
-        /// Result limit (for search_crates)
+        /// Result limit (for [`search_crates`])
         #[arg(long, default_value = "10")]
         limit: u32,
 
-        /// Output format [json, markdown, text]
+        /// Output format [`json`], [`markdown`], [`text`]
         #[arg(long, default_value = "markdown")]
         format: String,
     },
 
     /// Check server health status
     Health {
-        /// Check type [all, external, internal, docs_rs, crates_io]
+        /// Check type [`all`], [`external`], [`internal`], [`docs_rs`], [`crates_io`]
         #[arg(short = 't', long, default_value = "all")]
         check_type: String,
 

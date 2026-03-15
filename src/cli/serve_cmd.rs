@@ -1,7 +1,7 @@
 //! Serve command implementation
 
-use crates_docs::server::transport;
-use crates_docs::CratesDocsServer;
+use crate::server::transport;
+use crate::CratesDocsServer;
 use std::path::PathBuf;
 
 /// Start server command
@@ -27,8 +27,7 @@ pub async fn run_serve_command(
         oauth_client_id,
         oauth_client_secret,
         oauth_redirect_uri,
-    )
-    .await?;
+    )?;
 
     // Get the actual transport mode (for logging and startup)
     let transport_mode = config.server.transport_mode.clone();
@@ -38,10 +37,10 @@ pub async fn run_serve_command(
         // In debug mode, override log level from config file
         let mut debug_config = config.logging.clone();
         debug_config.level = "debug".to_string();
-        crates_docs::init_logging_with_config(&debug_config)
+        crate::init_logging_with_config(&debug_config)
             .map_err(|e| format!("Failed to initialize logging system: {e}"))?;
     } else {
-        crates_docs::init_logging_with_config(&config.logging)
+        crate::init_logging_with_config(&config.logging)
             .map_err(|e| format!("Failed to initialize logging system: {e}"))?;
     }
 
@@ -53,7 +52,7 @@ pub async fn run_serve_command(
     // Create server (async to support Redis)
     let server: CratesDocsServer = CratesDocsServer::new_async(config)
         .await
-        .map_err(|e| format!("Failed to create server: {}", e))?;
+        .map_err(|e| format!("Failed to create server: {e}"))?;
 
     // Start server based on mode
     match transport_mode.to_lowercase().as_str() {
@@ -61,7 +60,7 @@ pub async fn run_serve_command(
             tracing::info!("Using Stdio transport mode");
             transport::run_stdio_server(&server)
                 .await
-                .map_err(|e| format!("Failed to start Stdio server: {}", e))?;
+                .map_err(|e| format!("Failed to start Stdio server: {e}"))?;
         }
         "http" => {
             tracing::info!(
@@ -71,7 +70,7 @@ pub async fn run_serve_command(
             );
             transport::run_http_server(&server)
                 .await
-                .map_err(|e| format!("Failed to start HTTP server: {}", e))?;
+                .map_err(|e| format!("Failed to start HTTP server: {e}"))?;
         }
         "sse" => {
             tracing::info!(
@@ -81,7 +80,7 @@ pub async fn run_serve_command(
             );
             transport::run_sse_server(&server)
                 .await
-                .map_err(|e| format!("Failed to start SSE server: {}", e))?;
+                .map_err(|e| format!("Failed to start SSE server: {e}"))?;
         }
         "hybrid" => {
             tracing::info!(
@@ -91,10 +90,10 @@ pub async fn run_serve_command(
             );
             transport::run_hybrid_server(&server)
                 .await
-                .map_err(|e| format!("Failed to start hybrid server: {}", e))?;
+                .map_err(|e| format!("Failed to start hybrid server: {e}"))?;
         }
         _ => {
-            return Err(format!("Unknown transport mode: {}", transport_mode).into());
+            return Err(format!("Unknown transport mode: {transport_mode}").into());
         }
     }
 
@@ -103,7 +102,7 @@ pub async fn run_serve_command(
 
 /// Load configuration
 #[allow(clippy::too_many_arguments)]
-async fn load_config(
+fn load_config(
     config_path: &PathBuf,
     host: Option<String>,
     port: Option<u16>,
@@ -112,17 +111,17 @@ async fn load_config(
     oauth_client_id: Option<String>,
     oauth_client_secret: Option<String>,
     oauth_redirect_uri: Option<String>,
-) -> Result<crates_docs::config::AppConfig, Box<dyn std::error::Error>> {
+) -> Result<crate::config::AppConfig, Box<dyn std::error::Error>> {
     let mut config = if config_path.exists() {
         tracing::info!("Loading configuration from file: {}", config_path.display());
-        crates_docs::config::AppConfig::from_file(config_path)
-            .map_err(|e| format!("Failed to load config file: {}", e))?
+        crate::config::AppConfig::from_file(config_path)
+            .map_err(|e| format!("Failed to load config file: {e}"))?
     } else {
         tracing::warn!(
             "Config file does not exist, using default config: {}",
             config_path.display()
         );
-        crates_docs::config::AppConfig::default()
+        crate::config::AppConfig::default()
     };
 
     // Only override config file when command line arguments are explicitly provided
@@ -170,7 +169,7 @@ async fn load_config(
     // Validate configuration
     config
         .validate()
-        .map_err(|e| format!("Configuration validation failed: {}", e))?;
+        .map_err(|e| format!("Configuration validation failed: {e}"))?;
 
     Ok(config)
 }

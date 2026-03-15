@@ -25,6 +25,7 @@ pub use version_cmd::run_version_command;
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "High-performance Rust crate documentation query MCP server", long_about = None)]
 pub struct Cli {
+    /// CLI command to execute
     #[command(subcommand)]
     pub command: Commands,
 

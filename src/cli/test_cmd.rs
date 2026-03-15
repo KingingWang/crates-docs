@@ -17,7 +17,7 @@ pub async fn run_test_command(
     tracing::info!("Testing tool: {}", tool);
 
     // Create cache
-    let cache_config = crates_docs::cache::CacheConfig {
+    let cache_config = crate::cache::CacheConfig {
         cache_type: "memory".to_string(),
         memory_size: Some(1000),
         default_ttl: Some(3600),
@@ -25,14 +25,14 @@ pub async fn run_test_command(
         key_prefix: String::new(),
     };
 
-    let cache = crates_docs::cache::create_cache(&cache_config)?;
-    let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
+    let cache = crate::cache::create_cache(&cache_config)?;
+    let cache_arc: Arc<dyn crate::cache::Cache> = Arc::from(cache);
 
     // Create document service
-    let doc_service = Arc::new(crates_docs::tools::docs::DocService::new(cache_arc));
+    let doc_service = Arc::new(crate::tools::docs::DocService::new(cache_arc));
 
     // Create tool registry
-    let registry = crates_docs::tools::create_default_registry(&doc_service);
+    let registry = crate::tools::create_default_registry(&doc_service);
 
     match tool {
         "lookup_crate" => {
@@ -48,7 +48,7 @@ pub async fn run_test_command(
             execute_health_check(&registry).await?;
         }
         _ => {
-            return Err(format!("Unknown tool: {}", tool).into());
+            return Err(format!("Unknown tool: {tool}").into());
         }
     }
 
@@ -56,16 +56,16 @@ pub async fn run_test_command(
     Ok(())
 }
 
-/// Execute lookup_crate tool
+/// Execute `lookup_crate` tool
 async fn execute_lookup_crate(
     crate_name: Option<&str>,
     version: Option<&str>,
     format: &str,
-    registry: &crates_docs::tools::ToolRegistry,
+    registry: &crate::tools::ToolRegistry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(name) = crate_name {
-        println!("Testing crate lookup: {} (version: {:?})", name, version);
-        println!("Output format: {}", format);
+        println!("Testing crate lookup: {name} (version: {version:?})");
+        println!("Output format: {format}");
 
         // Prepare arguments
         let mut arguments = serde_json::json!({
@@ -80,7 +80,7 @@ async fn execute_lookup_crate(
         // Execute tool
         match registry.execute_tool("lookup_crate", arguments).await {
             Ok(result) => print_tool_result(&result),
-            Err(e) => eprintln!("Tool execution failed: {}", e),
+            Err(e) => eprintln!("Tool execution failed: {e}"),
         }
     } else {
         return Err("lookup_crate requires --crate-name parameter".into());
@@ -88,16 +88,16 @@ async fn execute_lookup_crate(
     Ok(())
 }
 
-/// Execute search_crates tool
+/// Execute `search_crates` tool
 async fn execute_search_crates(
     query: Option<&str>,
     limit: u32,
     format: &str,
-    registry: &crates_docs::tools::ToolRegistry,
+    registry: &crate::tools::ToolRegistry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(q) = query {
-        println!("Testing crate search: {} (limit: {})", q, limit);
-        println!("Output format: {}", format);
+        println!("Testing crate search: {q} (limit: {limit})");
+        println!("Output format: {format}");
 
         // Prepare arguments
         let arguments = serde_json::json!({
@@ -109,7 +109,7 @@ async fn execute_search_crates(
         // Execute tool
         match registry.execute_tool("search_crates", arguments).await {
             Ok(result) => print_tool_result(&result),
-            Err(e) => eprintln!("Tool execution failed: {}", e),
+            Err(e) => eprintln!("Tool execution failed: {e}"),
         }
     } else {
         return Err("search_crates requires --query parameter".into());
@@ -117,20 +117,17 @@ async fn execute_search_crates(
     Ok(())
 }
 
-/// Execute lookup_item tool
+/// Execute `lookup_item` tool
 async fn execute_lookup_item(
     crate_name: Option<&str>,
     item_path: Option<&str>,
     version: Option<&str>,
     format: &str,
-    registry: &crates_docs::tools::ToolRegistry,
+    registry: &crate::tools::ToolRegistry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let (Some(name), Some(path)) = (crate_name, item_path) {
-        println!(
-            "Testing item lookup: {}::{} (version: {:?})",
-            name, path, version
-        );
-        println!("Output format: {}", format);
+        println!("Testing item lookup: {name}::{path} (version: {version:?})");
+        println!("Output format: {format}");
 
         // Prepare arguments
         let mut arguments = serde_json::json!({
@@ -146,7 +143,7 @@ async fn execute_lookup_item(
         // Execute tool
         match registry.execute_tool("lookup_item", arguments).await {
             Ok(result) => print_tool_result(&result),
-            Err(e) => eprintln!("Tool execution failed: {}", e),
+            Err(e) => eprintln!("Tool execution failed: {e}"),
         }
     } else {
         return Err("lookup_item requires --crate-name and --item-path parameters".into());
@@ -154,9 +151,9 @@ async fn execute_lookup_item(
     Ok(())
 }
 
-/// Execute health_check tool
+/// Execute `health_check` tool
 async fn execute_health_check(
-    registry: &crates_docs::tools::ToolRegistry,
+    registry: &crate::tools::ToolRegistry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing health check");
 
@@ -169,7 +166,7 @@ async fn execute_health_check(
     // Execute tool
     match registry.execute_tool("health_check", arguments).await {
         Ok(result) => print_tool_result(&result),
-        Err(e) => eprintln!("Tool execution failed: {}", e),
+        Err(e) => eprintln!("Tool execution failed: {e}"),
     }
     Ok(())
 }
@@ -183,7 +180,7 @@ fn print_tool_result(result: &rust_mcp_sdk::schema::CallToolResult) {
                 println!("{}", text_content.text);
             }
             other => {
-                println!("Non-text content: {:?}", other);
+                println!("Non-text content: {other:?}");
             }
         }
     }
