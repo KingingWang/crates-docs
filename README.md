@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/KingingWang/crates-docs/workflows/CI/badge.svg)](https://github.com/KingingWang/crates-docs/actions)
 [![codecov](https://codecov.io/gh/kingingwang/crates-docs/branch/main/graph/badge.svg)](https://codecov.io/gh/kingingwang/crates-docs)
+[![GitHub stars](https://img.shields.io/github/stars/KingingWang/crates-docs?style=social)](https://github.com/KingingWang/crates-docs/stargazers)
 
 一个高性能的 Rust crate 文档查询 MCP 服务器，支持多种传输协议。
 
@@ -545,3 +546,7 @@ MIT License
 
 - [Issues](https://github.com/KingingWang/crates-docs/issues)
 - Email: kingingwang@foxmail.com
+
+## Star History
+
+[![Stargazers over time](https://starchart.cc/KingingWang/crates-docs.svg)](https://starchart.cc/KingingWang/crates-docs)
