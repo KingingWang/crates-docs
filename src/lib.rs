@@ -9,6 +9,7 @@
 #![allow(clippy::missing_panics_doc)]
 
 pub mod cache;
+pub mod cli;
 pub mod config;
 pub mod error;
 pub mod server;

@@ -12,10 +12,10 @@ pub fn run_config_command(output: &PathBuf, force: bool) -> Result<(), Box<dyn s
         .into());
     }
 
-    let config = crates_docs::config::AppConfig::default();
+    let config = crate::config::AppConfig::default();
     config
         .save_to_file(output)
-        .map_err(|e| format!("Failed to save config file: {}", e))?;
+        .map_err(|e| format!("Failed to save config file: {e}"))?;
 
     println!("Config file generated: {}", output.display());
     println!("Please edit the config file as needed.");

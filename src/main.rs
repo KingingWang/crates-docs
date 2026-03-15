@@ -1,9 +1,7 @@
 //! Crates Docs MCP Server main program
 
-mod cli;
-
 use clap::Parser;
-use cli::{run, Cli};
+use crates_docs::cli::{run, Cli};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
