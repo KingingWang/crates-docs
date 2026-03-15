@@ -32,6 +32,7 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
             handler: handler.to_mcp_server_handler(),
             task_store: None,
             client_task_store: None,
+            message_observer: None,
         });
 
     tracing::info!("Stdio MCP server started, waiting for connections...");
