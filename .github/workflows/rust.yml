@@ -503,7 +503,7 @@ jobs:
         echo "binary_name=$BINARY_NAME" >> $GITHUB_OUTPUT
     
     - name: Upload release asset
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: crates-docs-v${{ steps.version.outputs.version }}-${{ matrix.target }}*
         fail_on_unmatched_files: false
