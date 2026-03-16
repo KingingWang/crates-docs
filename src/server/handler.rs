@@ -126,6 +126,20 @@ impl CratesDocsHandlerCore {
     pub fn new(server: Arc<CratesDocsServer>) -> Self {
         Self { server }
     }
+
+    async fn execute_tool_request(&self, params: CallToolRequestParams) -> ResultFromServer {
+        self.server
+            .tool_registry()
+            .execute_tool(
+                &params.name,
+                params
+                    .arguments
+                    .map_or_else(|| serde_json::Value::Null, serde_json::Value::Object),
+            )
+            .await
+            .unwrap_or_else(CallToolResult::from)
+            .into()
+    }
 }
 
 #[async_trait]
@@ -147,18 +161,7 @@ impl ServerHandlerCore for CratesDocsHandlerCore {
                 .into())
             }
             RequestFromClient::CallToolRequest(params) => {
-                let result = self
-                    .server
-                    .tool_registry()
-                    .execute_tool(
-                        &params.name,
-                        params
-                            .arguments
-                            .map_or_else(|| serde_json::Value::Null, serde_json::Value::Object),
-                    )
-                    .await
-                    .map_err(|_e| CallToolError::unknown_tool(params.name.clone()))?;
-                Ok(result.into())
+                Ok(self.execute_tool_request(params).await)
             }
             RequestFromClient::ListResourcesRequest(_params) => Ok(ListResourcesResult {
                 resources: vec![],
@@ -210,5 +213,41 @@ impl ServerHandlerCore for CratesDocsHandlerCore {
         // Log error but don't interrupt
         tracing::error!("MCP error: {:?}", _error);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CratesDocsHandlerCore;
+    use crate::server::CratesDocsServer;
+    use rust_mcp_sdk::schema::{CallToolRequestParams, CallToolResult, ContentBlock};
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_execute_tool_request_preserves_tool_errors() {
+        let server = Arc::new(CratesDocsServer::new(crate::AppConfig::default()).unwrap());
+        let handler = CratesDocsHandlerCore::new(server);
+        let result = handler
+            .execute_tool_request(CallToolRequestParams {
+                arguments: Some(serde_json::Map::from_iter([(
+                    "verbose".to_string(),
+                    serde_json::Value::String("bad".to_string()),
+                )])),
+                meta: None,
+                name: "health_check".to_string(),
+                task: None,
+            })
+            .await;
+
+        let result = CallToolResult::try_from(result).unwrap();
+        assert_eq!(result.is_error, Some(true));
+
+        let Some(ContentBlock::TextContent(text)) = result.content.first() else {
+            panic!("expected first content block to be text");
+        };
+
+        assert!(text.text.contains("health_check"));
+        assert!(text.text.contains("Parameter parsing failed"));
+        assert!(!text.text.contains("Unknown tool"));
     }
 }
