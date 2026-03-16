@@ -12,7 +12,7 @@
 
 ## 特性
 
-- 🚀 **高性能**: 异步 Rust + LRU/TTL 内存缓存，可选 Redis 扩展
+- 🚀 **高性能**: 异步 Rust + TinyLFU/TTL 内存缓存，支持按条目 TTL，可选 Redis 扩展
 - 📦 **多架构 Docker 镜像**: 支持 `linux/amd64` 和 `linux/arm64`
 - 🔧 **多种传输协议**: Stdio、HTTP (Streamable HTTP)、SSE、Hybrid
 - 📚 **完整文档查询**: crate 搜索、文档查找、特定项目查询
@@ -28,7 +28,7 @@ src/
 ├── main.rs             # 程序入口
 ├── cache/              # 缓存层
 │   ├── mod.rs          # Cache trait 定义
-│   ├── memory.rs       # 内存缓存实现（LRU + TTL）
+│   ├── memory.rs       # 内存缓存实现（TinyLFU + 按条目 TTL）
 │   └── redis.rs        # Redis 缓存实现
 ├── cli/                # 命令行接口
 │   ├── mod.rs          # CLI 定义和路由
@@ -388,9 +388,9 @@ export CRATES_DOCS_ENABLE_FILE="true"
 
 ### 内存缓存（默认）
 
-- 当前实现位于 [`MemoryCache`](src/cache/memory.rs:29)
-- 使用 LRU 淘汰策略
-- 支持 TTL 过期
+- 当前实现位于 [`MemoryCache`](src/cache/memory.rs:37)
+- 基于 `moka::sync::Cache`，使用 TinyLFU 淘汰策略
+- 支持按条目 TTL 过期
 - 适用于单实例部署
 
 ### Redis 缓存
