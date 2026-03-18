@@ -131,6 +131,8 @@ fn test_cli_parse_test_command() {
         "search_crates",
         "--query",
         "serde",
+        "--sort",
+        "downloads",
         "--limit",
         "20",
         "--format",
@@ -145,6 +147,7 @@ fn test_cli_parse_test_command() {
             crate_name,
             item_path,
             query,
+            sort,
             version,
             limit,
             format,
@@ -153,6 +156,7 @@ fn test_cli_parse_test_command() {
             assert!(crate_name.is_none());
             assert!(item_path.is_none());
             assert_eq!(query, Some("serde".to_string()));
+            assert_eq!(sort, Some("downloads".to_string()));
             assert!(version.is_none());
             assert_eq!(limit, 20);
             assert_eq!(format, "json");
@@ -211,6 +215,7 @@ fn test_cli_parse_test_command_all_args() {
             crate_name,
             item_path,
             query,
+            sort,
             version,
             limit,
             format,
@@ -219,6 +224,7 @@ fn test_cli_parse_test_command_all_args() {
             assert_eq!(crate_name, Some("serde".to_string()));
             assert_eq!(item_path, Some("Deserialize".to_string()));
             assert!(query.is_none());
+            assert!(sort.is_none());
             assert_eq!(version, Some("1.0.0".to_string()));
             assert_eq!(limit, 5);
             assert_eq!(format, "text");
@@ -461,9 +467,17 @@ fn test_run_version_command() {
 /// 测试 test 命令 - 未知工具
 #[tokio::test]
 async fn test_run_test_command_unknown_tool() {
-    let result =
-        crates_docs::cli::run_test_command("unknown_tool", None, None, None, None, 10, "markdown")
-            .await;
+    let result = crates_docs::cli::run_test_command(
+        "unknown_tool",
+        None,
+        None,
+        None,
+        None,
+        None,
+        10,
+        "markdown",
+    )
+    .await;
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
@@ -473,9 +487,17 @@ async fn test_run_test_command_unknown_tool() {
 /// 测试 test 命令 - lookup_crate 缺少 crate_name
 #[tokio::test]
 async fn test_run_test_command_lookup_crate_missing_name() {
-    let result =
-        crates_docs::cli::run_test_command("lookup_crate", None, None, None, None, 10, "markdown")
-            .await;
+    let result = crates_docs::cli::run_test_command(
+        "lookup_crate",
+        None,
+        None,
+        None,
+        None,
+        None,
+        10,
+        "markdown",
+    )
+    .await;
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
@@ -485,9 +507,17 @@ async fn test_run_test_command_lookup_crate_missing_name() {
 /// 测试 test 命令 - search_crates 缺少 query
 #[tokio::test]
 async fn test_run_test_command_search_crates_missing_query() {
-    let result =
-        crates_docs::cli::run_test_command("search_crates", None, None, None, None, 10, "markdown")
-            .await;
+    let result = crates_docs::cli::run_test_command(
+        "search_crates",
+        None,
+        None,
+        None,
+        None,
+        None,
+        10,
+        "markdown",
+    )
+    .await;
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
@@ -501,6 +531,7 @@ async fn test_run_test_command_lookup_item_missing_args() {
     let result = crates_docs::cli::run_test_command(
         "lookup_item",
         Some("serde"),
+        None,
         None,
         None,
         None,
@@ -520,6 +551,7 @@ async fn test_run_test_command_lookup_item_missing_args() {
         Some("Deserialize"),
         None,
         None,
+        None,
         10,
         "markdown",
     )
@@ -531,11 +563,37 @@ async fn test_run_test_command_lookup_item_missing_args() {
 /// 测试 test 命令 - health_check 工具
 #[tokio::test]
 async fn test_run_test_command_health_check() {
-    let result =
-        crates_docs::cli::run_test_command("health_check", None, None, None, None, 10, "markdown")
-            .await;
+    let result = crates_docs::cli::run_test_command(
+        "health_check",
+        None,
+        None,
+        None,
+        None,
+        None,
+        10,
+        "markdown",
+    )
+    .await;
 
     // health_check 应该成功执行
+    assert!(result.is_ok());
+}
+
+/// 测试 test 命令 - search_crates 接受排序参数
+#[tokio::test]
+async fn test_run_test_command_search_crates_with_sort() {
+    let result = crates_docs::cli::run_test_command(
+        "search_crates",
+        None,
+        None,
+        Some("serde"),
+        Some("downloads"),
+        None,
+        1,
+        "json",
+    )
+    .await;
+
     assert!(result.is_ok());
 }
 
@@ -566,6 +624,7 @@ fn test_commands_enum_variants() {
             crate_name: None,
             item_path: None,
             query: None,
+            sort: None,
             version: None,
             limit: 10,
             format: "markdown".to_string(),
@@ -621,4 +680,29 @@ fn test_cli_parse_invalid_limit() {
     let result =
         crates_docs::cli::Cli::try_parse_from(["crates-docs", "test", "--limit", "not_a_number"]);
     assert!(result.is_err());
+}
+
+/// 测试 Cli 解析 - search_crates 排序参数
+#[test]
+fn test_cli_parse_test_command_with_sort() {
+    let cli = crates_docs::cli::Cli::try_parse_from([
+        "crates-docs",
+        "test",
+        "--tool",
+        "search_crates",
+        "--query",
+        "mcp",
+        "--sort",
+        "recent-downloads",
+    ]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::Test { query, sort, .. } => {
+            assert_eq!(query, Some("mcp".to_string()));
+            assert_eq!(sort, Some("recent-downloads".to_string()));
+        }
+        _ => panic!("Expected Test command"),
+    }
 }
