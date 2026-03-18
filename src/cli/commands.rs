@@ -66,6 +66,10 @@ pub enum Commands {
         #[arg(long)]
         query: Option<String>,
 
+        /// Search sort order (for [`search_crates`]) [`relevance`], [`downloads`], [`recent-downloads`], [`recent-updates`], [`new`]
+        #[arg(long)]
+        sort: Option<String>,
+
         /// Version number (optional)
         #[arg(long)]
         version: Option<String>,

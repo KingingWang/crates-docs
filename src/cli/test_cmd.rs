@@ -10,6 +10,7 @@ pub async fn run_test_command(
     crate_name: Option<&str>,
     item_path: Option<&str>,
     query: Option<&str>,
+    sort: Option<&str>,
     version: Option<&str>,
     limit: u32,
     format: &str,
@@ -39,7 +40,7 @@ pub async fn run_test_command(
             execute_lookup_crate(crate_name, version, format, &registry).await?;
         }
         "search_crates" => {
-            execute_search_crates(query, limit, format, &registry).await?;
+            execute_search_crates(query, sort, limit, format, &registry).await?;
         }
         "lookup_item" => {
             execute_lookup_item(crate_name, item_path, version, format, &registry).await?;
@@ -91,20 +92,26 @@ async fn execute_lookup_crate(
 /// Execute `search_crates` tool
 async fn execute_search_crates(
     query: Option<&str>,
+    sort: Option<&str>,
     limit: u32,
     format: &str,
     registry: &crate::tools::ToolRegistry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(q) = query {
         println!("Testing crate search: {q} (limit: {limit})");
+        println!("Sort order: {}", sort.unwrap_or("relevance"));
         println!("Output format: {format}");
 
         // Prepare arguments
-        let arguments = serde_json::json!({
+        let mut arguments = serde_json::json!({
             "query": q,
             "limit": limit,
             "format": format
         });
+
+        if let Some(sort) = sort {
+            arguments["sort"] = serde_json::Value::String(sort.to_string());
+        }
 
         // Execute tool
         match registry.execute_tool("search_crates", arguments).await {

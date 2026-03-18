@@ -52,11 +52,13 @@ fn test_search_crates_tool_params() {
     let params = SearchCratesTool {
         query: "web framework".to_string(),
         limit: Some(20),
+        sort: Some("downloads".to_string()),
         format: Some("json".to_string()),
     };
 
     assert_eq!(params.query, "web framework");
     assert_eq!(params.limit, Some(20));
+    assert_eq!(params.sort, Some("downloads".to_string()));
     assert_eq!(params.format, Some("json".to_string()));
 }
 
@@ -145,6 +147,15 @@ fn test_lookup_and_search_tools_invalid_arguments() {
         .block_on(async { search_tool.execute(serde_json::json!({"limit": "x"})).await })
         .unwrap_err();
     assert!(err.to_string().contains("search_crates"));
+
+    let err = rt
+        .block_on(async {
+            search_tool
+                .execute(serde_json::json!({"query": "serde", "sort": "invalid-sort"}))
+                .await
+        })
+        .unwrap_err();
+    assert!(err.to_string().contains("Invalid sort option"));
 }
 
 // ============================================================================

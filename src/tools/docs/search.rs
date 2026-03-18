@@ -42,6 +42,14 @@ pub struct SearchCratesTool {
     )]
     pub limit: Option<u32>,
 
+    /// 排序方式
+    #[json_schema(
+        title = "排序方式",
+        description = "Sort order for crates.io search: relevance (default), downloads, recent-downloads, recent-updates, new",
+        default = "relevance"
+    )]
+    pub sort: Option<String>,
+
     /// 输出格式
     #[json_schema(
         title = "输出格式",
@@ -51,9 +59,32 @@ pub struct SearchCratesTool {
     pub format: Option<String>,
 }
 
+const DEFAULT_SEARCH_SORT: &str = "relevance";
+const VALID_SEARCH_SORTS: &[&str] = &[
+    DEFAULT_SEARCH_SORT,
+    "downloads",
+    "recent-downloads",
+    "recent-updates",
+    "new",
+];
+
 /// Search crates tool实现
 pub struct SearchCratesToolImpl {
     service: Arc<super::DocService>,
+}
+
+fn normalize_search_sort(sort: Option<&str>) -> std::result::Result<String, CallToolError> {
+    match sort {
+        Some(sort) if VALID_SEARCH_SORTS.contains(&sort) => Ok(sort.to_string()),
+        Some(sort) => Err(CallToolError::invalid_arguments(
+            "search_crates",
+            Some(format!(
+                "Invalid sort option '{sort}', expected one of: {}",
+                VALID_SEARCH_SORTS.join(", ")
+            )),
+        )),
+        None => Ok(DEFAULT_SEARCH_SORT.to_string()),
+    }
 }
 
 impl SearchCratesToolImpl {
@@ -68,9 +99,10 @@ impl SearchCratesToolImpl {
         &self,
         query: &str,
         limit: u32,
+        sort: &str,
     ) -> std::result::Result<Vec<CrateInfo>, CallToolError> {
         // Build cache key
-        let cache_key = format!("search:{query}:{limit}");
+        let cache_key = format!("search:{query}:{sort}:{limit}");
 
         // Check cache
         if let Some(cached) = self.service.cache().get(&cache_key).await {
@@ -80,9 +112,10 @@ impl SearchCratesToolImpl {
 
         // Build crates.io API URL
         let url = format!(
-            "https://crates.io/api/v1/crates?q={}&per_page={}",
+            "https://crates.io/api/v1/crates?q={}&per_page={}&sort={}",
             urlencoding::encode(query),
-            limit
+            limit,
+            urlencoding::encode(sort)
         );
 
         // 发送 HTTP 请求
@@ -273,7 +306,8 @@ impl Tool for SearchCratesToolImpl {
         })?;
 
         let limit = params.limit.unwrap_or(10).min(100); // 限制最大100个结果
-        let crates = self.search_crates(&params.query, limit).await?;
+        let sort = normalize_search_sort(params.sort.as_deref())?;
+        let crates = self.search_crates(&params.query, limit, &sort).await?;
 
         let format = params.format.unwrap_or_else(|| "markdown".to_string());
         let content = format_search_results(&crates, &format);
