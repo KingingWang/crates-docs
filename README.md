@@ -226,16 +226,26 @@ crates-docs serve --mode hybrid --host 0.0.0.0 --port 8080
 
 ### 2. search_crates - 搜索 Crate
 
-从 crates.io 搜索 Rust crate。
+从 crates.io 搜索 Rust crate，支持按相关性、总下载量、近期下载热度、最近更新时间和最新发布进行排序，适合做 crate 发现、选型和横向比较。
 
 | 参数 | 类型 | 必需 | 描述 |
 |------|------|------|------|
 | `query` | string | ✅ | 搜索关键词 |
 | `limit` | number | ❌ | 结果数量（1-100），默认 10 |
+| `sort` | string | ❌ | 排序方式，支持 `relevance`（默认）、`downloads`、`recent-downloads`、`recent-updates`、`new` |
 | `format` | string | ❌ | 输出格式：`markdown`、`text`、`json` |
 
+**排序建议**
+
+- `relevance`：优先返回与关键词最相关的结果，适合通用搜索。
+- `downloads`：按累计下载量排序，适合优先看生态里最常用、最成熟的 crate。
+- `recent-downloads`：按近期下载热度排序，适合观察最近更活跃或更受关注的项目。
+- `recent-updates`：按最近更新时间排序，适合关注仍在持续维护的 crate。
+- `new`：按发布时间排序，适合探索新发布项目。
+
 ```json
-{ "query": "web framework", "limit": 5 }
+{ "query": "web framework", "limit": 5, "sort": "downloads" }
+{ "query": "mcp", "sort": "recent-downloads", "format": "json" }
 ```
 
 ### 3. lookup_item - 查找特定项目
@@ -283,9 +293,9 @@ crates-docs serve --mode hybrid --host 0.0.0.0 --port 8080
 
 ### 搜索相关 crate
 
-**用户**: "有什么好用的 HTTP 客户端？"
+**用户**: "有什么稳定、大家都常用的 HTTP 客户端？"
 
-**AI 调用**: `{ "query": "http client", "limit": 10 }`
+**AI 调用**: `{ "query": "http client", "limit": 10, "sort": "downloads" }`
 
 ## 命令行
 
@@ -302,6 +312,8 @@ crates-docs config --output config.toml --force
 # 测试工具
 crates-docs test --tool lookup_crate --crate-name serde
 crates-docs test --tool search_crates --query "async"
+crates-docs test --tool search_crates --query "mcp" --sort downloads
+crates-docs test --tool search_crates --query "agent" --sort recent-updates --format json
 
 # CLI 健康检查入口
 crates-docs health
