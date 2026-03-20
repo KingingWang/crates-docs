@@ -561,4 +561,10 @@ MIT License
 
 ## Star History
 
-[![Stargazers over time](https://starchart.cc/KingingWang/crates-docs.svg)](https://starchart.cc/KingingWang/crates-docs)
+<a href="https://www.star-history.com/?repos=KingingWang%2Fcrates-docs&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=KingingWang/crates-docs&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=KingingWang/crates-docs&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=KingingWang/crates-docs&type=date&legend=top-left" />
+ </picture>
+</a>
