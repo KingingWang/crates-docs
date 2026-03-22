@@ -1,6 +1,30 @@
-//! Server module
+//! 服务器模块
 //!
-//! Provides MCP server implementation with support for multiple transport protocols.
+//! 提供 MCP 服务器实现，支持多种传输协议（stdio、HTTP、SSE、Hybrid）。
+//!
+//! # 主要组件
+//!
+//! - `CratesDocsServer`: 主服务器结构体
+//! - `handler`: MCP 请求处理
+//! - `transport`: 传输层实现
+//! - `auth`: OAuth 认证支持
+//!
+//! # 示例
+//!
+//! ```rust,no_run
+//! use crates_docs::{AppConfig, CratesDocsServer};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let config = AppConfig::default();
+//!     let server = CratesDocsServer::new(config)?;
+//!
+//!     // 运行 HTTP 服务器
+//!     server.run_http().await?;
+//!
+//!     Ok(())
+//! }
+//! ```
 
 pub mod auth;
 pub mod handler;
@@ -15,10 +39,22 @@ use rust_mcp_sdk::schema::{
 };
 use std::sync::Arc;
 
-/// Re-export `ServerConfig` from config module for backward compatibility
+/// 从配置模块重新导出 `ServerConfig` 以保持向后兼容
 pub use crate::config::ServerConfig;
 
-/// MCP server
+/// 从 handler 模块重新导出 `CratesDocsHandler`
+pub use handler::CratesDocsHandler;
+
+/// Crates Docs MCP 服务器
+///
+/// 主服务器结构体，管理配置、工具注册表和缓存。
+/// 支持多种传输协议：stdio、HTTP、SSE、Hybrid。
+///
+/// # 字段
+///
+/// - `config`: 应用配置
+/// - `tool_registry`: 工具注册表
+/// - `cache`: 缓存实例
 #[derive(Clone)]
 pub struct CratesDocsServer {
     config: AppConfig,
@@ -27,7 +63,16 @@ pub struct CratesDocsServer {
 }
 
 impl CratesDocsServer {
-    /// Create server from parts (common initialization logic)
+    /// 从组件创建服务器（内部初始化逻辑）
+    ///
+    /// # 参数
+    ///
+    /// * `config` - 应用配置
+    /// * `cache` - 缓存实例
+    ///
+    /// # 错误
+    ///
+    /// 如果文档服务创建失败，返回错误
     fn from_parts(config: AppConfig, cache: Arc<dyn Cache>) -> crate::error::Result<Self> {
         // Create document service with cache configuration
         let doc_service = Arc::new(crate::tools::docs::DocService::with_config(
@@ -45,18 +90,60 @@ impl CratesDocsServer {
         })
     }
 
-    /// Create a new server instance (synchronous)
+    /// 创建新的服务器实例（同步）
     ///
-    /// Note: This method only supports memory cache. For Redis, use the `new_async` method.
+    /// # 参数
+    ///
+    /// * `config` - 应用配置
+    ///
+    /// # 错误
+    ///
+    /// 如果缓存创建失败，返回错误
+    ///
+    /// # 注意
+    ///
+    /// 此方法仅支持内存缓存。如需使用 Redis，请使用 [`new_async`](Self::new_async) 方法。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use crates_docs::{AppConfig, CratesDocsServer};
+    ///
+    /// let config = AppConfig::default();
+    /// let server = CratesDocsServer::new(config).expect("Failed to create server");
+    /// ```
     pub fn new(config: AppConfig) -> Result<Self> {
         let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
         let cache: Arc<dyn Cache> = Arc::from(cache_box);
         Self::from_parts(config, cache)
     }
 
-    /// Create a new server instance (asynchronous)
+    /// 创建新的服务器实例（异步）
     ///
-    /// Supports memory cache and Redis cache (requires cache-redis feature).
+    /// # 参数
+    ///
+    /// * `config` - 应用配置
+    ///
+    /// # 错误
+    ///
+    /// 如果缓存创建失败，返回错误
+    ///
+    /// # 注意
+    ///
+    /// 支持内存缓存和 Redis 缓存（需要启用 `cache-redis` feature）。
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use crates_docs::{AppConfig, CratesDocsServer};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let config = AppConfig::default();
+    ///     let server = CratesDocsServer::new_async(config).await?;
+    ///     Ok(())
+    /// }
+    /// ```
     #[allow(unused_variables)]
     #[allow(clippy::unused_async)]
     pub async fn new_async(config: AppConfig) -> Result<Self> {
@@ -77,25 +164,27 @@ impl CratesDocsServer {
         }
     }
 
-    /// Get server configuration
+    /// 获取服务器配置
     #[must_use]
     pub fn config(&self) -> &AppConfig {
         &self.config
     }
 
-    /// Get tool registry
+    /// 获取工具注册表
     #[must_use]
     pub fn tool_registry(&self) -> &Arc<ToolRegistry> {
         &self.tool_registry
     }
 
-    /// Get cache
+    /// 获取缓存实例
     #[must_use]
     pub fn cache(&self) -> &Arc<dyn Cache> {
         &self.cache
     }
 
-    /// Get server information
+    /// 获取服务器信息
+    ///
+    /// 返回 MCP 初始化结果，包含服务器元数据和能力信息
     #[must_use]
     pub fn server_info(&self) -> InitializeResult {
         InitializeResult {
@@ -125,17 +214,29 @@ impl CratesDocsServer {
         }
     }
 
-    /// Run Stdio server
+    /// 运行 Stdio 服务器
+    ///
+    /// # 错误
+    ///
+    /// 如果服务器启动失败，返回错误
     pub async fn run_stdio(&self) -> Result<()> {
         transport::run_stdio_server(self).await
     }
 
-    /// Run HTTP server
+    /// 运行 HTTP 服务器
+    ///
+    /// # 错误
+    ///
+    /// 如果服务器启动失败，返回错误
     pub async fn run_http(&self) -> Result<()> {
         transport::run_http_server(self).await
     }
 
-    /// Run SSE server
+    /// 运行 SSE 服务器
+    ///
+    /// # 错误
+    ///
+    /// 如果服务器启动失败，返回错误
     pub async fn run_sse(&self) -> Result<()> {
         transport::run_sse_server(self).await
     }

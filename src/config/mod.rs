@@ -1,4 +1,32 @@
-//! Configuration module
+//! 配置模块
+//!
+//! 提供应用程序配置管理，支持从文件加载、环境变量和默认值。
+//!
+//! # 配置来源优先级
+//!
+//! 1. 环境变量（最高优先级）
+//! 2. 配置文件
+//! 3. 默认值（最低优先级）
+//!
+//! # 支持的配置格式
+//!
+//! - TOML 配置文件
+//! - 环境变量（前缀 `CRATES_DOCS_`）
+//!
+//! # 示例
+//!
+//! ```rust,no_run
+//! use crates_docs::config::AppConfig;
+//!
+//! // 从文件加载配置
+//! let config = AppConfig::from_file("config.toml").expect("Failed to load config");
+//!
+//! // 从环境变量加载配置
+//! let config = AppConfig::from_env().expect("Failed to load config from env");
+//!
+//! // 使用默认配置
+//! let config = AppConfig::default();
+//! ```
 
 use crate::cache::CacheConfig;
 use crate::server::auth::OAuthConfig;
@@ -7,22 +35,32 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-/// Application configuration
+/// 应用程序配置
+///
+/// 包含服务器、缓存、OAuth、日志和性能配置。
+///
+/// # 字段
+///
+/// - `server`: 服务器配置
+/// - `cache`: 缓存配置
+/// - `oauth`: OAuth 配置
+/// - `logging`: 日志配置
+/// - `performance`: 性能配置
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct AppConfig {
-    /// Server configuration
+    /// 服务器配置
     pub server: ServerConfig,
 
-    /// Cache configuration
+    /// 缓存配置
     pub cache: CacheConfig,
 
-    /// OAuth configuration
+    /// OAuth 配置
     pub oauth: OAuthConfig,
 
-    /// Logging configuration
+    /// 日志配置
     pub logging: LoggingConfig,
 
-    /// Performance configuration
+    /// 性能配置
     pub performance: PerformanceConfig,
 }
 
