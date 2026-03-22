@@ -19,6 +19,9 @@
 - 🛡️ **安全可靠**: 速率限制、连接池、请求验证
 - 📊 **健康监控**: 内置健康检查和性能监控
 - 🏗️ **模块化架构**: 清晰的模块划分，易于扩展和维护
+- 🔄 **HTTP 重试机制**: 可配置的 HTTP 客户端重试逻辑，提高外部服务调用可靠性
+- 📊 **Prometheus 指标**: 内置指标监控支持，便于运维观测
+- ⏱️ **细粒度缓存 TTL**: 为 crate 文档、项目文档、搜索结果提供独立的 TTL 配置
 
 ## 项目结构
 
@@ -346,6 +349,12 @@ allowed_origins = ["http://localhost:*"]
 cache_type = "memory"
 memory_size = 1000
 default_ttl = 3600
+# crate 文档缓存 TTL（秒），默认 1 小时
+crate_docs_ttl_secs = 3600
+# 项目文档缓存 TTL（秒），默认 30 分钟
+item_docs_ttl_secs = 1800
+# 搜索结果缓存 TTL（秒），默认 5 分钟
+search_results_ttl_secs = 300
 
 [logging]
 level = "info"
@@ -356,6 +365,16 @@ enable_file = false  # 默认仅控制台输出
 http_client_pool_size = 10
 cache_max_size = 1000
 enable_response_compression = true
+# HTTP 客户端最大重试次数
+http_client_max_retries = 3
+# HTTP 客户端重试初始延迟（毫秒）
+http_client_retry_initial_delay_ms = 100
+# HTTP 客户端重试最大延迟（毫秒）
+http_client_retry_max_delay_ms = 10000
+# 启用 Prometheus 指标收集
+enable_metrics = true
+# 指标服务端口号（0 表示使用服务器端口）
+metrics_port = 0
 ```
 
 > **启用文件日志**：设置 `enable_file = true` 并配置 `file_path` 可写入日志文件。
@@ -423,6 +442,13 @@ cache_type = "redis"
 redis_url = "redis://localhost:6379"
 default_ttl = 3600
 ```
+
+### 缓存 TTL 配置
+
+支持为不同类型的数据配置独立的 TTL：
+- `crate_docs_ttl_secs`: crate 文档缓存时间（默认 3600 秒 / 1 小时）
+- `item_docs_ttl_secs`: 项目文档缓存时间（默认 1800 秒 / 30 分钟）
+- `search_results_ttl_secs`: 搜索结果缓存时间（默认 300 秒 / 5 分钟）
 
 ## 部署
 

@@ -4,7 +4,7 @@
 # 服务器名称
 name = "crates-docs"
 # 服务器版本
-version = "0.3.0"
+version = "0.4.0"
 # 服务器描述
 description = "高性能 Rust crate 文档查询 MCP 服务器"
 # 监听主机
@@ -45,6 +45,12 @@ memory_size = 1000
 # redis_url = "redis://localhost:6379"
 # 默认缓存时间（秒）
 default_ttl = 3600
+# crate 文档缓存 TTL（秒），默认 1 小时
+crate_docs_ttl_secs = 3600
+# 项目文档缓存 TTL（秒），默认 30 分钟
+item_docs_ttl_secs = 1800
+# 搜索结果缓存 TTL（秒），默认 5 分钟
+search_results_ttl_secs = 300
 
 [oauth]
 # 是否启用 OAuth
