@@ -4,16 +4,59 @@ use crate::cache::Cache;
 use std::sync::Arc;
 use std::time::Duration;
 
+/// TTL configuration for document cache
+#[derive(Debug, Clone, Copy)]
+pub struct DocCacheTtl {
+    /// TTL for crate documentation (seconds)
+    pub crate_docs_secs: u64,
+    /// TTL for search results (seconds)
+    pub search_results_secs: u64,
+    /// TTL for item documentation (seconds)
+    pub item_docs_secs: u64,
+}
+
+impl Default for DocCacheTtl {
+    fn default() -> Self {
+        Self {
+            crate_docs_secs: 3600,    // 1 hour
+            search_results_secs: 300, // 5 minutes
+            item_docs_secs: 1800,     // 30 minutes
+        }
+    }
+}
+
+impl DocCacheTtl {
+    /// Create TTL config from `CacheConfig`
+    #[must_use]
+    pub fn from_cache_config(config: &crate::cache::CacheConfig) -> Self {
+        Self {
+            crate_docs_secs: config.crate_docs_ttl_secs.unwrap_or(3600),
+            search_results_secs: config.search_results_ttl_secs.unwrap_or(300),
+            item_docs_secs: config.item_docs_ttl_secs.unwrap_or(1800),
+        }
+    }
+}
+
 /// Document cache service
 #[derive(Clone)]
 pub struct DocCache {
     cache: Arc<dyn Cache>,
+    ttl: DocCacheTtl,
 }
 
 impl DocCache {
-    /// Create a new document cache
+    /// Create a new document cache with default TTL
     pub fn new(cache: Arc<dyn Cache>) -> Self {
-        Self { cache }
+        Self {
+            cache,
+            ttl: DocCacheTtl::default(),
+        }
+    }
+
+    /// Create a new document cache with custom TTL configuration
+    #[must_use]
+    pub fn with_ttl(cache: Arc<dyn Cache>, ttl: DocCacheTtl) -> Self {
+        Self { cache, ttl }
     }
 
     /// Get cached document
@@ -35,7 +78,11 @@ impl DocCache {
     ) -> crate::error::Result<()> {
         let key = Self::crate_cache_key(crate_name, version);
         self.cache
-            .set(key, content, Some(Duration::from_secs(3600)))
+            .set(
+                key,
+                content,
+                Some(Duration::from_secs(self.ttl.crate_docs_secs)),
+            )
             .await
     }
 
@@ -58,8 +105,12 @@ impl DocCache {
     ) -> crate::error::Result<()> {
         let key = Self::search_cache_key(query, limit);
         self.cache
-            .set(key, content, Some(Duration::from_secs(300)))
-            .await // 5 minutes cache
+            .set(
+                key,
+                content,
+                Some(Duration::from_secs(self.ttl.search_results_secs)),
+            )
+            .await
     }
 
     /// Get cached item documentation
@@ -87,8 +138,12 @@ impl DocCache {
     ) -> crate::error::Result<()> {
         let key = Self::item_cache_key(crate_name, item_path, version);
         self.cache
-            .set(key, content, Some(Duration::from_secs(1800)))
-            .await // 30 minutes cache
+            .set(
+                key,
+                content,
+                Some(Duration::from_secs(self.ttl.item_docs_secs)),
+            )
+            .await
     }
 
     /// Clear cache
@@ -200,5 +255,31 @@ mod tests {
             DocCache::item_cache_key("serde", "Serialize", Some("1.0")),
             "item:serde:1.0:Serialize"
         );
+    }
+
+    #[test]
+    fn test_doc_cache_ttl_default() {
+        let ttl = DocCacheTtl::default();
+        assert_eq!(ttl.crate_docs_secs, 3600);
+        assert_eq!(ttl.search_results_secs, 300);
+        assert_eq!(ttl.item_docs_secs, 1800);
+    }
+
+    #[test]
+    fn test_doc_cache_ttl_from_config() {
+        let config = crate::cache::CacheConfig {
+            cache_type: "memory".to_string(),
+            memory_size: Some(1000),
+            redis_url: None,
+            key_prefix: String::new(),
+            default_ttl: Some(3600),
+            crate_docs_ttl_secs: Some(7200),
+            item_docs_ttl_secs: Some(3600),
+            search_results_ttl_secs: Some(600),
+        };
+        let ttl = DocCacheTtl::from_cache_config(&config);
+        assert_eq!(ttl.crate_docs_secs, 7200);
+        assert_eq!(ttl.item_docs_secs, 3600);
+        assert_eq!(ttl.search_results_secs, 600);
     }
 }

@@ -80,11 +80,19 @@ impl LookupCrateToolImpl {
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
 
-        if !response.status().is_success() {
+        let status = response.status();
+        if !status.is_success() {
+            let error_body = response.text().await.map_err(|e| {
+                CallToolError::from_message(format!("Failed to read error response: {e}"))
+            })?;
             return Err(CallToolError::from_message(format!(
                 "Failed to get documentation: HTTP {} - {}",
-                response.status(),
-                response.text().await.unwrap_or_default()
+                status,
+                if error_body.is_empty() {
+                    "No error details".to_string()
+                } else {
+                    error_body
+                }
             )));
         }
 

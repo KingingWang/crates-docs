@@ -61,13 +61,7 @@ fn test_html_entity_decoding() {
 /// 测试 DocCache 的 crate 文档缓存
 #[tokio::test]
 async fn test_doc_cache_crate_docs() {
-    let config = CacheConfig {
-        cache_type: "memory".to_string(),
-        memory_size: Some(100),
-        default_ttl: Some(3600),
-        redis_url: None,
-        key_prefix: String::new(),
-    };
+    let config = CacheConfig::default();
     let cache = create_cache(&config).expect("创建缓存失败");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
     let doc_cache = DocCache::new(cache_arc);
@@ -102,13 +96,7 @@ async fn test_doc_cache_crate_docs() {
 /// 测试 DocCache 的项目文档缓存
 #[tokio::test]
 async fn test_doc_cache_item_docs() {
-    let config = CacheConfig {
-        cache_type: "memory".to_string(),
-        memory_size: Some(100),
-        default_ttl: Some(3600),
-        redis_url: None,
-        key_prefix: String::new(),
-    };
+    let config = CacheConfig::default();
     let cache = create_cache(&config).expect("创建缓存失败");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
     let doc_cache = DocCache::new(cache_arc);
@@ -829,6 +817,9 @@ fn test_create_cache_unsupported_type() {
         default_ttl: Some(3600),
         redis_url: None,
         key_prefix: String::new(),
+        crate_docs_ttl_secs: Some(3600),
+        item_docs_ttl_secs: Some(1800),
+        search_results_ttl_secs: Some(300),
     };
 
     let result = create_cache(&config);
@@ -850,6 +841,9 @@ fn test_create_cache_redis_sync_error() {
         default_ttl: Some(3600),
         redis_url: Some("redis://localhost:6379".to_string()),
         key_prefix: String::new(),
+        crate_docs_ttl_secs: Some(3600),
+        item_docs_ttl_secs: Some(1800),
+        search_results_ttl_secs: Some(300),
     };
 
     // 同步创建 Redis 缓存应该返回错误（需要异步初始化）
@@ -1531,7 +1525,7 @@ fn test_doc_service_accessors_and_default() {
 
     let cache = create_cache(&CacheConfig::default()).unwrap();
     let cache: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
-    let service = DocService::new(cache.clone());
+    let service = DocService::new(cache.clone()).expect("创建 DocService 失败");
 
     let _client = service.client();
     assert!(Arc::ptr_eq(service.cache(), &cache));

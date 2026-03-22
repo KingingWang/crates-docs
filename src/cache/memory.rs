@@ -56,10 +56,18 @@ impl MemoryCache {
 
 #[async_trait::async_trait]
 impl super::Cache for MemoryCache {
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn get(&self, key: &str) -> Option<String> {
-        self.cache.get(key).map(|entry| entry.value.clone())
+        let result = self.cache.get(key).map(|entry| entry.value.clone());
+        if result.is_some() {
+            tracing::trace!(cache_type = "memory", key = %key, "Cache hit");
+        } else {
+            tracing::trace!(cache_type = "memory", key = %key, "Cache miss");
+        }
+        result
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn set(
         &self,
         key: String,
@@ -67,22 +75,30 @@ impl super::Cache for MemoryCache {
         ttl: Option<Duration>,
     ) -> crate::error::Result<()> {
         let entry = CacheEntry { value, ttl };
+        tracing::trace!(cache_type = "memory", key = %key, "Setting cache entry");
         self.cache.insert(key, entry);
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn delete(&self, key: &str) -> crate::error::Result<()> {
+        tracing::trace!(cache_type = "memory", key = %key, "Deleting cache entry");
         self.cache.invalidate(key);
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn clear(&self) -> crate::error::Result<()> {
+        tracing::trace!(cache_type = "memory", "Clearing all cache entries");
         self.cache.invalidate_all();
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn exists(&self, key: &str) -> bool {
-        self.cache.contains_key(key)
+        let result = self.cache.contains_key(key);
+        tracing::trace!(cache_type = "memory", key = %key, exists = result, "Checking cache entry existence");
+        result
     }
 }
 

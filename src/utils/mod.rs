@@ -6,14 +6,19 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 
-/// HTTP client builder
+/// HTTP client builder with retry support
 pub struct HttpClientBuilder {
     timeout: Duration,
     connect_timeout: Duration,
+    read_timeout: Duration,
     pool_max_idle_per_host: usize,
+    pool_idle_timeout: Duration,
     user_agent: String,
     enable_gzip: bool,
     enable_brotli: bool,
+    max_retries: u32,
+    retry_initial_delay: Duration,
+    retry_max_delay: Duration,
 }
 
 impl Default for HttpClientBuilder {
@@ -21,10 +26,15 @@ impl Default for HttpClientBuilder {
         Self {
             timeout: Duration::from_secs(30),
             connect_timeout: Duration::from_secs(10),
+            read_timeout: Duration::from_secs(30),
             pool_max_idle_per_host: 10,
+            pool_idle_timeout: Duration::from_secs(90),
             user_agent: format!("CratesDocsMCP/{}", crate::VERSION),
             enable_gzip: true,
             enable_brotli: true,
+            max_retries: 3,
+            retry_initial_delay: Duration::from_millis(100),
+            retry_max_delay: Duration::from_secs(10),
         }
     }
 }
@@ -50,10 +60,24 @@ impl HttpClientBuilder {
         self
     }
 
+    /// Set read timeout
+    #[must_use]
+    pub fn read_timeout(mut self, read_timeout: Duration) -> Self {
+        self.read_timeout = read_timeout;
+        self
+    }
+
     /// Set connection pool size
     #[must_use]
     pub fn pool_max_idle_per_host(mut self, max_idle: usize) -> Self {
         self.pool_max_idle_per_host = max_idle;
+        self
+    }
+
+    /// Set pool idle timeout
+    #[must_use]
+    pub fn pool_idle_timeout(mut self, idle_timeout: Duration) -> Self {
+        self.pool_idle_timeout = idle_timeout;
         self
     }
 
@@ -78,12 +102,34 @@ impl HttpClientBuilder {
         self
     }
 
+    /// Set max retry attempts
+    #[must_use]
+    pub fn max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = max_retries;
+        self
+    }
+
+    /// Set retry initial delay
+    #[must_use]
+    pub fn retry_initial_delay(mut self, delay: Duration) -> Self {
+        self.retry_initial_delay = delay;
+        self
+    }
+
+    /// Set retry max delay
+    #[must_use]
+    pub fn retry_max_delay(mut self, delay: Duration) -> Self {
+        self.retry_max_delay = delay;
+        self
+    }
+
     /// Build HTTP client
     pub fn build(self) -> Result<Client> {
         let mut builder = Client::builder()
             .timeout(self.timeout)
             .connect_timeout(self.connect_timeout)
             .pool_max_idle_per_host(self.pool_max_idle_per_host)
+            .pool_idle_timeout(self.pool_idle_timeout)
             .user_agent(&self.user_agent);
 
         // reqwest 0.13 enables gzip and brotli by default
@@ -100,6 +146,37 @@ impl HttpClientBuilder {
             .build()
             .map_err(|e| Error::HttpRequest(e.to_string()))
     }
+
+    /// Build HTTP client with retry support
+    ///
+    /// Note: Retry logic is implemented at the application level for better control.
+    /// This method returns the standard `reqwest::Client`.
+    pub fn build_with_retry(self) -> Result<Client> {
+        // Build client with configured settings
+        // Retry logic should be implemented at the application level
+        // for better control over retry behavior
+        self.build()
+    }
+}
+
+/// Create HTTP client from performance config
+#[must_use]
+pub fn create_http_client_from_config(
+    config: &crate::config::PerformanceConfig,
+) -> HttpClientBuilder {
+    HttpClientBuilder::new()
+        .timeout(Duration::from_secs(config.http_client_timeout_secs))
+        .connect_timeout(Duration::from_secs(config.http_client_connect_timeout_secs))
+        .read_timeout(Duration::from_secs(config.http_client_read_timeout_secs))
+        .pool_max_idle_per_host(config.http_client_pool_size)
+        .pool_idle_timeout(Duration::from_secs(
+            config.http_client_pool_idle_timeout_secs,
+        ))
+        .max_retries(config.http_client_max_retries)
+        .retry_initial_delay(Duration::from_millis(
+            config.http_client_retry_initial_delay_ms,
+        ))
+        .retry_max_delay(Duration::from_millis(config.http_client_retry_max_delay_ms))
 }
 
 /// Rate limiter

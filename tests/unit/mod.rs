@@ -7,5 +7,6 @@ mod config_tests;
 mod error_tests;
 mod lib_tests;
 mod server_tests;
+mod tools_docs_tests;
 mod tools_tests;
 mod utils_tests;

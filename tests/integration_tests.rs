@@ -11,13 +11,7 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_cache_functionality() {
     // 创建内存缓存
-    let config = CacheConfig {
-        cache_type: "memory".to_string(),
-        memory_size: Some(100),
-        default_ttl: Some(3600),
-        redis_url: None,
-        key_prefix: String::new(),
-    };
+    let config = CacheConfig::default();
 
     let cache = create_cache(&config).expect("创建缓存失败");
 
@@ -103,19 +97,13 @@ fn test_config_loading() {
 #[tokio::test]
 async fn test_tool_registry() {
     // 创建缓存
-    let config = CacheConfig {
-        cache_type: "memory".to_string(),
-        memory_size: Some(100),
-        default_ttl: Some(3600),
-        redis_url: None,
-        key_prefix: String::new(),
-    };
+    let config = CacheConfig::default();
 
     let cache = create_cache(&config).expect("创建缓存失败");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
 
     // 创建文档服务
-    let doc_service = Arc::new(DocService::new(cache_arc));
+    let doc_service = Arc::new(DocService::new(cache_arc).expect("创建 DocService 失败"));
 
     // 创建工具注册表
     let registry = crates_docs::tools::create_default_registry(&doc_service);
@@ -420,4 +408,106 @@ fn test_oauth_config() {
 
     let validation_result = invalid_config.validate();
     assert!(validation_result.is_err());
+}
+
+/// 测试传输模式 - stdio
+#[tokio::test]
+async fn test_transport_mode_stdio() {
+    let config = AppConfig::default();
+    let server = CratesDocsServer::new(config).unwrap();
+
+    // stdio 模式测试 - 验证服务器可以创建
+    let server_info = server.server_info();
+    assert_eq!(server_info.server_info.name, "crates-docs");
+}
+
+/// 测试传输模式 - HTTP
+#[tokio::test]
+async fn test_transport_mode_http() {
+    let mut config = AppConfig::default();
+    config.server.transport_mode = "http".to_string();
+    config.server.host = "127.0.0.1".to_string();
+    config.server.port = 8081;
+
+    let server = CratesDocsServer::new(config).unwrap();
+    let server_info = server.server_info();
+
+    assert_eq!(server_info.server_info.name, "crates-docs");
+    assert_eq!(server.config().server.transport_mode, "http");
+}
+
+/// 测试传输模式 - SSE
+#[tokio::test]
+async fn test_transport_mode_sse() {
+    let mut config = AppConfig::default();
+    config.server.transport_mode = "sse".to_string();
+    config.server.host = "127.0.0.1".to_string();
+    config.server.port = 8082;
+
+    let server = CratesDocsServer::new(config).unwrap();
+    let server_info = server.server_info();
+
+    assert_eq!(server_info.server_info.name, "crates-docs");
+    assert_eq!(server.config().server.transport_mode, "sse");
+}
+
+/// 测试传输模式 - hybrid
+#[tokio::test]
+async fn test_transport_mode_hybrid() {
+    let mut config = AppConfig::default();
+    config.server.transport_mode = "hybrid".to_string();
+    config.server.host = "127.0.0.1".to_string();
+    config.server.port = 8083;
+
+    let server = CratesDocsServer::new(config).unwrap();
+    let server_info = server.server_info();
+
+    assert_eq!(server_info.server_info.name, "crates-docs");
+    assert_eq!(server.config().server.transport_mode, "hybrid");
+}
+
+/// 测试性能配置
+#[tokio::test]
+async fn test_performance_config() {
+    let mut config = AppConfig::default();
+
+    // 配置 HTTP 客户端参数
+    config.performance.http_client_pool_size = 20;
+    config.performance.http_client_pool_idle_timeout_secs = 120;
+    config.performance.http_client_connect_timeout_secs = 15;
+    config.performance.http_client_timeout_secs = 45;
+    config.performance.http_client_read_timeout_secs = 45;
+    config.performance.http_client_max_retries = 5;
+    config.performance.http_client_retry_initial_delay_ms = 200;
+    config.performance.http_client_retry_max_delay_ms = 20000;
+
+    // 配置缓存参数
+    config.performance.cache_max_size = 2000;
+    config.performance.cache_default_ttl_secs = 7200;
+
+    // 配置速率限制
+    config.performance.rate_limit_per_second = 200;
+    config.performance.concurrent_request_limit = 100;
+
+    // 配置指标
+    config.performance.enable_metrics = true;
+    config.performance.metrics_port = 9090;
+
+    let server = CratesDocsServer::new(config).unwrap();
+    let perf_config = &server.config().performance;
+
+    assert_eq!(perf_config.http_client_pool_size, 20);
+    assert_eq!(perf_config.http_client_pool_idle_timeout_secs, 120);
+    assert_eq!(perf_config.http_client_connect_timeout_secs, 15);
+    assert_eq!(perf_config.http_client_timeout_secs, 45);
+    assert_eq!(perf_config.http_client_read_timeout_secs, 45);
+    assert_eq!(perf_config.http_client_max_retries, 5);
+    assert_eq!(perf_config.http_client_retry_initial_delay_ms, 200);
+    assert_eq!(perf_config.http_client_retry_max_delay_ms, 20000);
+    assert_eq!(perf_config.cache_max_size, 2000);
+    assert_eq!(perf_config.cache_default_ttl_secs, 7200);
+    assert_eq!(perf_config.rate_limit_per_second, 200);
+    assert_eq!(perf_config.concurrent_request_limit, 100);
+    assert!(perf_config.enable_metrics);
+    assert_eq!(perf_config.metrics_port, 9090);
 }

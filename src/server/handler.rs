@@ -14,6 +14,8 @@ use rust_mcp_sdk::{
     McpServer,
 };
 use std::sync::Arc;
+use tracing::{info_span, Instrument};
+use uuid::Uuid;
 
 /// MCP server handler
 pub struct CratesDocsHandler {
@@ -41,13 +43,25 @@ impl ServerHandler for CratesDocsHandler {
         _request: Option<PaginatedRequestParams>,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<ListToolsResult, RpcError> {
-        let tools = self.tool_registry().get_tools();
+        let trace_id = Uuid::new_v4().to_string();
+        let span = info_span!(
+            "list_tools",
+            trace_id = %trace_id,
+        );
 
-        Ok(ListToolsResult {
-            tools,
-            meta: None,
-            next_cursor: None,
-        })
+        async {
+            tracing::debug!("Listing available tools");
+            let tools = self.tool_registry().get_tools();
+            tracing::debug!("Found {} tools", tools.len());
+
+            Ok(ListToolsResult {
+                tools,
+                meta: None,
+                next_cursor: None,
+            })
+        }
+        .instrument(span)
+        .await
     }
 
     /// Handle call tool request
@@ -56,14 +70,47 @@ impl ServerHandler for CratesDocsHandler {
         params: CallToolRequestParams,
         _runtime: std::sync::Arc<dyn McpServer>,
     ) -> std::result::Result<CallToolResult, CallToolError> {
-        self.tool_registry()
-            .execute_tool(
-                &params.name,
-                params
-                    .arguments
-                    .map_or_else(|| serde_json::Value::Null, serde_json::Value::Object),
-            )
-            .await
+        let trace_id = Uuid::new_v4().to_string();
+        let tool_name = params.name.clone();
+        let span = info_span!(
+            "call_tool",
+            trace_id = %trace_id,
+            tool = %tool_name,
+        );
+
+        async {
+            tracing::info!("Executing tool: {}", tool_name);
+            let start = std::time::Instant::now();
+
+            let result = self
+                .tool_registry()
+                .execute_tool(
+                    &tool_name,
+                    params
+                        .arguments
+                        .map_or_else(|| serde_json::Value::Null, serde_json::Value::Object),
+                )
+                .await;
+
+            let duration = start.elapsed();
+            match &result {
+                Ok(_) => {
+                    tracing::info!("Tool {} executed successfully in {:?}", tool_name, duration);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Tool {} execution failed after {:?}: {:?}",
+                        tool_name,
+                        duration,
+                        e
+                    );
+                }
+            }
+
+            result
+        }
+        .instrument(span)
+        .await
     }
 
     /// Handle list resources request
@@ -128,17 +175,48 @@ impl CratesDocsHandlerCore {
     }
 
     async fn execute_tool_request(&self, params: CallToolRequestParams) -> ResultFromServer {
-        self.server
-            .tool_registry()
-            .execute_tool(
-                &params.name,
-                params
-                    .arguments
-                    .map_or_else(|| serde_json::Value::Null, serde_json::Value::Object),
-            )
-            .await
-            .unwrap_or_else(CallToolResult::from)
-            .into()
+        let trace_id = Uuid::new_v4().to_string();
+        let tool_name = params.name.clone();
+        let span = info_span!(
+            "execute_tool_core",
+            trace_id = %trace_id,
+            tool = %tool_name,
+        );
+
+        async {
+            tracing::info!("Executing tool request: {}", tool_name);
+            let start = std::time::Instant::now();
+
+            let result = self
+                .server
+                .tool_registry()
+                .execute_tool(
+                    &tool_name,
+                    params
+                        .arguments
+                        .map_or_else(|| serde_json::Value::Null, serde_json::Value::Object),
+                )
+                .await;
+
+            let duration = start.elapsed();
+            match &result {
+                Ok(_) => {
+                    tracing::info!("Tool {} executed successfully in {:?}", tool_name, duration);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Tool {} execution failed after {:?}: {:?}",
+                        tool_name,
+                        duration,
+                        e
+                    );
+                }
+            }
+
+            result.unwrap_or_else(CallToolResult::from).into()
+        }
+        .instrument(span)
+        .await
     }
 }
 

@@ -12,6 +12,7 @@ pub mod cache;
 pub mod cli;
 pub mod config;
 pub mod error;
+pub mod metrics;
 pub mod server;
 pub mod tools;
 pub mod utils;

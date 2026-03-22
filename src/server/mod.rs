@@ -27,15 +27,13 @@ pub struct CratesDocsServer {
 }
 
 impl CratesDocsServer {
-    /// Create a new server instance (synchronous)
-    ///
-    /// Note: This method only supports memory cache. For Redis, use the `new_async` method.
-    pub fn new(config: AppConfig) -> Result<Self> {
-        let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
-        let cache: Arc<dyn Cache> = Arc::from(cache_box);
-
-        // Create document service
-        let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
+    /// Create server from parts (common initialization logic)
+    fn from_parts(config: AppConfig, cache: Arc<dyn Cache>) -> crate::error::Result<Self> {
+        // Create document service with cache configuration
+        let doc_service = Arc::new(crate::tools::docs::DocService::with_config(
+            cache.clone(),
+            &config.cache,
+        )?);
 
         // Create tool registry
         let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
@@ -45,6 +43,15 @@ impl CratesDocsServer {
             tool_registry,
             cache,
         })
+    }
+
+    /// Create a new server instance (synchronous)
+    ///
+    /// Note: This method only supports memory cache. For Redis, use the `new_async` method.
+    pub fn new(config: AppConfig) -> Result<Self> {
+        let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
+        let cache: Arc<dyn Cache> = Arc::from(cache_box);
+        Self::from_parts(config, cache)
     }
 
     /// Create a new server instance (asynchronous)
@@ -58,18 +65,7 @@ impl CratesDocsServer {
         {
             let cache_box: Box<dyn Cache> = crate::cache::create_cache_async(&config.cache).await?;
             let cache: Arc<dyn Cache> = Arc::from(cache_box);
-
-            // Create document service
-            let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
-
-            // Create tool registry
-            let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
-
-            Ok(Self {
-                config,
-                tool_registry,
-                cache,
-            })
+            Self::from_parts(config, cache)
         }
 
         #[cfg(not(feature = "cache-redis"))]
@@ -77,18 +73,7 @@ impl CratesDocsServer {
             // No cache-redis feature, fall back to synchronous creation
             let cache_box: Box<dyn Cache> = crate::cache::create_cache(&config.cache)?;
             let cache: Arc<dyn Cache> = Arc::from(cache_box);
-
-            // Create document service
-            let doc_service = Arc::new(crate::tools::docs::DocService::new(cache.clone()));
-
-            // Create tool registry
-            let tool_registry = Arc::new(crate::tools::create_default_registry(&doc_service));
-
-            Ok(Self {
-                config,
-                tool_registry,
-                cache,
-            })
+            Self::from_parts(config, cache)
         }
     }
 
