@@ -67,6 +67,7 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
         client_task_store: None,
         allowed_hosts: Some(config.server.allowed_hosts.clone()),
         allowed_origins: Some(config.server.allowed_origins.clone()),
+        health_endpoint: Some("/health".to_string()),
         ..Default::default()
     };
 
@@ -110,6 +111,7 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
         client_task_store: None,
         allowed_hosts: Some(config.server.allowed_hosts.clone()),
         allowed_origins: Some(config.server.allowed_origins.clone()),
+        health_endpoint: Some("/health".to_string()),
         ..Default::default()
     };
 
@@ -153,6 +155,7 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
         client_task_store: None,
         allowed_hosts: Some(config.server.allowed_hosts.clone()),
         allowed_origins: Some(config.server.allowed_origins.clone()),
+        health_endpoint: Some("/health".to_string()),
         ..Default::default()
     };
 

@@ -91,6 +91,10 @@ path = "src/main.rs"
 name = "unit"
 path = "tests/unit/mod.rs"
 
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
+
 [profile.release]
 lto = true
 codegen-units = 1
