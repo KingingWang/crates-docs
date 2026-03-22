@@ -11,13 +11,7 @@ use std::sync::Arc;
 #[tokio::test]
 async fn test_cache_functionality() {
     // 创建内存缓存
-    let config = CacheConfig {
-        cache_type: "memory".to_string(),
-        memory_size: Some(100),
-        default_ttl: Some(3600),
-        redis_url: None,
-        key_prefix: String::new(),
-    };
+    let config = CacheConfig::default();
 
     let cache = create_cache(&config).expect("创建缓存失败");
 
@@ -103,19 +97,13 @@ fn test_config_loading() {
 #[tokio::test]
 async fn test_tool_registry() {
     // 创建缓存
-    let config = CacheConfig {
-        cache_type: "memory".to_string(),
-        memory_size: Some(100),
-        default_ttl: Some(3600),
-        redis_url: None,
-        key_prefix: String::new(),
-    };
+    let config = CacheConfig::default();
 
     let cache = create_cache(&config).expect("创建缓存失败");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
 
     // 创建文档服务
-    let doc_service = Arc::new(DocService::new(cache_arc));
+    let doc_service = Arc::new(DocService::new(cache_arc).expect("创建 DocService 失败"));
 
     // 创建工具注册表
     let registry = crates_docs::tools::create_default_registry(&doc_service);

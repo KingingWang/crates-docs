@@ -18,19 +18,13 @@ pub async fn run_test_command(
     tracing::info!("Testing tool: {}", tool);
 
     // Create cache
-    let cache_config = crate::cache::CacheConfig {
-        cache_type: "memory".to_string(),
-        memory_size: Some(1000),
-        default_ttl: Some(3600),
-        redis_url: None,
-        key_prefix: String::new(),
-    };
+    let cache_config = crate::cache::CacheConfig::default();
 
     let cache = crate::cache::create_cache(&cache_config)?;
     let cache_arc: Arc<dyn crate::cache::Cache> = Arc::from(cache);
 
     // Create document service
-    let doc_service = Arc::new(crate::tools::docs::DocService::new(cache_arc));
+    let doc_service = Arc::new(crate::tools::docs::DocService::new(cache_arc)?);
 
     // Create tool registry
     let registry = crate::tools::create_default_registry(&doc_service);

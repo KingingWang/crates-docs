@@ -168,7 +168,7 @@ fn test_doc_service_accessors_and_default() {
 
     let cache = create_cache(&CacheConfig::default()).unwrap();
     let cache: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
-    let service = DocService::new(cache.clone());
+    let service = DocService::new(cache.clone()).expect("创建 DocService 失败");
 
     let _client = service.client();
     assert!(Arc::ptr_eq(service.cache(), &cache));

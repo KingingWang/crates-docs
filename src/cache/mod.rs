@@ -64,6 +64,36 @@ pub struct CacheConfig {
 
     /// Default TTL (seconds)
     pub default_ttl: Option<u64>,
+
+    /// Crate documentation cache TTL (seconds)
+    #[serde(default = "default_crate_docs_ttl")]
+    pub crate_docs_ttl_secs: Option<u64>,
+
+    /// Item documentation cache TTL (seconds)
+    #[serde(default = "default_item_docs_ttl")]
+    pub item_docs_ttl_secs: Option<u64>,
+
+    /// Search results cache TTL (seconds)
+    #[serde(default = "default_search_results_ttl")]
+    pub search_results_ttl_secs: Option<u64>,
+}
+
+/// Default crate docs TTL (1 hour)
+#[must_use]
+pub fn default_crate_docs_ttl() -> Option<u64> {
+    Some(3600)
+}
+
+/// Default item docs TTL (30 minutes)
+#[must_use]
+pub fn default_item_docs_ttl() -> Option<u64> {
+    Some(1800)
+}
+
+/// Default search results TTL (5 minutes)
+#[must_use]
+pub fn default_search_results_ttl() -> Option<u64> {
+    Some(300)
 }
 
 /// Default key prefix
@@ -80,6 +110,9 @@ impl Default for CacheConfig {
             redis_url: None,
             key_prefix: String::new(),
             default_ttl: Some(3600), // 1 hour
+            crate_docs_ttl_secs: default_crate_docs_ttl(),
+            item_docs_ttl_secs: default_item_docs_ttl(),
+            search_results_ttl_secs: default_search_results_ttl(),
         }
     }
 }
