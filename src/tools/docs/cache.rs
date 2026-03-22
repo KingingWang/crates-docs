@@ -1,32 +1,67 @@
-//! Document cache module
+//! 文档缓存模块
+//!
+//! 提供文档专用的缓存服务，支持 crate 文档、搜索结果和项目文档的独立 TTL 配置。
+//!
+//! # 缓存键格式
+//!
+//! - Crate 文档: `crate:{name}` 或 `crate:{name}:{version}`
+//! - 搜索结果: `search:{query}:{limit}`
+//! - 项目文档: `item:{crate}:{path}` 或 `item:{crate}:{version}:{path}`
+//!
+//! # 示例
+//!
+//! ```rust,no_run
+//! use std::sync::Arc;
+//! use crates_docs::tools::docs::cache::{DocCache, DocCacheTtl};
+//! use crates_docs::cache::memory::MemoryCache;
+//!
+//! let cache = Arc::new(MemoryCache::new(1000));
+//! let doc_cache = DocCache::new(cache);
+//! ```
 
 use crate::cache::Cache;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// TTL configuration for document cache
+/// 文档缓存 TTL 配置
+///
+/// 为不同类型的文档配置独立的 TTL。
+///
+/// # 字段
+///
+/// - `crate_docs_secs`: crate 文档缓存时间（秒）
+/// - `search_results_secs`: 搜索结果缓存时间（秒）
+/// - `item_docs_secs`: 项目文档缓存时间（秒）
 #[derive(Debug, Clone, Copy)]
 pub struct DocCacheTtl {
-    /// TTL for crate documentation (seconds)
+    /// crate 文档 TTL（秒）
     pub crate_docs_secs: u64,
-    /// TTL for search results (seconds)
+    /// 搜索结果 TTL（秒）
     pub search_results_secs: u64,
-    /// TTL for item documentation (seconds)
+    /// 项目文档 TTL（秒）
     pub item_docs_secs: u64,
 }
 
 impl Default for DocCacheTtl {
     fn default() -> Self {
         Self {
-            crate_docs_secs: 3600,    // 1 hour
-            search_results_secs: 300, // 5 minutes
-            item_docs_secs: 1800,     // 30 minutes
+            crate_docs_secs: 3600,    // 1 小时
+            search_results_secs: 300, // 5 分钟
+            item_docs_secs: 1800,     // 30 分钟
         }
     }
 }
 
 impl DocCacheTtl {
-    /// Create TTL config from `CacheConfig`
+    /// 从 `CacheConfig` 创建 TTL 配置
+    ///
+    /// # 参数
+    ///
+    /// * `config` - 缓存配置
+    ///
+    /// # 返回值
+    ///
+    /// 返回根据配置创建的 TTL 配置
     #[must_use]
     pub fn from_cache_config(config: &crate::cache::CacheConfig) -> Self {
         Self {
@@ -37,7 +72,14 @@ impl DocCacheTtl {
     }
 }
 
-/// Document cache service
+/// 文档缓存服务
+///
+/// 提供文档专用的缓存操作，支持 crate 文档、搜索结果和项目文档。
+///
+/// # 字段
+///
+/// - `cache`: 底层缓存实例
+/// - `ttl`: TTL 配置
 #[derive(Clone)]
 pub struct DocCache {
     cache: Arc<dyn Cache>,
@@ -45,7 +87,22 @@ pub struct DocCache {
 }
 
 impl DocCache {
-    /// Create a new document cache with default TTL
+    /// 创建新的文档缓存（使用默认 TTL）
+    ///
+    /// # 参数
+    ///
+    /// * `cache` - 缓存实例
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use crates_docs::tools::docs::cache::DocCache;
+    /// use crates_docs::cache::memory::MemoryCache;
+    ///
+    /// let cache = Arc::new(MemoryCache::new(1000));
+    /// let doc_cache = DocCache::new(cache);
+    /// ```
     pub fn new(cache: Arc<dyn Cache>) -> Self {
         Self {
             cache,
@@ -53,23 +110,59 @@ impl DocCache {
         }
     }
 
-    /// Create a new document cache with custom TTL configuration
+    /// 创建新的文档缓存（使用自定义 TTL）
+    ///
+    /// # 参数
+    ///
+    /// * `cache` - 缓存实例
+    /// * `ttl` - TTL 配置
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use crates_docs::tools::docs::cache::{DocCache, DocCacheTtl};
+    /// use crates_docs::cache::memory::MemoryCache;
+    ///
+    /// let cache = Arc::new(MemoryCache::new(1000));
+    /// let ttl = DocCacheTtl {
+    ///     crate_docs_secs: 7200,
+    ///     search_results_secs: 600,
+    ///     item_docs_secs: 3600,
+    /// };
+    /// let doc_cache = DocCache::with_ttl(cache, ttl);
+    /// ```
     #[must_use]
     pub fn with_ttl(cache: Arc<dyn Cache>, ttl: DocCacheTtl) -> Self {
         Self { cache, ttl }
     }
 
-    /// Get cached document
+    /// 获取缓存的 crate 文档
+    ///
+    /// # 参数
+    ///
+    /// * `crate_name` - crate 名称
+    /// * `version` - 可选的版本号
+    ///
+    /// # 返回值
+    ///
+    /// 如果缓存命中，返回文档内容；否则返回 `None`
     pub async fn get_crate_docs(&self, crate_name: &str, version: Option<&str>) -> Option<String> {
         let key = Self::crate_cache_key(crate_name, version);
         self.cache.get(&key).await
     }
 
-    /// Set cached document
+    /// 设置 crate 文档缓存
     ///
-    /// # Errors
+    /// # 参数
     ///
-    /// Returns an error if the cache operation fails
+    /// * `crate_name` - crate 名称
+    /// * `version` - 可选的版本号
+    /// * `content` - 文档内容
+    ///
+    /// # 错误
+    ///
+    /// 如果缓存操作失败，返回错误
     pub async fn set_crate_docs(
         &self,
         crate_name: &str,
@@ -86,17 +179,32 @@ impl DocCache {
             .await
     }
 
-    /// Get cached search results
+    /// 获取缓存的搜索结果
+    ///
+    /// # 参数
+    ///
+    /// * `query` - 搜索查询
+    /// * `limit` - 结果数量限制
+    ///
+    /// # 返回值
+    ///
+    /// 如果缓存命中，返回搜索结果；否则返回 `None`
     pub async fn get_search_results(&self, query: &str, limit: u32) -> Option<String> {
         let key = Self::search_cache_key(query, limit);
         self.cache.get(&key).await
     }
 
-    /// Set cached search results
+    /// 设置搜索结果缓存
     ///
-    /// # Errors
+    /// # 参数
     ///
-    /// Returns an error if the cache operation fails
+    /// * `query` - 搜索查询
+    /// * `limit` - 结果数量限制
+    /// * `content` - 搜索结果内容
+    ///
+    /// # 错误
+    ///
+    /// 如果缓存操作失败，返回错误
     pub async fn set_search_results(
         &self,
         query: &str,
@@ -113,7 +221,17 @@ impl DocCache {
             .await
     }
 
-    /// Get cached item documentation
+    /// 获取缓存的项目文档
+    ///
+    /// # 参数
+    ///
+    /// * `crate_name` - crate 名称
+    /// * `item_path` - 项目路径
+    /// * `version` - 可选的版本号
+    ///
+    /// # 返回值
+    ///
+    /// 如果缓存命中，返回项目文档；否则返回 `None`
     pub async fn get_item_docs(
         &self,
         crate_name: &str,
@@ -124,11 +242,18 @@ impl DocCache {
         self.cache.get(&key).await
     }
 
-    /// Set cached item documentation
+    /// 设置项目文档缓存
     ///
-    /// # Errors
+    /// # 参数
     ///
-    /// Returns an error if the cache operation fails
+    /// * `crate_name` - crate 名称
+    /// * `item_path` - 项目路径
+    /// * `version` - 可选的版本号
+    /// * `content` - 文档内容
+    ///
+    /// # 错误
+    ///
+    /// 如果缓存操作失败，返回错误
     pub async fn set_item_docs(
         &self,
         crate_name: &str,
@@ -146,16 +271,16 @@ impl DocCache {
             .await
     }
 
-    /// Clear cache
+    /// 清除缓存
     ///
-    /// # Errors
+    /// # 错误
     ///
-    /// Returns an error if the cache operation fails
+    /// 如果缓存操作失败，返回错误
     pub async fn clear(&self) -> crate::error::Result<()> {
         self.cache.clear().await
     }
 
-    /// Build crate cache key
+    /// 构建 crate 缓存键
     fn crate_cache_key(crate_name: &str, version: Option<&str>) -> String {
         if let Some(ver) = version {
             format!("crate:{crate_name}:{ver}")
@@ -164,12 +289,12 @@ impl DocCache {
         }
     }
 
-    /// Build search cache key
+    /// 构建搜索缓存键
     fn search_cache_key(query: &str, limit: u32) -> String {
         format!("search:{query}:{limit}")
     }
 
-    /// Build item cache key
+    /// 构建项目缓存键
     fn item_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
         if let Some(ver) = version {
             format!("item:{crate_name}:{ver}:{item_path}")

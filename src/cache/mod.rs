@@ -1,6 +1,20 @@
-//! Cache module
+//! 缓存模块
 //!
-//! Provides memory cache and Redis cache support.
+//! 提供内存缓存和 Redis 缓存支持。
+//!
+//! # 特性
+//!
+//! - **内存缓存**: 基于 `moka` 的高性能内存缓存，支持 `TinyLFU` 淘汰策略
+//! - **Redis 缓存**: 支持分布式部署（需要启用 `cache-redis` feature）
+//!
+//! # 示例
+//!
+//! ```rust,no_run
+//! use crates_docs::cache::{Cache, CacheConfig, create_cache};
+//!
+//! let config = CacheConfig::default();
+//! let cache = create_cache(&config).expect("Failed to create cache");
+//! ```
 
 #[cfg(feature = "cache-memory")]
 pub mod memory;
@@ -10,17 +24,38 @@ pub mod redis;
 
 use std::time::Duration;
 
-/// Cache trait
+/// 缓存 trait
+///
+/// 定义缓存操作的基本接口，支持异步读写、TTL 过期和批量清理。
+///
+/// # 实现
+///
+/// - `memory::MemoryCache`: 内存缓存实现
+/// - `redis::RedisCache`: Redis 缓存实现（需要 `cache-redis` feature）
 #[async_trait::async_trait]
 pub trait Cache: Send + Sync {
-    /// Get cache value
+    /// 获取缓存值
+    ///
+    /// # 参数
+    ///
+    /// * `key` - 缓存键
+    ///
+    /// # 返回值
+    ///
+    /// 如果键存在且未过期，返回缓存值；否则返回 `None`
     async fn get(&self, key: &str) -> Option<String>;
 
-    /// Set cache value
+    /// 设置缓存值
     ///
-    /// # Errors
+    /// # 参数
     ///
-    /// Returns an error if the cache operation fails
+    /// * `key` - 缓存键
+    /// * `value` - 缓存值
+    /// * `ttl` - 可选的过期时间
+    ///
+    /// # 错误
+    ///
+    /// 如果缓存操作失败，返回错误
     async fn set(
         &self,
         key: String,
@@ -28,75 +63,102 @@ pub trait Cache: Send + Sync {
         ttl: Option<Duration>,
     ) -> crate::error::Result<()>;
 
-    /// Delete cache value
+    /// 删除缓存值
     ///
-    /// # Errors
+    /// # 参数
     ///
-    /// Returns an error if the cache operation fails
+    /// * `key` - 缓存键
+    ///
+    /// # 错误
+    ///
+    /// 如果缓存操作失败，返回错误
     async fn delete(&self, key: &str) -> crate::error::Result<()>;
 
-    /// Clear all cache entries with the configured key prefix
+    /// 清除所有缓存条目
     ///
-    /// # Errors
+    /// 仅清除配置了前缀的缓存条目。
     ///
-    /// Returns an error if the cache operation fails
+    /// # 错误
+    ///
+    /// 如果缓存操作失败，返回错误
     async fn clear(&self) -> crate::error::Result<()>;
 
-    /// Check if key exists
+    /// 检查键是否存在
+    ///
+    /// # 参数
+    ///
+    /// * `key` - 缓存键
+    ///
+    /// # 返回值
+    ///
+    /// 如果键存在返回 `true`，否则返回 `false`
     async fn exists(&self, key: &str) -> bool;
 }
 
-/// Cache configuration
+/// 缓存配置
+///
+/// 配置缓存类型、大小、TTL 等参数。
+///
+/// # 字段
+///
+/// - `cache_type`: 缓存类型，`"memory"` 或 `"redis"`
+/// - `memory_size`: 内存缓存大小（条目数）
+/// - `redis_url`: Redis 连接 URL
+/// - `key_prefix`: 键前缀（用于隔离不同服务的缓存）
+/// - `default_ttl`: 默认 TTL（秒）
+/// - `crate_docs_ttl_secs`: crate 文档缓存 TTL（秒）
+/// - `item_docs_ttl_secs`: 项目文档缓存 TTL（秒）
+/// - `search_results_ttl_secs`: 搜索结果缓存 TTL（秒）
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct CacheConfig {
-    /// Cache type: memory or redis
+    /// 缓存类型：`memory` 或 `redis`
     pub cache_type: String,
 
-    /// Memory cache size (number of entries)
+    /// 内存缓存大小（条目数）
     pub memory_size: Option<usize>,
 
-    /// Redis connection URL
+    /// Redis 连接 URL
     pub redis_url: Option<String>,
 
-    /// Key prefix for Redis cache (to isolate cache entries from different services)
+    /// Redis 缓存键前缀（用于隔离不同服务的缓存条目）
     #[serde(default = "default_key_prefix")]
     pub key_prefix: String,
 
-    /// Default TTL (seconds)
+    /// 默认 TTL（秒）
     pub default_ttl: Option<u64>,
 
-    /// Crate documentation cache TTL (seconds)
+    /// crate 文档缓存 TTL（秒）
     #[serde(default = "default_crate_docs_ttl")]
     pub crate_docs_ttl_secs: Option<u64>,
 
-    /// Item documentation cache TTL (seconds)
+    /// 项目文档缓存 TTL（秒）
     #[serde(default = "default_item_docs_ttl")]
     pub item_docs_ttl_secs: Option<u64>,
 
-    /// Search results cache TTL (seconds)
+    /// 搜索结果缓存 TTL（秒）
     #[serde(default = "default_search_results_ttl")]
     pub search_results_ttl_secs: Option<u64>,
 }
 
-/// Default crate docs TTL (1 hour)
+/// 默认 crate 文档 TTL（1 小时）
 #[must_use]
 pub fn default_crate_docs_ttl() -> Option<u64> {
     Some(3600)
 }
 
-/// Default item docs TTL (30 minutes)
+/// 默认项目文档 TTL（30 分钟）
 #[must_use]
 pub fn default_item_docs_ttl() -> Option<u64> {
     Some(1800)
 }
 
-/// Default search results TTL (5 minutes)
+/// 默认搜索结果 TTL（5 分钟）
 #[must_use]
 pub fn default_search_results_ttl() -> Option<u64> {
     Some(300)
 }
 
-/// Default key prefix
+/// 默认键前缀
 #[must_use]
 pub fn default_key_prefix() -> String {
     String::new()
@@ -117,11 +179,24 @@ impl Default for CacheConfig {
     }
 }
 
-/// Create cache instance
+/// 创建缓存实例
 ///
-/// # Errors
+/// # 参数
 ///
-/// Returns an error if cache type is not supported or configuration is invalid
+/// * `config` - 缓存配置
+///
+/// # 错误
+///
+/// 如果缓存类型不支持或配置无效，返回错误
+///
+/// # 示例
+///
+/// ```rust,no_run
+/// use crates_docs::cache::{CacheConfig, create_cache};
+///
+/// let config = CacheConfig::default();
+/// let cache = create_cache(&config).expect("Failed to create cache");
+/// ```
 pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error::Error> {
     match config.cache_type.as_str() {
         "memory" => {
@@ -161,11 +236,30 @@ pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error
     }
 }
 
-/// Create cache instance asynchronously
+/// 异步创建缓存实例
 ///
-/// # Errors
+/// 支持 Redis 缓存的异步初始化。
 ///
-/// Returns an error if cache type is not supported or configuration is invalid
+/// # 参数
+///
+/// * `config` - 缓存配置
+///
+/// # 错误
+///
+/// 如果缓存类型不支持或配置无效，返回错误
+///
+/// # 示例
+///
+/// ```rust,no_run
+/// use crates_docs::cache::{CacheConfig, create_cache_async};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let config = CacheConfig::default();
+///     let cache = create_cache_async(&config).await?;
+///     Ok(())
+/// }
+/// ```
 #[cfg(feature = "cache-redis")]
 pub async fn create_cache_async(
     config: &CacheConfig,

@@ -1,6 +1,43 @@
 //! Crates Docs MCP Server
 //!
-//! A high-performance Rust crate documentation query MCP server with support for multiple transport protocols and OAuth authentication.
+//! 一个高性能的 Rust crate 文档查询 MCP 服务器，支持多种传输协议和 OAuth 认证。
+//!
+//! # 主要功能
+//!
+//! - **Crate 文档查询**: 从 docs.rs 获取 crate 的完整文档
+//! - **Crate 搜索**: 从 crates.io 搜索 Rust crate
+//! - **项目文档查找**: 查找 crate 中的特定类型、函数或模块
+//! - **健康检查**: 检查服务器和外部服务状态
+//!
+//! # 传输协议支持
+//!
+//! - `stdio`: 标准输入输出（适合 MCP 客户端集成）
+//! - `http`: HTTP 传输（Streamable HTTP）
+//! - `sse`: Server-Sent Events
+//! - `hybrid`: 混合模式（HTTP + SSE）
+//!
+//! # 缓存支持
+//!
+//! - **内存缓存**: 基于 `moka` 的高性能内存缓存，支持 `TinyLFU` 淘汰策略和按条目 TTL
+//! - **Redis 缓存**: 支持分布式部署（需要启用 `cache-redis` feature）
+//!
+//! # 示例
+//!
+//! ```rust,no_run
+//! use crates_docs::{AppConfig, CratesDocsServer};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // 使用默认配置创建服务器
+//!     let config = AppConfig::default();
+//!     let server = CratesDocsServer::new(config)?;
+//!
+//!     // 运行 HTTP 服务器
+//!     server.run_http().await?;
+//!
+//!     Ok(())
+//! }
+//! ```
 
 #![warn(missing_docs)]
 #![warn(clippy::pedantic)]
@@ -18,14 +55,17 @@ pub mod tools;
 pub mod utils;
 
 pub use crate::config::{AppConfig, ServerConfig};
-/// Re-export common types
+/// 重新导出错误类型
 pub use crate::error::{Error, Result};
+/// 重新导出服务器类型
 pub use crate::server::CratesDocsServer;
 
-/// Server version information
+/// 服务器版本号
+///
+/// 从 `CARGO_PKG_VERSION` 环境变量获取
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Server name
+/// 服务器名称
 pub const NAME: &str = "crates-docs";
 
 /// Initialize the logging system (simple version using boolean parameter)

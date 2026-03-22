@@ -1,4 +1,11 @@
-//! MCP handler implementation
+//! MCP 请求处理器实现
+//!
+//! 提供 MCP 协议请求的处理逻辑，包括工具列表、工具调用、资源列表等。
+//!
+//! # 主要结构体
+//!
+//! - `CratesDocsHandler`: 标准 MCP 处理器
+//! - `CratesDocsHandlerCore`: 核心处理器（提供更细粒度的控制）
 
 use crate::server::CratesDocsServer;
 use crate::tools::ToolRegistry;
@@ -17,19 +24,41 @@ use std::sync::Arc;
 use tracing::{info_span, Instrument};
 use uuid::Uuid;
 
-/// MCP server handler
+/// MCP 服务器处理器
+///
+/// 实现标准 MCP 协议处理器接口，处理客户端请求。
+///
+/// # 字段
+///
+/// - `server`: 服务器实例的 Arc 引用
 pub struct CratesDocsHandler {
     server: Arc<CratesDocsServer>,
 }
 
 impl CratesDocsHandler {
-    /// Create a new handler
+    /// 创建新的处理器
+    ///
+    /// # 参数
+    ///
+    /// * `server` - 服务器实例
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use std::sync::Arc;
+    /// use crates_docs::server::{CratesDocsServer, CratesDocsHandler};
+    /// use crates_docs::AppConfig;
+    ///
+    /// let config = AppConfig::default();
+    /// let server = Arc::new(CratesDocsServer::new(config).unwrap());
+    /// let handler = CratesDocsHandler::new(server);
+    /// ```
     #[must_use]
     pub fn new(server: Arc<CratesDocsServer>) -> Self {
         Self { server }
     }
 
-    /// Get the tool registry
+    /// 获取工具注册表
     fn tool_registry(&self) -> &ToolRegistry {
         self.server.tool_registry()
     }
