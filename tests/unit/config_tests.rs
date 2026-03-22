@@ -221,4 +221,37 @@ fn test_performance_config_default() {
     let config = crates_docs::config::PerformanceConfig::default();
     assert!(config.http_client_pool_size > 0);
     assert!(config.cache_max_size > 0);
+    // Test new HTTP client config fields
+    assert!(config.http_client_pool_idle_timeout_secs > 0);
+    assert!(config.http_client_connect_timeout_secs > 0);
+    assert!(config.http_client_timeout_secs > 0);
+    assert!(config.http_client_read_timeout_secs > 0);
+    assert!(config.http_client_max_retries > 0);
+    assert!(config.http_client_retry_initial_delay_ms > 0);
+    assert!(config.http_client_retry_max_delay_ms > 0);
+    assert!(config.enable_metrics);
+}
+
+#[test]
+fn test_config_validation_zero_pool_idle_timeout() {
+    let mut config = AppConfig::default();
+    config.performance.http_client_pool_idle_timeout_secs = 0;
+    let result = config.validate();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_config_validation_zero_connect_timeout() {
+    let mut config = AppConfig::default();
+    config.performance.http_client_connect_timeout_secs = 0;
+    let result = config.validate();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_config_validation_zero_request_timeout() {
+    let mut config = AppConfig::default();
+    config.performance.http_client_timeout_secs = 0;
+    let result = config.validate();
+    assert!(result.is_err());
 }

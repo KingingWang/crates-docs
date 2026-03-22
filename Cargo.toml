@@ -48,10 +48,13 @@ moka = { version = "0.12", optional = true, features = ["sync"] }
 redis = { version = "1.0", optional = true, features = ["tokio-comp"] }
 lru = "0.16"
 
-# 日志
+# 日志和监控
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
+tracing-opentelemetry = { version = "0.28", optional = true }
+opentelemetry = { version = "0.28", optional = true }
+prometheus-client = "0.23"
 
 # 工具库
 async-trait = "0.1"
@@ -62,6 +65,7 @@ parking_lot = "0.12"
 flate2 = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 urlencoding = "2.1"
+uuid = { version = "1.11", features = ["v4"] }
 
 # CLI 工具
 clap = { version = "4.5", features = ["derive", "env"] }
@@ -75,6 +79,9 @@ reqwest = { version = "0.13", features = ["json"] }
 serde_json = "1.0"
 tempfile = "3.27"
 temp-env = "0.3"
+mockall = "0.13"
+wiremock = "0.6"
+mockito = "1.6"
 
 [[bin]]
 name = "crates-docs"

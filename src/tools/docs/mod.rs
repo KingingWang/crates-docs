@@ -7,6 +7,7 @@ pub mod lookup_item;
 pub mod search;
 
 use crate::cache::{Cache, CacheConfig};
+use crate::config::PerformanceConfig;
 use std::sync::Arc;
 
 /// Document service
@@ -37,9 +38,33 @@ impl DocService {
     ) -> crate::error::Result<Self> {
         let ttl = cache::DocCacheTtl::from_cache_config(cache_config);
         let doc_cache = cache::DocCache::with_ttl(cache.clone(), ttl);
-        let client = reqwest::Client::builder()
-            .user_agent(format!("CratesDocsMCP/{}", crate::VERSION))
-            .timeout(std::time::Duration::from_secs(30))
+        // Use default performance config for backward compatibility
+        let perf_config = PerformanceConfig::default();
+        let client = crate::utils::create_http_client_from_config(&perf_config)
+            .build()
+            .map_err(|e| {
+                crate::error::Error::Initialization(format!("Failed to create HTTP client: {e}"))
+            })?;
+        Ok(Self {
+            client,
+            cache,
+            doc_cache,
+        })
+    }
+
+    /// Create a new document service with full configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP client cannot be created
+    pub fn with_full_config(
+        cache: Arc<dyn Cache>,
+        cache_config: &CacheConfig,
+        perf_config: &PerformanceConfig,
+    ) -> crate::error::Result<Self> {
+        let ttl = cache::DocCacheTtl::from_cache_config(cache_config);
+        let doc_cache = cache::DocCache::with_ttl(cache.clone(), ttl);
+        let client = crate::utils::create_http_client_from_config(perf_config)
             .build()
             .map_err(|e| {
                 crate::error::Error::Initialization(format!("Failed to create HTTP client: {e}"))

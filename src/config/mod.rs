@@ -123,6 +123,27 @@ pub struct PerformanceConfig {
     /// HTTP client connection pool size
     pub http_client_pool_size: usize,
 
+    /// HTTP client pool idle timeout (seconds)
+    pub http_client_pool_idle_timeout_secs: u64,
+
+    /// HTTP client connection timeout (seconds)
+    pub http_client_connect_timeout_secs: u64,
+
+    /// HTTP client request timeout (seconds)
+    pub http_client_timeout_secs: u64,
+
+    /// HTTP client read timeout (seconds)
+    pub http_client_read_timeout_secs: u64,
+
+    /// HTTP client max retry attempts
+    pub http_client_max_retries: u32,
+
+    /// HTTP client retry initial delay (milliseconds)
+    pub http_client_retry_initial_delay_ms: u64,
+
+    /// HTTP client retry max delay (milliseconds)
+    pub http_client_retry_max_delay_ms: u64,
+
     /// Maximum cache size (number of entries)
     pub cache_max_size: usize,
 
@@ -137,6 +158,12 @@ pub struct PerformanceConfig {
 
     /// Enable response compression
     pub enable_response_compression: bool,
+
+    /// Enable Prometheus metrics
+    pub enable_metrics: bool,
+
+    /// Metrics endpoint port (0 = use server port)
+    pub metrics_port: u16,
 }
 
 impl Default for ServerConfig {
@@ -181,11 +208,20 @@ impl Default for PerformanceConfig {
     fn default() -> Self {
         Self {
             http_client_pool_size: 10,
+            http_client_pool_idle_timeout_secs: 90,
+            http_client_connect_timeout_secs: 10,
+            http_client_timeout_secs: 30,
+            http_client_read_timeout_secs: 30,
+            http_client_max_retries: 3,
+            http_client_retry_initial_delay_ms: 100,
+            http_client_retry_max_delay_ms: 10000,
             cache_max_size: 1000,
             cache_default_ttl_secs: 3600,
             rate_limit_per_second: 100,
             concurrent_request_limit: 50,
             enable_response_compression: true,
+            enable_metrics: true,
+            metrics_port: 0,
         }
     }
 }
@@ -279,6 +315,24 @@ impl AppConfig {
         if self.performance.http_client_pool_size == 0 {
             return Err(crate::error::Error::Config(
                 "HTTP client connection pool size cannot be 0".to_string(),
+            ));
+        }
+
+        if self.performance.http_client_pool_idle_timeout_secs == 0 {
+            return Err(crate::error::Error::Config(
+                "HTTP client pool idle timeout cannot be 0".to_string(),
+            ));
+        }
+
+        if self.performance.http_client_connect_timeout_secs == 0 {
+            return Err(crate::error::Error::Config(
+                "HTTP client connection timeout cannot be 0".to_string(),
+            ));
+        }
+
+        if self.performance.http_client_timeout_secs == 0 {
+            return Err(crate::error::Error::Config(
+                "HTTP client request timeout cannot be 0".to_string(),
             ));
         }
 
