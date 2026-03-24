@@ -48,26 +48,26 @@ fn test_error_from_anyhow_error() {
 
 #[test]
 fn test_error_display() {
-    let err = Error::Config("test config error".to_string());
+    let err = Error::config("field", "test config error");
     assert!(err.to_string().contains("test config error"));
 
-    let err = Error::Cache("test cache error".to_string());
+    let err = Error::cache("get", Some("key".to_string()), "test cache error");
     assert!(err.to_string().contains("test cache error"));
 
-    let err = Error::Mcp("test mcp error".to_string());
+    let err = Error::mcp("context", "test mcp error");
     assert!(err.to_string().contains("test mcp error"));
 }
 
 #[test]
 fn test_error_variants_display() {
     // 测试各种错误类型的 Display
-    let err = Error::Config("config error".to_string());
+    let err = Error::config("field", "config error");
     assert!(!err.to_string().is_empty());
 
-    let err = Error::Cache("cache error".to_string());
+    let err = Error::cache("get", None, "cache error");
     assert!(!err.to_string().is_empty());
 
-    let err = Error::HttpRequest("http error".to_string());
+    let err = Error::http_request("GET", "https://example.com", 500, "http error");
     assert!(!err.to_string().is_empty());
 
     let err = Error::Json(serde_json::from_str::<serde_json::Value>("bad").unwrap_err());
@@ -79,16 +79,16 @@ fn test_error_variants_display() {
     let err = Error::Url(url::ParseError::EmptyHost);
     assert!(!err.to_string().is_empty());
 
-    let err = Error::Mcp("mcp error".to_string());
+    let err = Error::mcp("context", "mcp error");
     assert!(!err.to_string().is_empty());
 
-    let err = Error::Initialization("init error".to_string());
+    let err = Error::initialization("component", "init error");
     assert!(!err.to_string().is_empty());
 
-    let err = Error::Auth("auth error".to_string());
+    let err = Error::auth("provider", "auth error");
     assert!(!err.to_string().is_empty());
 
-    let err = Error::Parse("parse error".to_string());
+    let err = Error::parse("input", None, "parse error");
     assert!(!err.to_string().is_empty());
 
     let err = Error::Other("other error".to_string());

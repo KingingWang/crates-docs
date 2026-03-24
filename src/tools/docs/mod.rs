@@ -92,7 +92,10 @@ impl DocService {
         let client = crate::utils::create_http_client_from_config(&perf_config)
             .build()
             .map_err(|e| {
-                crate::error::Error::Initialization(format!("Failed to create HTTP client: {e}"))
+                crate::error::Error::initialization(
+                    "http_client",
+                    format!("Failed to create HTTP client: {e}"),
+                )
             })?;
         Ok(Self {
             client,
@@ -122,7 +125,10 @@ impl DocService {
         let client = crate::utils::create_http_client_from_config(perf_config)
             .build()
             .map_err(|e| {
-                crate::error::Error::Initialization(format!("Failed to create HTTP client: {e}"))
+                crate::error::Error::initialization(
+                    "http_client",
+                    format!("Failed to create HTTP client: {e}"),
+                )
             })?;
         Ok(Self {
             client,

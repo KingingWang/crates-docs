@@ -271,11 +271,12 @@ impl AppConfig {
     ///
     /// Returns an error if file does not exist, cannot be read, or format is invalid
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, crate::error::Error> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| crate::error::Error::Config(format!("Failed to read config file: {e}")))?;
+        let content = fs::read_to_string(path).map_err(|e| {
+            crate::error::Error::config("file", format!("Failed to read config file: {e}"))
+        })?;
 
         let config: Self = toml::from_str(&content).map_err(|e| {
-            crate::error::Error::Config(format!("Failed to parse config file: {e}"))
+            crate::error::Error::parse("config", None, format!("Failed to parse config file: {e}"))
         })?;
 
         config.validate()?;
@@ -289,18 +290,21 @@ impl AppConfig {
     /// Returns an error if configuration cannot be serialized, directory cannot be created, or file cannot be written
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), crate::error::Error> {
         let content = toml::to_string_pretty(self).map_err(|e| {
-            crate::error::Error::Config(format!("Failed to serialize configuration: {e}"))
+            crate::error::Error::config(
+                "serialization",
+                format!("Failed to serialize configuration: {e}"),
+            )
         })?;
 
         // Ensure directory exists
         if let Some(parent) = path.as_ref().parent() {
             fs::create_dir_all(parent).map_err(|e| {
-                crate::error::Error::Config(format!("Failed to create directory: {e}"))
+                crate::error::Error::config("directory", format!("Failed to create directory: {e}"))
             })?;
         }
 
         fs::write(path, content).map_err(|e| {
-            crate::error::Error::Config(format!("Failed to write config file: {e}"))
+            crate::error::Error::config("file", format!("Failed to write config file: {e}"))
         })?;
 
         Ok(())
@@ -314,70 +318,75 @@ impl AppConfig {
     pub fn validate(&self) -> Result<(), crate::error::Error> {
         // Validate server configuration
         if self.server.host.is_empty() {
-            return Err(crate::error::Error::Config(
-                "Server host cannot be empty".to_string(),
-            ));
+            return Err(crate::error::Error::config("host", "cannot be empty"));
         }
 
         if self.server.port == 0 {
-            return Err(crate::error::Error::Config(
-                "Server port cannot be 0".to_string(),
-            ));
+            return Err(crate::error::Error::config("port", "cannot be 0"));
         }
 
         if self.server.max_connections == 0 {
-            return Err(crate::error::Error::Config(
-                "Maximum connections cannot be 0".to_string(),
+            return Err(crate::error::Error::config(
+                "max_connections",
+                "cannot be 0",
             ));
         }
 
         // Validate transport mode
         let valid_modes = ["stdio", "http", "sse", "hybrid"];
         if !valid_modes.contains(&self.server.transport_mode.as_str()) {
-            return Err(crate::error::Error::Config(format!(
-                "Invalid transport mode: {}, valid values: {:?}",
-                self.server.transport_mode, valid_modes
-            )));
+            return Err(crate::error::Error::config(
+                "transport_mode",
+                format!(
+                    "Invalid transport mode: {}, valid values: {:?}",
+                    self.server.transport_mode, valid_modes
+                ),
+            ));
         }
 
         // Validate log level
         let valid_levels = ["trace", "debug", "info", "warn", "error"];
         if !valid_levels.contains(&self.logging.level.as_str()) {
-            return Err(crate::error::Error::Config(format!(
-                "Invalid log level: {}, valid values: {:?}",
-                self.logging.level, valid_levels
-            )));
+            return Err(crate::error::Error::config(
+                "log_level",
+                format!(
+                    "Invalid log level: {}, valid values: {:?}",
+                    self.logging.level, valid_levels
+                ),
+            ));
         }
 
         // Validate performance configuration
         if self.performance.http_client_pool_size == 0 {
-            return Err(crate::error::Error::Config(
-                "HTTP client connection pool size cannot be 0".to_string(),
+            return Err(crate::error::Error::config(
+                "http_client_pool_size",
+                "cannot be 0",
             ));
         }
 
         if self.performance.http_client_pool_idle_timeout_secs == 0 {
-            return Err(crate::error::Error::Config(
-                "HTTP client pool idle timeout cannot be 0".to_string(),
+            return Err(crate::error::Error::config(
+                "http_client_pool_idle_timeout_secs",
+                "cannot be 0",
             ));
         }
 
         if self.performance.http_client_connect_timeout_secs == 0 {
-            return Err(crate::error::Error::Config(
-                "HTTP client connection timeout cannot be 0".to_string(),
+            return Err(crate::error::Error::config(
+                "http_client_connect_timeout_secs",
+                "cannot be 0",
             ));
         }
 
         if self.performance.http_client_timeout_secs == 0 {
-            return Err(crate::error::Error::Config(
-                "HTTP client request timeout cannot be 0".to_string(),
+            return Err(crate::error::Error::config(
+                "http_client_timeout_secs",
+                "cannot be 0",
             ));
         }
 
         if self.performance.cache_max_size == 0 {
-            return Err(crate::error::Error::Config(
-                "Maximum cache size cannot be 0".to_string(),
-            ));
+            return Err(crate::error::Error::config("cache_max_size", "cannot be 0"));
         }
 
         // Validate OAuth configuration
@@ -408,7 +417,7 @@ impl AppConfig {
         if let Ok(port) = std::env::var("CRATES_DOCS_PORT") {
             config.server.port = port
                 .parse()
-                .map_err(|e| crate::error::Error::Config(format!("Invalid port: {e}")))?;
+                .map_err(|e| crate::error::Error::config("port", format!("Invalid port: {e}")))?;
         }
 
         if let Ok(mode) = std::env::var("CRATES_DOCS_TRANSPORT_MODE") {

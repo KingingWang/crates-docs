@@ -92,7 +92,7 @@ pub fn init_logging(debug: bool) -> Result<()> {
         .with(filter)
         .with(fmt_layer)
         .try_init()
-        .map_err(|e| error::Error::Initialization(e.to_string()))?;
+        .map_err(|e| error::Error::initialization("logging", e.to_string()))?;
 
     Ok(())
 }
@@ -103,6 +103,34 @@ pub fn init_logging(debug: bool) -> Result<()> {
 /// Returns an error if logging system initialization fails
 pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result<()> {
     use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+    /// Helper macro to create fmt layer with standard configuration
+    macro_rules! fmt_layer {
+        () => {
+            fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_thread_names(true)
+                .compact()
+        };
+        ($writer:expr) => {
+            fmt::layer()
+                .with_writer($writer)
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_thread_names(true)
+                .compact()
+        };
+    }
+
+    /// Helper macro to initialize subscriber with error handling
+    macro_rules! try_init {
+        ($subscriber:expr) => {
+            $subscriber
+                .try_init()
+                .map_err(|e| error::Error::initialization("logging", e.to_string()))?
+        };
+    }
 
     // Parse log level
     let level = match config.level.to_lowercase().as_str() {
@@ -119,107 +147,62 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
     match (config.enable_console, config.enable_file, &config.file_path) {
         // Enable both console and file logging
         (true, true, Some(file_path)) => {
-            // Determine log directory
-            let log_dir = std::path::Path::new(file_path)
-                .parent()
-                .filter(|p| !p.as_os_str().is_empty())
-                .unwrap_or_else(|| std::path::Path::new("."));
-            let log_file_name = std::path::Path::new(file_path)
-                .file_name()
-                .unwrap_or(std::ffi::OsStr::new("crates-docs.log"));
+            let (log_dir, log_file_name) = parse_log_path(file_path);
+            ensure_log_directory(&log_dir)?;
+            let file_appender = tracing_appender::rolling::daily(&log_dir, log_file_name);
 
-            // Ensure directory exists
-            std::fs::create_dir_all(log_dir).map_err(|e| {
-                error::Error::Initialization(format!("Failed to create log directory: {e}"))
-            })?;
-
-            // Create file log layer
-            let file_appender = tracing_appender::rolling::daily(log_dir, log_file_name);
-
-            tracing_subscriber::registry()
+            try_init!(tracing_subscriber::registry()
                 .with(filter)
-                .with(
-                    fmt::layer()
-                        .with_target(true)
-                        .with_thread_ids(true)
-                        .with_thread_names(true)
-                        .compact(),
-                )
-                .with(
-                    fmt::layer()
-                        .with_writer(file_appender)
-                        .with_target(true)
-                        .with_thread_ids(true)
-                        .with_thread_names(true)
-                        .compact(),
-                )
-                .try_init()
-                .map_err(|e| error::Error::Initialization(e.to_string()))?;
+                .with(fmt_layer!())
+                .with(fmt_layer!(file_appender)));
         }
 
         // Enable console logging only
         (true, _, _) | (false, false, _) => {
-            tracing_subscriber::registry()
+            try_init!(tracing_subscriber::registry()
                 .with(filter)
-                .with(
-                    fmt::layer()
-                        .with_target(true)
-                        .with_thread_ids(true)
-                        .with_thread_names(true)
-                        .compact(),
-                )
-                .try_init()
-                .map_err(|e| error::Error::Initialization(e.to_string()))?;
+                .with(fmt_layer!()));
         }
 
         // Enable file logging only
         (false, true, Some(file_path)) => {
-            // Determine log directory
-            let log_dir = std::path::Path::new(file_path)
-                .parent()
-                .filter(|p| !p.as_os_str().is_empty())
-                .unwrap_or_else(|| std::path::Path::new("."));
-            let log_file_name = std::path::Path::new(file_path)
-                .file_name()
-                .unwrap_or(std::ffi::OsStr::new("crates-docs.log"));
+            let (log_dir, log_file_name) = parse_log_path(file_path);
+            ensure_log_directory(&log_dir)?;
+            let file_appender = tracing_appender::rolling::daily(&log_dir, log_file_name);
 
-            // Ensure directory exists
-            std::fs::create_dir_all(log_dir).map_err(|e| {
-                error::Error::Initialization(format!("Failed to create log directory: {e}"))
-            })?;
-
-            // Create file log layer
-            let file_appender = tracing_appender::rolling::daily(log_dir, log_file_name);
-
-            tracing_subscriber::registry()
+            try_init!(tracing_subscriber::registry()
                 .with(filter)
-                .with(
-                    fmt::layer()
-                        .with_writer(file_appender)
-                        .with_target(true)
-                        .with_thread_ids(true)
-                        .with_thread_names(true)
-                        .compact(),
-                )
-                .try_init()
-                .map_err(|e| error::Error::Initialization(e.to_string()))?;
+                .with(fmt_layer!(file_appender)));
         }
 
         // Other cases, use default console logging
         _ => {
-            tracing_subscriber::registry()
+            try_init!(tracing_subscriber::registry()
                 .with(filter)
-                .with(
-                    fmt::layer()
-                        .with_target(true)
-                        .with_thread_ids(true)
-                        .with_thread_names(true)
-                        .compact(),
-                )
-                .try_init()
-                .map_err(|e| error::Error::Initialization(e.to_string()))?;
+                .with(fmt_layer!()));
         }
     }
 
     Ok(())
+}
+
+/// Parse log file path into directory and file name components
+fn parse_log_path(file_path: &str) -> (std::path::PathBuf, std::ffi::OsString) {
+    let path = std::path::Path::new(file_path);
+    let log_dir = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .map_or_else(|| std::path::PathBuf::from("."), std::path::PathBuf::from);
+    let log_file_name = path.file_name().map_or_else(
+        || std::ffi::OsString::from("crates-docs.log"),
+        std::ffi::OsString::from,
+    );
+    (log_dir, log_file_name)
+}
+
+/// Ensure log directory exists
+fn ensure_log_directory(log_dir: &std::path::Path) -> Result<()> {
+    std::fs::create_dir_all(log_dir).map_err(|e| {
+        error::Error::initialization("log_directory", format!("Failed to create: {e}"))
+    })
 }

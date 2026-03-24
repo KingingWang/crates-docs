@@ -207,8 +207,9 @@ pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error
             }
             #[cfg(not(feature = "cache-memory"))]
             {
-                Err(crate::error::Error::Config(
-                    "memory cache feature is not enabled".to_string(),
+                Err(crate::error::Error::config(
+                    "cache_type",
+                    "memory cache feature is not enabled",
                 ))
             }
         }
@@ -217,22 +218,23 @@ pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error
             {
                 // Note: Redis cache requires async initialization, this returns a placeholder
                 // In practice, use the create_cache_async function
-                Err(crate::error::Error::Config(
-                    "Redis cache requires async initialization. Use create_cache_async instead."
-                        .to_string(),
+                Err(crate::error::Error::config(
+                    "cache_type",
+                    "Redis cache requires async initialization. Use create_cache_async instead.",
                 ))
             }
             #[cfg(not(feature = "cache-redis"))]
             {
-                Err(crate::error::Error::Config(
-                    "redis cache feature is not enabled".to_string(),
+                Err(crate::error::Error::config(
+                    "cache_type",
+                    "redis cache feature is not enabled",
                 ))
             }
         }
-        _ => Err(crate::error::Error::Config(format!(
-            "unsupported cache type: {}",
-            config.cache_type
-        ))),
+        _ => Err(crate::error::Error::config(
+            "cache_type",
+            format!("unsupported cache type: {}", config.cache_type),
+        )),
     }
 }
 
@@ -273,14 +275,14 @@ pub async fn create_cache_async(
             let url = config
                 .redis_url
                 .as_ref()
-                .ok_or_else(|| crate::error::Error::Config("redis_url is required".to_string()))?;
+                .ok_or_else(|| crate::error::Error::config("redis_url", "redis_url is required"))?;
             Ok(Box::new(
                 redis::RedisCache::new(url, config.key_prefix.clone()).await?,
             ))
         }
-        _ => Err(crate::error::Error::Config(format!(
-            "unsupported cache type: {}",
-            config.cache_type
-        ))),
+        _ => Err(crate::error::Error::config(
+            "cache_type",
+            format!("unsupported cache type: {}", config.cache_type),
+        )),
     }
 }

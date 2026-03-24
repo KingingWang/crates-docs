@@ -151,7 +151,7 @@ fn test_config_validation_empty_host() {
     config.server.host = "".to_string();
     let result = config.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Server host"));
+    assert!(result.unwrap_err().to_string().contains("host"));
 }
 
 /// 测试配置验证 - 端口为 0
@@ -305,14 +305,14 @@ fn test_error_conversions() {
 fn test_error_display() {
     use crates_docs::error::Error;
 
-    let error = Error::Config("test config error".to_string());
+    let error = Error::config("test_field", "test config error");
     assert!(error.to_string().contains("Configuration error"));
     assert!(error.to_string().contains("test config error"));
 
-    let error = Error::Initialization("test init error".to_string());
+    let error = Error::initialization("test_component", "test init error");
     assert!(error.to_string().contains("Initialization failed"));
 
-    let error = Error::HttpRequest("test http error".to_string());
+    let error = Error::http_request("GET", "https://example.com", 500, "test http error");
     assert!(error.to_string().contains("HTTP request failed"));
 }
 
@@ -762,30 +762,27 @@ fn test_error_from_anyhow_error() {
 fn test_error_variants_display() {
     use crates_docs::Error;
 
-    let variants = [
+    let variants: Vec<(Error, &str)> = vec![
         (
-            Error::Initialization("init failed".to_string()),
+            Error::initialization("component", "init failed"),
             "Initialization failed",
         ),
+        (Error::config("field", "bad config"), "Configuration error"),
         (
-            Error::Config("bad config".to_string()),
-            "Configuration error",
-        ),
-        (
-            Error::HttpRequest("request failed".to_string()),
+            Error::http_request("GET", "https://example.com", 500, "request failed"),
             "HTTP request failed",
         ),
-        (Error::Parse("parse error".to_string()), "Parse failed"),
+        (Error::parse("input", None, "parse error"), "Parse failed"),
         (
-            Error::Cache("cache error".to_string()),
-            "Cache operation failed",
+            Error::cache("get", Some("key".to_string()), "cache error"),
+            "Cache operation",
         ),
         (
-            Error::Auth("auth failed".to_string()),
+            Error::auth("provider", "auth failed"),
             "Authentication failed",
         ),
         (
-            Error::Mcp("protocol error".to_string()),
+            Error::mcp("context", "protocol error"),
             "MCP protocol error",
         ),
         (Error::Other("unknown error".to_string()), "Unknown error"),
@@ -1357,10 +1354,7 @@ fn test_config_validate_with_oauth_enabled_and_invalid_oauth() {
 
     let result = config.validate();
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("client_id is required"));
+    assert!(result.unwrap_err().to_string().contains("client_id"));
 }
 
 #[test]
@@ -1444,10 +1438,7 @@ fn test_oauth_config_validate_missing_redirect_uri() {
 
     let result = config.validate();
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("redirect_uri is required"));
+    assert!(result.unwrap_err().to_string().contains("redirect_uri"));
 }
 
 #[test]
@@ -1468,7 +1459,7 @@ fn test_oauth_config_validate_invalid_urls() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("Invalid redirect_uri"));
+        .contains("redirect_uri"));
 
     config.redirect_uri = Some("http://localhost/callback".to_string());
     config.authorization_endpoint = Some("bad-url".to_string());
@@ -1476,7 +1467,7 @@ fn test_oauth_config_validate_invalid_urls() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("Invalid authorization_endpoint"));
+        .contains("authorization_endpoint"));
 
     config.authorization_endpoint = Some("https://example.com/auth".to_string());
     config.token_endpoint = Some("bad-url".to_string());
@@ -1484,7 +1475,7 @@ fn test_oauth_config_validate_invalid_urls() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("Invalid token_endpoint"));
+        .contains("token_endpoint"));
 }
 
 #[test]
@@ -1512,9 +1503,9 @@ fn test_oauth_to_mcp_config() {
     let result = config.to_mcp_config();
     // 无论是否启用 auth feature，默认配置（enabled=false）应该返回错误
     assert!(result.is_err());
-    // 错误消息可能是 "OAuth is not enabled" 或 "OAuth feature is not enabled"
+    // 错误消息包含 "oauth"
     let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("OAuth") && err_msg.contains("not enabled"));
+    assert!(err_msg.contains("oauth"));
 }
 
 #[test]

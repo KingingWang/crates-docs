@@ -72,7 +72,7 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
 
     // Create Stdio transport
     let transport = StdioTransport::new(TransportOptions::default())
-        .map_err(|e| crate::error::Error::Mcp(e.to_string()))?;
+        .map_err(|e| crate::error::Error::mcp("transport", e.to_string()))?;
 
     // Create MCP server
     let mcp_server: Arc<rust_mcp_sdk::mcp_server::ServerRuntime> =
@@ -89,7 +89,7 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
     mcp_server
         .start()
         .await
-        .map_err(|e: McpSdkError| crate::error::Error::Mcp(e.to_string()))?;
+        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
 
     Ok(())
 }
@@ -158,7 +158,7 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
     mcp_server
         .start()
         .await
-        .map_err(|e: McpSdkError| crate::error::Error::Mcp(e.to_string()))?;
+        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
 
     Ok(())
 }
@@ -227,7 +227,7 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     mcp_server
         .start()
         .await
-        .map_err(|e: McpSdkError| crate::error::Error::Mcp(e.to_string()))?;
+        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
 
     Ok(())
 }
@@ -296,7 +296,7 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
     mcp_server
         .start()
         .await
-        .map_err(|e: McpSdkError| crate::error::Error::Mcp(e.to_string()))?;
+        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
 
     Ok(())
 }
