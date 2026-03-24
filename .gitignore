@@ -21,4 +21,7 @@ target
 #.idea/
 
 **/AGENTS.md
+.roo
+.agent
+.claude
 
