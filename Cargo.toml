@@ -52,13 +52,15 @@ lru = "0.16"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
-tracing-opentelemetry = { version = "0.28", optional = true }
-opentelemetry = { version = "0.28", optional = true }
-prometheus-client = "0.23"
+tracing-opentelemetry = { version = "0.32", optional = true }
+opentelemetry = { version = "0.31", optional = true }
+prometheus-client = "0.24"
 
 # 工具库
 async-trait = "0.1"
 html2md = "0.2"
+scraper = "0.26"
+regex = "1.11"
 url = "2.5"
 base64 = "0.22"
 parking_lot = "0.12"
@@ -77,9 +79,9 @@ chrono = "0.4"
 tokio = { version = "1.40", features = ["full", "test-util"] }
 reqwest = { version = "0.13", features = ["json"] }
 serde_json = "1.0"
-tempfile = "3.27"
+tempfile = "3.27.0"
 temp-env = "0.3"
-mockall = "0.13"
+mockall = "0.14"
 wiremock = "0.6"
 mockito = "1.6"
 
