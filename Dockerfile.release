@@ -1,0 +1,41 @@
+# Dockerfile for release builds - uses pre-compiled binaries
+# This Dockerfile is optimized for CI/CD pipelines where binaries are pre-compiled
+# using cross-rs for cross-platform builds, avoiding slow QEMU emulation.
+#
+# Uses scratch (empty) base image since musl binary is fully statically linked.
+# CA certificates are copied from alpine for HTTPS support.
+
+# Stage 1: Get CA certificates from alpine
+FROM alpine:latest AS certs
+RUN apk add --no-cache ca-certificates
+
+# Stage 2: Final minimal image
+ARG TARGETARCH
+FROM scratch
+
+# Copy CA certificates for HTTPS requests to docs.rs and crates.io
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Copy pre-compiled binary based on target architecture
+# The binary is expected to be at ./binaries/crates-docs-${TARGETARCH}
+COPY binaries/crates-docs-${TARGETARCH} /app/crates-docs
+
+# Copy default configuration
+COPY examples/config.example.toml /app/config.toml
+
+# Set working directory
+WORKDIR /app
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV RUST_LOG=info
+ENV CRATES_DOCS_HOST=0.0.0.0
+ENV CRATES_DOCS_PORT=8080
+ENV CRATES_DOCS_TRANSPORT_MODE=hybrid
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+# Start command (no shell needed for scratch image)
+ENTRYPOINT ["/app/crates-docs"]
+CMD ["serve", "--config", "/app/config.toml"]
