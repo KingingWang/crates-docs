@@ -107,10 +107,7 @@ fn test_oauth_config_validate_missing_redirect_uri() {
     };
     let result = config.validate();
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("redirect_uri is required"));
+    assert!(result.unwrap_err().to_string().contains("redirect_uri"));
 }
 
 #[test]
@@ -129,7 +126,7 @@ fn test_oauth_config_validate_invalid_urls() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("Invalid redirect_uri"));
+        .contains("redirect_uri"));
 
     config.redirect_uri = Some("http://localhost/callback".to_string());
     config.authorization_endpoint = Some("bad-url".to_string());
@@ -137,7 +134,7 @@ fn test_oauth_config_validate_invalid_urls() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("Invalid authorization_endpoint"));
+        .contains("authorization_endpoint"));
 
     config.authorization_endpoint = Some("https://example.com/auth".to_string());
     config.token_endpoint = Some("bad-url".to_string());
@@ -145,7 +142,7 @@ fn test_oauth_config_validate_invalid_urls() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("Invalid token_endpoint"));
+        .contains("token_endpoint"));
 }
 
 // ============================================================================
@@ -177,7 +174,12 @@ fn test_oauth_to_mcp_config_without_feature() {
     // 默认 enabled=false，应返回错误
     assert!(result.is_err());
     if let Err(e) = result {
-        assert!(e.to_string().contains("OAuth is not enabled"));
+        // 结构化错误消息格式: "Configuration error for 'oauth': is not enabled"
+        let err_msg = e.to_string();
+        assert!(
+            err_msg.contains("oauth") && err_msg.contains("not enabled"),
+            "Expected error message to contain 'oauth' and 'not enabled', got: {err_msg}"
+        );
     }
 }
 
@@ -189,7 +191,7 @@ fn test_oauth_to_mcp_config_without_feature() {
     // feature 未启用，应返回错误
     assert!(result.is_err());
     if let Err(e) = result {
-        assert!(e.to_string().contains("OAuth feature is not enabled"));
+        assert!(e.to_string().contains("oauth"));
     }
 }
 

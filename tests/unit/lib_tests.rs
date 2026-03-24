@@ -26,7 +26,7 @@ fn test_name_constant() {
 
 #[test]
 fn test_error_reexport() {
-    let err = crates_docs::Error::Config("test".to_string());
+    let err = crates_docs::Error::config("field", "test");
     assert!(!err.to_string().is_empty());
 }
 

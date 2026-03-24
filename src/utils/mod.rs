@@ -144,7 +144,7 @@ impl HttpClientBuilder {
 
         builder
             .build()
-            .map_err(|e| Error::HttpRequest(e.to_string()))
+            .map_err(|e| Error::http_request("BUILD", "client", 0, e.to_string()))
     }
 
     /// Build HTTP client with retry support

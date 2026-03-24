@@ -13,7 +13,7 @@ fn test_config_validation_empty_host() {
     config.server.host = "".to_string();
     let result = config.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Server host"));
+    assert!(result.unwrap_err().to_string().contains("host"));
 }
 
 #[test]

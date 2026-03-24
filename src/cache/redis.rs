@@ -41,20 +41,22 @@ impl RedisCache {
     /// Returns an error if Redis connection fails or ping test fails
     pub async fn new(url: &str, key_prefix: String) -> Result<Self, Error> {
         let client = redis::Client::open(url)
-            .map_err(|e| Error::Cache(format!("Redis connection failed: {e}")))?;
+            .map_err(|e| Error::cache("connect", None, format!("failed: {e}")))?;
 
         // Create multiplexed connection (can be shared across multiple operations)
         let conn = client
             .get_multiplexed_async_connection()
             .await
-            .map_err(|e| Error::Cache(format!("Redis connection creation failed: {e}")))?;
+            .map_err(|e| {
+                Error::cache("connect", None, format!("connection creation failed: {e}"))
+            })?;
 
         // Simple ping test
         let mut ping_conn = conn.clone();
         let _: String = redis::cmd("PING")
             .query_async(&mut ping_conn)
             .await
-            .map_err(|e| Error::Cache(format!("Redis ping failed: {e}")))?;
+            .map_err(|e| Error::cache("ping", None, format!("failed: {e}")))?;
 
         Ok(Self { conn, key_prefix })
     }
@@ -120,7 +122,7 @@ impl super::Cache for RedisCache {
                 .await
         };
 
-        result.map_err(|e| Error::Cache(format!("Redis SET failed for key '{key}': {e}")))
+        result.map_err(|e| Error::cache("set", Some(key.clone()), format!("failed: {e}")))
     }
 
     async fn delete(&self, key: &str) -> crate::error::Result<()> {
@@ -132,7 +134,7 @@ impl super::Cache for RedisCache {
             .query_async(&mut conn)
             .await;
 
-        result.map_err(|e| Error::Cache(format!("Redis DEL failed for key '{key}': {e}")))
+        result.map_err(|e| Error::cache("delete", Some(key.to_string()), format!("failed: {e}")))
     }
 
     async fn clear(&self) -> crate::error::Result<()> {
@@ -165,9 +167,11 @@ impl super::Cache for RedisCache {
                         match del_result {
                             Ok(deleted) => total_deleted += deleted,
                             Err(e) => {
-                                return Err(Error::Cache(format!(
-                                    "Redis DEL during clear failed: {e}"
-                                )));
+                                return Err(Error::cache(
+                                    "clear",
+                                    None,
+                                    format!("DEL failed: {e}"),
+                                ));
                             }
                         }
                     }
@@ -179,7 +183,7 @@ impl super::Cache for RedisCache {
                     }
                 }
                 Err(e) => {
-                    return Err(Error::Cache(format!("Redis SCAN during clear failed: {e}")));
+                    return Err(Error::cache("clear", None, format!("SCAN failed: {e}")));
                 }
             }
         }

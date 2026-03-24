@@ -132,40 +132,40 @@ impl OAuthConfig {
         }
 
         if self.client_id.is_none() {
-            return Err(Error::Config("client_id is required".to_string()));
+            return Err(Error::config("client_id", "is required"));
         }
 
         if self.client_secret.is_none() {
-            return Err(Error::Config("client_secret is required".to_string()));
+            return Err(Error::config("client_secret", "is required"));
         }
 
         if self.redirect_uri.is_none() {
-            return Err(Error::Config("redirect_uri is required".to_string()));
+            return Err(Error::config("redirect_uri", "is required"));
         }
 
         if self.authorization_endpoint.is_none() {
-            return Err(Error::Config(
-                "authorization_endpoint is required".to_string(),
-            ));
+            return Err(Error::config("authorization_endpoint", "is required"));
         }
 
         if self.token_endpoint.is_none() {
-            return Err(Error::Config("token_endpoint is required".to_string()));
+            return Err(Error::config("token_endpoint", "is required"));
         }
 
         // Validate URLs
         if let Some(uri) = &self.redirect_uri {
-            Url::parse(uri).map_err(|e| Error::Config(format!("Invalid redirect_uri: {e}")))?;
+            Url::parse(uri)
+                .map_err(|e| Error::config("redirect_uri", format!("Invalid URL: {e}")))?;
         }
 
         if let Some(endpoint) = &self.authorization_endpoint {
-            Url::parse(endpoint)
-                .map_err(|e| Error::Config(format!("Invalid authorization_endpoint: {e}")))?;
+            Url::parse(endpoint).map_err(|e| {
+                Error::config("authorization_endpoint", format!("Invalid URL: {e}"))
+            })?;
         }
 
         if let Some(endpoint) = &self.token_endpoint {
             Url::parse(endpoint)
-                .map_err(|e| Error::Config(format!("Invalid token_endpoint: {e}")))?;
+                .map_err(|e| Error::config("token_endpoint", format!("Invalid URL: {e}")))?;
         }
 
         Ok(())
@@ -175,7 +175,7 @@ impl OAuthConfig {
     #[cfg(feature = "auth")]
     pub fn to_mcp_config(&self) -> Result<()> {
         if !self.enabled {
-            return Err(Error::Config("OAuth is not enabled".to_string()));
+            return Err(Error::config("oauth", "is not enabled"));
         }
 
         // Temporarily return empty result, to be implemented when OAuth feature is complete
@@ -185,7 +185,7 @@ impl OAuthConfig {
     /// Convert to rust-mcp-sdk `OAuthConfig`
     #[cfg(not(feature = "auth"))]
     pub fn to_mcp_config(&self) -> Result<()> {
-        Err(Error::Config("OAuth feature is not enabled".to_string()))
+        Err(Error::config("oauth", "feature is not enabled"))
     }
 }
 
