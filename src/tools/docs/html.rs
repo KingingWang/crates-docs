@@ -1,208 +1,292 @@
 //! HTML processing utilities
 //!
 //! Provides HTML cleaning and conversion functions for documentation extraction.
+//! Uses the `scraper` crate for robust HTML5 parsing.
+
+use regex::Regex;
+use scraper::{Html, Selector};
+use std::sync::LazyLock;
 
 /// Tags whose content should be completely removed during HTML cleaning
-const SKIP_TAGS: [&str; 4] = ["script", "style", "noscript", "iframe"];
+const SKIP_TAGS: &[&str] = &["script", "style", "noscript", "iframe"];
 
-/// Common HTML entity mappings
-const HTML_ENTITIES: [(&str, &str); 6] = [
-    ("lt", "<"),
-    ("gt", ">"),
-    ("amp", "&"),
-    ("quot", "\""),
-    ("apos", "'"),
-    ("nbsp", " "),
-];
+/// Tags that represent navigation/structure elements to remove
+const NAV_TAGS: &[&str] = &["nav", "header", "footer", "aside"];
 
-/// Clean HTML by removing unwanted tags (script, style, noscript, iframe) and their content
+/// UI elements that don't contribute to documentation content
+const UI_TAGS: &[&str] = &["button", "details", "summary"];
+
+/// Regex patterns for self-closing/void tags to remove
+static LINK_TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<link[^>]*>").unwrap());
+
+static META_TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<meta[^>]*>").unwrap());
+
+/// Regex to remove "Copy item path" and similar UI text
+static COPY_PATH_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Copy item path").unwrap());
+
+/// Regex to remove anchor links like [§](#xxx)
+static ANCHOR_LINK_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").unwrap());
+
+/// Regex to remove relative source links like [Source](../src/...)
+static SOURCE_LINK_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[Source\]\([^)]*\)").unwrap());
+
+/// Regex to remove relative documentation links like [de](de/index.html) or [forward\_to\_deserialize\_any](macro.xxx.html)
+/// Matches: [text](relative_path.html) where `relative_path` starts with letter and ends with .html
+static RELATIVE_LINK_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[[^\]]*\]\([a-zA-Z][^)]*\.html\)").unwrap());
+
+/// Regex to clean up section markers like [§](#xxx) that may remain in headings
+static SECTION_MARKER_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").unwrap());
+
+/// Clean HTML by removing unwanted tags and their content
+///
+/// Uses the `scraper` crate for robust HTML5 parsing, which handles
+/// malformed HTML better than manual parsing.
 #[must_use]
 pub fn clean_html(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let chars: Vec<char> = html.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-    let mut skip_depth = 0;
+    let document = Html::parse_document(html);
+    remove_unwanted_elements(&document, html)
+}
 
-    while i < len {
-        let c = chars[i];
+/// Remove unwanted elements from HTML using scraper for parsing
+fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
+    let mut result = original_html.to_string();
 
-        if c == '<' {
-            let start = i;
-            let mut j = i + 1;
-
-            // Collect tag name
-            let tag_name = collect_tag_name(&chars, &mut j, len);
-            let tag_lower = tag_name.to_lowercase();
-            let pure_tag = tag_lower.trim_start_matches('/');
-
-            // Check if this is a skip tag
-            let is_skip_tag = SKIP_TAGS.contains(&pure_tag);
-
-            if is_skip_tag {
-                if tag_lower.starts_with('/') {
-                    // Closing tag
-                    if skip_depth > 0 {
-                        skip_depth -= 1;
-                    }
-                    skip_to_tag_end(&chars, &mut j, len);
-                    i = j;
-                    continue;
-                }
-
-                // Opening tag
-                skip_depth += 1;
-                skip_to_tag_end(&chars, &mut j, len);
-                i = j;
-                continue;
+    // Remove skip tags with their content using scraper
+    for tag in SKIP_TAGS {
+        if let Ok(selector) = Selector::parse(tag) {
+            let elements: Vec<_> = document.select(&selector).collect();
+            for element in elements {
+                let element_html = element.html();
+                result = result.replace(&element_html, "");
             }
-
-            // Skip to end of tag
-            skip_to_tag_end(&chars, &mut j, len);
-
-            // Keep content if not inside a skip tag
-            if skip_depth == 0 {
-                result.extend(chars[start..j].iter().copied());
-            }
-
-            i = j;
-        } else {
-            if skip_depth == 0 {
-                result.push(c);
-            }
-            i += 1;
         }
     }
+
+    // Re-parse after removing skip tags
+    let mut updated_doc = Html::parse_document(&result);
+
+    // Remove navigation/structure elements
+    for tag in NAV_TAGS {
+        if let Ok(selector) = Selector::parse(tag) {
+            let elements: Vec<_> = updated_doc.select(&selector).collect();
+            for element in elements {
+                let element_html = element.html();
+                result = result.replace(&element_html, "");
+            }
+        }
+    }
+
+    // Re-parse after removing nav tags
+    updated_doc = Html::parse_document(&result);
+
+    // Remove UI elements (buttons, details, summary)
+    for tag in UI_TAGS {
+        if let Ok(selector) = Selector::parse(tag) {
+            let elements: Vec<_> = updated_doc.select(&selector).collect();
+            for element in elements {
+                let element_html = element.html();
+                result = result.replace(&element_html, "");
+            }
+        }
+    }
+
+    // Use regex to remove self-closing tags (link, meta)
+    result = LINK_TAG_REGEX.replace_all(&result, "").to_string();
+    result = META_TAG_REGEX.replace_all(&result, "").to_string();
+
+    // Remove UI text and anchor links
+    result = COPY_PATH_REGEX.replace_all(&result, "").to_string();
+    result = ANCHOR_LINK_REGEX.replace_all(&result, "").to_string();
+
+    // Remove relative source and documentation links
+    result = SOURCE_LINK_REGEX.replace_all(&result, "").to_string();
+    result = RELATIVE_LINK_REGEX.replace_all(&result, "").to_string();
+
+    // Clean up any remaining section markers
+    result = SECTION_MARKER_REGEX.replace_all(&result, "").to_string();
 
     result
 }
 
 /// Convert HTML to plain text by removing all HTML tags
+///
+/// Uses the `scraper` crate for robust HTML5 parsing.
 #[must_use]
 pub fn html_to_text(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let chars: Vec<char> = html.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-    let mut skip_content = false;
+    let document = Html::parse_document(html);
 
-    while i < len {
-        let c = chars[i];
+    // Build selectors for skip tags
+    let mut text_parts = Vec::new();
 
-        match c {
-            '<' => {
-                let mut j = i + 1;
-                let tag_name = collect_tag_name(&chars, &mut j, len);
-                let tag_lower = tag_name.to_lowercase();
-                let is_closing = tag_lower.starts_with('/');
-                let pure_tag = tag_lower.trim_start_matches('/');
+    // Select the root and extract text, handling skip tags
+    let body_selector = Selector::parse("body").unwrap();
 
-                // Check if we should skip content
-                if !is_closing && !skip_content {
-                    skip_content = SKIP_TAGS.contains(&pure_tag);
-                } else if is_closing {
-                    skip_content = false;
-                }
-
-                skip_to_tag_end(&chars, &mut j, len);
-                i = j;
-
-                // Add space after block-level elements
-                if !skip_content {
-                    result.push(' ');
-                }
-            }
-            '&' => {
-                let mut j = i + 1;
-                let entity = collect_entity(&chars, &mut j, len);
-
-                // Look up entity replacement
-                let replacement = HTML_ENTITIES
-                    .iter()
-                    .find_map(
-                        |&(name, repl)| {
-                            if entity == name {
-                                Some(repl)
-                            } else {
-                                None
-                            }
-                        },
-                    )
-                    .unwrap_or("");
-
-                if !replacement.is_empty() {
-                    result.push_str(replacement);
-                }
-                i = j;
-            }
-            _ => {
-                if !skip_content {
-                    result.push(c);
-                }
-                i += 1;
-            }
+    if let Some(body) = document.select(&body_selector).next() {
+        extract_text_excluding_skip_tags(&body, &mut text_parts);
+    } else {
+        // No body tag, extract from entire document
+        let all_selector = Selector::parse("*").unwrap();
+        if let Some(root) = document.select(&all_selector).next() {
+            extract_text_excluding_skip_tags(&root, &mut text_parts);
         }
     }
 
-    clean_whitespace(&result)
+    clean_whitespace(&text_parts.join(" "))
+}
+
+/// Extract text from an element, excluding content in skip tags
+fn extract_text_excluding_skip_tags(
+    element: &scraper::element_ref::ElementRef,
+    text_parts: &mut Vec<String>,
+) {
+    let tag_name = element.value().name().to_lowercase();
+
+    // Skip unwanted tags entirely
+    if SKIP_TAGS.contains(&tag_name.as_str()) {
+        return;
+    }
+
+    // Get direct text content
+    for text in element.text() {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            text_parts.push(trimmed.to_string());
+        }
+    }
+}
+
+/// Check if an element is a block-level element
+#[allow(dead_code)]
+fn is_block_element(tag: &str) -> bool {
+    const BLOCK_ELEMENTS: &[&str] = &[
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "body",
+        "canvas",
+        "dd",
+        "div",
+        "dl",
+        "dt",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "form",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "head",
+        "header",
+        "hgroup",
+        "hr",
+        "html",
+        "li",
+        "main",
+        "nav",
+        "noscript",
+        "ol",
+        "p",
+        "pre",
+        "section",
+        "table",
+        "tbody",
+        "td",
+        "tfoot",
+        "th",
+        "thead",
+        "tr",
+        "ul",
+        "video",
+    ];
+    BLOCK_ELEMENTS.contains(&tag)
 }
 
 /// Extract documentation from HTML by cleaning and converting to Markdown
+///
+/// For docs.rs pages, extracts only the main content area to avoid
+/// navigation elements, footers, and other non-documentation content.
 #[must_use]
 pub fn extract_documentation(html: &str) -> String {
-    let cleaned_html = clean_html(html);
-    html2md::parse_html(&cleaned_html)
+    // Try to extract main content area from docs.rs pages
+    let main_content = extract_main_content(html);
+    let cleaned_html = clean_html(&main_content);
+    let markdown = html2md::parse_html(&cleaned_html);
+
+    // Post-process markdown to remove unwanted links
+    clean_markdown(&markdown)
+}
+
+/// Clean markdown output by removing relative links and UI artifacts
+fn clean_markdown(markdown: &str) -> String {
+    let result = markdown.to_string();
+
+    // Remove source links like [Source](../src/...)
+    let result = SOURCE_LINK_REGEX.replace_all(&result, "").to_string();
+
+    // Remove relative documentation links like [de](de/index.html)
+    let result = RELATIVE_LINK_REGEX.replace_all(&result, "").to_string();
+
+    // Remove section markers like [§](#xxx)
+    let result = SECTION_MARKER_REGEX.replace_all(&result, "").to_string();
+
+    // Clean up multiple blank lines
+    let result = result.replace("\n\n\n", "\n\n");
+
+    result.trim().to_string()
+}
+
+/// Extract main content from docs.rs HTML
+///
+/// Looks for `<section id="main-content">` which contains the actual documentation.
+/// Falls back to full HTML if main content section is not found.
+fn extract_main_content(html: &str) -> String {
+    let document = Html::parse_document(html);
+
+    // Try to find main-content section (docs.rs structure)
+    if let Ok(selector) = Selector::parse("#main-content") {
+        if let Some(main_section) = document.select(&selector).next() {
+            return main_section.html();
+        }
+    }
+
+    // Fallback: try rustdoc_body_wrapper
+    if let Ok(selector) = Selector::parse("#rustdoc_body_wrapper") {
+        if let Some(wrapper) = document.select(&selector).next() {
+            return wrapper.html();
+        }
+    }
+
+    // Last resort: return original HTML
+    html.to_string()
 }
 
 /// Extract search results from HTML
 #[must_use]
 pub fn extract_search_results(html: &str, item_path: &str) -> String {
-    let cleaned_html = clean_html(html);
+    let main_content = extract_main_content(html);
+    let cleaned_html = clean_html(&main_content);
     let markdown = html2md::parse_html(&cleaned_html);
+    let cleaned_markdown = clean_markdown(&markdown);
 
-    if markdown.trim().is_empty() {
+    if cleaned_markdown.trim().is_empty() {
         format!("未找到项目 '{item_path}' 的文档")
     } else {
-        format!("## 搜索结果: {item_path}\n\n{markdown}")
+        format!("## 搜索结果: {item_path}\n\n{cleaned_markdown}")
     }
 }
 
 /// Clean extra whitespace from text
 fn clean_whitespace(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-/// Collect tag name starting from current position
-fn collect_tag_name(chars: &[char], j: &mut usize, len: usize) -> String {
-    let mut tag_name = String::new();
-    while *j < len && chars[*j] != '>' && !chars[*j].is_whitespace() {
-        tag_name.push(chars[*j]);
-        *j += 1;
-    }
-    tag_name
-}
-
-/// Skip to the end of current tag
-fn skip_to_tag_end(chars: &[char], j: &mut usize, len: usize) {
-    while *j < len && chars[*j] != '>' {
-        *j += 1;
-    }
-    if *j < len {
-        *j += 1; // Skip '>'
-    }
-}
-
-/// Collect HTML entity name
-fn collect_entity(chars: &[char], j: &mut usize, len: usize) -> String {
-    let mut entity = String::new();
-    while *j < len && chars[*j] != ';' {
-        entity.push(chars[*j]);
-        *j += 1;
-    }
-    if *j < len {
-        *j += 1; // Skip ';'
-    }
-    entity
 }
 
 #[cfg(test)]
@@ -276,5 +360,37 @@ mod tests {
         let result = extract_search_results(html, "nonexistent");
         assert!(result.contains("未找到项目"));
         assert!(result.contains("nonexistent"));
+    }
+
+    #[test]
+    fn test_clean_html_removes_link_tags() {
+        let html = r#"<html><head><link rel="stylesheet" href="test.css"></head><body>Hello</body></html>"#;
+        let cleaned = clean_html(html);
+        assert!(
+            !cleaned.contains("link"),
+            "link tag should be removed, got: {cleaned}"
+        );
+        assert!(
+            !cleaned.contains("stylesheet"),
+            "stylesheet should be removed, got: {cleaned}"
+        );
+        assert!(
+            cleaned.contains("Hello"),
+            "Body content should remain, got: {cleaned}"
+        );
+    }
+
+    #[test]
+    fn test_clean_html_removes_meta_tags() {
+        let html = r#"<html><head><meta charset="utf-8"></head><body>Content</body></html>"#;
+        let cleaned = clean_html(html);
+        assert!(
+            !cleaned.contains("meta"),
+            "meta tag should be removed, got: {cleaned}"
+        );
+        assert!(
+            cleaned.contains("Content"),
+            "Body content should remain, got: {cleaned}"
+        );
     }
 }

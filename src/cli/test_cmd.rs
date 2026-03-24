@@ -133,7 +133,7 @@ async fn execute_lookup_item(
         // Prepare arguments
         let mut arguments = serde_json::json!({
             "crate_name": name,
-            "itemPath": path,
+            "item_path": path,
             "format": format
         });
 
