@@ -10,14 +10,18 @@ FROM alpine:latest AS certs
 RUN apk add --no-cache ca-certificates
 
 # Stage 2: Final minimal image
-ARG TARGETARCH
 FROM scratch
+
+# ARG must be declared after FROM in multi-stage builds
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 # Copy CA certificates for HTTPS requests to docs.rs and crates.io
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy pre-compiled binary based on target architecture
 # The binary is expected to be at ./binaries/crates-docs-${TARGETARCH}
+# TARGETARCH values: amd64, arm64 (set automatically by docker buildx)
 COPY binaries/crates-docs-${TARGETARCH} /app/crates-docs
 
 # Copy default configuration
