@@ -466,13 +466,31 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: binary-amd64
-        path: ./binaries
+        path: ./binaries/amd64
       
     - name: Download arm64 binary
       uses: actions/download-artifact@v4
       with:
         name: binary-arm64
-        path: ./binaries
+        path: ./binaries/arm64
+      
+    - name: Verify and prepare binaries
+      run: |
+        echo "Downloaded binaries structure:"
+        find ./binaries -type f -ls
+        
+        # Move binaries to expected locations for Docker
+        # download-artifact@v4 creates subdirectories with artifact names
+        mv ./binaries/amd64/crates-docs-amd64 ./binaries/crates-docs-amd64 || true
+        mv ./binaries/arm64/crates-docs-arm64 ./binaries/crates-docs-arm64 || true
+        
+        echo "Final binaries:"
+        ls -la ./binaries/
+        
+        # Verify files exist and are executable
+        test -f ./binaries/crates-docs-amd64 || { echo "ERROR: amd64 binary not found"; exit 1; }
+        test -f ./binaries/crates-docs-arm64 || { echo "ERROR: arm64 binary not found"; exit 1; }
+        chmod +x ./binaries/crates-docs-amd64 ./binaries/crates-docs-arm64
       
     - name: Build and push Docker image
       uses: docker/build-push-action@v7
