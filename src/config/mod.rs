@@ -71,6 +71,7 @@ pub struct ServerConfig {
     pub name: String,
 
     /// Server version
+    #[serde(default = "default_version")]
     pub version: String,
 
     /// Server description
@@ -113,6 +114,11 @@ pub struct ServerConfig {
     /// Allowed origins for CORS (e.g., `["http://localhost:*"]`)
     /// Use `"*"` only in development, specify exact origins in production
     pub allowed_origins: Vec<String>,
+}
+
+/// Default server version from Cargo.toml
+fn default_version() -> String {
+    crate::VERSION.to_string()
 }
 
 /// Default icons for the server

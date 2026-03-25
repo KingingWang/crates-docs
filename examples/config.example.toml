@@ -3,8 +3,8 @@
 [server]
 # 服务器名称
 name = "crates-docs"
-# 服务器版本
-version = "0.4.0"
+# 服务器版本（默认使用 Cargo.toml 中的版本）
+# version = "0.5.3"
 # 服务器描述
 description = "高性能 Rust crate 文档查询 MCP 服务器"
 # 监听主机
