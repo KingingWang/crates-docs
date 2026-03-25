@@ -673,6 +673,68 @@ authorize_url = ""                      # 授权 URL
 token_url = ""                          # Token URL
 redirect_url = ""                       # 回调 URL
 scopes = []                             # OAuth 作用域
+
+# API Key 认证配置（可选）
+[api_key]
+enabled = false                         # 启用 API Key 认证
+keys = []                               # API Key 哈希列表（Argon2 PHC 格式），不要存明文 key
+header_name = "X-API-Key"               # API Key 请求头名称
+query_param_name = "api_key"            # API Key 查询参数名称
+allow_query_param = false               # 是否允许查询参数传递
+key_prefix = "sk"                       # API Key 前缀（用于生成和校验结构化 key）
+```
+
+### 环境变量配置
+
+支持通过环境变量配置，适用于 Docker 部署。
+
+对于 API Key，推荐先生成一次性明文 key，再把生成出的 **hash** 放入配置或环境变量中：
+
+```bash
+# 生成新的 API Key（会输出明文 key、key_id 和 hash）
+crates-docs generate-api-key --prefix sk
+
+# 服务器配置
+CRATES_DOCS_HOST=0.0.0.0
+CRATES_DOCS_PORT=8080
+CRATES_DOCS_TRANSPORT_MODE=hybrid
+
+# API Key 认证配置
+CRATES_DOCS_API_KEY_ENABLED=true
+CRATES_DOCS_API_KEYS='$argon2id$...generated_hash...'
+CRATES_DOCS_API_KEY_HEADER=X-API-Key
+CRATES_DOCS_API_KEY_ALLOW_QUERY=false
+CRATES_DOCS_API_KEY_PREFIX=sk
+```
+
+### Docker 部署示例
+
+```bash
+# 使用环境变量启用 API Key 认证（保存 hash，不保存明文 key）
+docker run -d \
+  -p 8080:8080 \
+  -e CRATES_DOCS_API_KEY_ENABLED=true \
+  -e CRATES_DOCS_API_KEYS='$argon2id$...generated_hash...' \
+  -e CRATES_DOCS_API_KEY_PREFIX=sk \
+  -e CRATES_DOCS_HOST=0.0.0.0 \
+  kingingwang/crates-docs:latest
+```
+
+### Docker Compose 示例
+
+```yaml
+version: '3.8'
+services:
+  crates-docs:
+    image: kingingwang/crates-docs:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - CRATES_DOCS_API_KEY_ENABLED=true
+      - CRATES_DOCS_API_KEYS=$argon2id$...generated_hash...
+      - CRATES_DOCS_API_KEY_PREFIX=sk
+      - CRATES_DOCS_HOST=0.0.0.0
+      - CRATES_DOCS_PORT=8080
 ```
 
 ### 配置项详细说明
@@ -751,6 +813,12 @@ export CRATES_DOCS_RATE_LIMIT_PER_SECOND="100"
 ```
 
 > **注意**：环境变量会覆盖配置文件中的设置。布尔值使用 `"true"` 或 `"false"` 字符串表示。
+>
+> **API Key 安全建议**：
+> - 使用 `crates-docs generate-api-key --prefix sk` 生成新的 key
+> - 只保存生成结果中的 **hash**
+> - 明文 key 只展示一次，之后请存入你的密钥管理系统
+> - 不要把明文 key 直接写入 `config.toml`、Docker Compose 或环境变量示例中
 
 ### 生成配置文件
 
@@ -887,6 +955,7 @@ cargo fmt --check
 | `sse` | 启用 SSE 传输 |
 | `macros` | 启用 MCP 宏支持 |
 | `auth` | 启用 OAuth 认证支持 |
+| `api-key` | 启用 API Key 认证支持（默认启用） |
 | `cache-memory` | 启用内存缓存相关支持 |
 | `cache-redis` | 启用 Redis 缓存 |
 | `tls` | 启用 TLS/SSL 支持 |

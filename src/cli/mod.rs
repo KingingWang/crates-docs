@@ -2,9 +2,12 @@
 //!
 //! Command-line interface for the Crates Docs MCP Server.
 
+mod api_key_cmd;
 mod commands;
 mod config_cmd;
 mod health_cmd;
+mod list_api_keys_cmd;
+mod revoke_api_key_cmd;
 mod serve_cmd;
 mod test_cmd;
 mod version_cmd;
@@ -12,9 +15,12 @@ mod version_cmd;
 use clap::Parser;
 use std::path::PathBuf;
 
+pub use api_key_cmd::run_generate_api_key_command;
 pub use commands::Commands;
 pub use config_cmd::run_config_command;
 pub use health_cmd::run_health_command;
+pub use list_api_keys_cmd::run_list_api_keys_command;
+pub use revoke_api_key_cmd::run_revoke_api_key_command;
 pub use serve_cmd::run_serve_command;
 pub use test_cmd::run_test_command;
 pub use version_cmd::run_version_command;
@@ -53,6 +59,10 @@ pub async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             oauth_client_id,
             oauth_client_secret,
             oauth_redirect_uri,
+            enable_api_key,
+            api_keys,
+            api_key_header,
+            api_key_query_param,
         } => {
             run_serve_command(
                 &cli.config,
@@ -64,8 +74,21 @@ pub async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 oauth_client_id,
                 oauth_client_secret,
                 oauth_redirect_uri,
+                enable_api_key,
+                api_keys,
+                api_key_header,
+                api_key_query_param,
             )
             .await?;
+        }
+        Commands::GenerateApiKey { prefix } => {
+            run_generate_api_key_command(&prefix)?;
+        }
+        Commands::ListApiKeys { config } => {
+            run_list_api_keys_command(&config)?;
+        }
+        Commands::RevokeApiKey { config, key } => {
+            run_revoke_api_key_command(&config, &key)?;
         }
         Commands::Config { output, force } => {
             run_config_command(&output, force)?;

@@ -29,7 +29,7 @@
 //! ```
 
 use crate::cache::CacheConfig;
-use crate::server::auth::OAuthConfig;
+use crate::server::auth::{AuthConfig, OAuthConfig};
 use rust_mcp_sdk::schema::{Icon, IconTheme};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -37,13 +37,13 @@ use std::path::Path;
 
 /// 应用程序配置
 ///
-/// 包含服务器、缓存、OAuth、日志和性能配置。
+/// 包含服务器、缓存、认证、日志和性能配置。
 ///
 /// # 字段
 ///
 /// - `server`: 服务器配置
 /// - `cache`: 缓存配置
-/// - `oauth`: OAuth 配置
+/// - `auth`: 认证配置（OAuth 和 API Key）
 /// - `logging`: 日志配置
 /// - `performance`: 性能配置
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -54,7 +54,12 @@ pub struct AppConfig {
     /// 缓存配置
     pub cache: CacheConfig,
 
-    /// OAuth 配置
+    /// 认证配置（OAuth 和 API Key）
+    #[serde(default)]
+    pub auth: AuthConfig,
+
+    /// OAuth 配置（向后兼容，优先使用 auth.oauth）
+    #[serde(default)]
     pub oauth: OAuthConfig,
 
     /// 日志配置
@@ -352,6 +357,7 @@ impl AppConfig {
 
         // Validate log level
         let valid_levels = ["trace", "debug", "info", "warn", "error"];
+
         if !valid_levels.contains(&self.logging.level.as_str()) {
             return Err(crate::error::Error::config(
                 "log_level",
@@ -442,6 +448,38 @@ impl AppConfig {
             config.logging.enable_file = enable_file.parse().unwrap_or(true);
         }
 
+        #[cfg(feature = "api-key")]
+        {
+            if let Ok(enabled) = std::env::var("CRATES_DOCS_API_KEY_ENABLED") {
+                config.auth.api_key.enabled = enabled.parse().unwrap_or(false);
+            }
+
+            if let Ok(keys) = std::env::var("CRATES_DOCS_API_KEYS") {
+                config.auth.api_key.keys = keys
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(ToOwned::to_owned)
+                    .collect();
+            }
+
+            if let Ok(header_name) = std::env::var("CRATES_DOCS_API_KEY_HEADER") {
+                config.auth.api_key.header_name = header_name;
+            }
+
+            if let Ok(query_param_name) = std::env::var("CRATES_DOCS_API_KEY_QUERY_PARAM_NAME") {
+                config.auth.api_key.query_param_name = query_param_name;
+            }
+
+            if let Ok(allow_query_param) = std::env::var("CRATES_DOCS_API_KEY_ALLOW_QUERY") {
+                config.auth.api_key.allow_query_param = allow_query_param.parse().unwrap_or(false);
+            }
+
+            if let Ok(key_prefix) = std::env::var("CRATES_DOCS_API_KEY_PREFIX") {
+                config.auth.api_key.key_prefix = key_prefix;
+            }
+        }
+
         config.validate()?;
         Ok(config)
     }
@@ -475,6 +513,35 @@ impl AppConfig {
             // Merge logging configuration
             if env.logging.level != "info" {
                 config.logging.level = env.logging.level;
+            }
+
+            #[cfg(feature = "api-key")]
+            {
+                let default_api_key = crate::server::auth::ApiKeyConfig::default();
+
+                if env.auth.api_key.enabled != default_api_key.enabled {
+                    config.auth.api_key.enabled = env.auth.api_key.enabled;
+                }
+
+                if env.auth.api_key.keys != default_api_key.keys {
+                    config.auth.api_key.keys = env.auth.api_key.keys;
+                }
+
+                if env.auth.api_key.header_name != default_api_key.header_name {
+                    config.auth.api_key.header_name = env.auth.api_key.header_name;
+                }
+
+                if env.auth.api_key.query_param_name != default_api_key.query_param_name {
+                    config.auth.api_key.query_param_name = env.auth.api_key.query_param_name;
+                }
+
+                if env.auth.api_key.allow_query_param != default_api_key.allow_query_param {
+                    config.auth.api_key.allow_query_param = env.auth.api_key.allow_query_param;
+                }
+
+                if env.auth.api_key.key_prefix != default_api_key.key_prefix {
+                    config.auth.api_key.key_prefix = env.auth.api_key.key_prefix;
+                }
             }
         }
 
