@@ -27,14 +27,14 @@ use std::sync::Arc;
 pub struct SearchCratesTool {
     /// Search query
     #[json_schema(
-        title = "Search query",
+        title = "Search Query",
         description = "Search keywords, e.g.: web framework, async, http client, serialization"
     )]
     pub query: String,
 
     /// Result count limit
     #[json_schema(
-        title = "结果限制",
+        title = "Result Limit",
         description = "Maximum number of results to return, range 1-100",
         minimum = 1,
         maximum = 100,
@@ -42,18 +42,18 @@ pub struct SearchCratesTool {
     )]
     pub limit: Option<u32>,
 
-    /// 排序方式
+    /// Sort order
     #[json_schema(
-        title = "排序方式",
-        description = "Sort order for crates.io search: relevance (default), downloads, recent-downloads, recent-updates, new",
+        title = "Sort Order",
+        description = "Sort order: relevance (default), downloads, recent-downloads, recent-updates, new",
         default = "relevance"
     )]
     pub sort: Option<String>,
 
-    /// 输出格式
+    /// Output format
     #[json_schema(
-        title = "输出格式",
-        description = "Search result output format: markdown (default), text (plain text), json (raw JSON)",
+        title = "Output Format",
+        description = "Output format: markdown (default), text (plain text), json (raw JSON)",
         default = "markdown"
     )]
     pub format: Option<String>,
