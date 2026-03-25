@@ -1,6 +1,6 @@
 [package]
 name = "crates-docs"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "高性能 Rust crate 文档查询 MCP 服务器，支持 Stdio/HTTP/SSE 传输和 OAuth 认证"
 authors = ["KingingWang <KingingWang@foxmail.com>"]
@@ -64,6 +64,7 @@ parking_lot = "0.12"
 flate2 = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 urlencoding = "2.1"
+fastrand = "2.3"
 uuid = { version = "1.11", features = ["v4"] }
 
 # CLI 工具

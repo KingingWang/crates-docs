@@ -170,3 +170,113 @@ fn test_create_cache_redis_sync_error() {
         assert!(e.to_string().contains("feature is not enabled"));
     }
 }
+
+// ============================================================================
+// TTL 抖动测试
+// ============================================================================
+
+use crates_docs::tools::docs::cache::DocCacheTtl;
+
+#[test]
+fn test_doc_cache_ttl_default_includes_jitter() {
+    let ttl = DocCacheTtl::default();
+    assert_eq!(ttl.crate_docs_secs, 3600);
+    assert_eq!(ttl.search_results_secs, 300);
+    assert_eq!(ttl.item_docs_secs, 1800);
+    // 默认 jitter 为 10%
+    assert!((ttl.jitter_ratio - 0.1).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_apply_jitter_zero_ratio_returns_base_ttl() {
+    let ttl = DocCacheTtl {
+        crate_docs_secs: 3600,
+        search_results_secs: 300,
+        item_docs_secs: 1800,
+        jitter_ratio: 0.0,
+    };
+
+    // jitter_ratio 为 0 时应该返回原始值
+    assert_eq!(ttl.apply_jitter(3600), 3600);
+    assert_eq!(ttl.apply_jitter(300), 300);
+}
+
+#[test]
+fn test_apply_jitter_within_expected_range() {
+    let ttl = DocCacheTtl {
+        crate_docs_secs: 3600,
+        search_results_secs: 300,
+        item_docs_secs: 1800,
+        jitter_ratio: 0.1, // 10% jitter
+    };
+
+    // 多次调用确保结果在预期范围内
+    for _ in 0..100 {
+        let result = ttl.apply_jitter(3600);
+        // 10% jitter 意味着结果应该在 [3240, 3960] 范围内
+        assert!(
+            result >= 3240,
+            "jitter result {result} is below minimum 3240"
+        );
+        assert!(
+            result <= 3960,
+            "jitter result {result} is above maximum 3960"
+        );
+    }
+}
+
+#[test]
+fn test_apply_jitter_clamps_to_valid_range() {
+    // 测试负的 jitter_ratio（应该被 clamp 到 0）
+    let ttl_negative = DocCacheTtl {
+        crate_docs_secs: 3600,
+        search_results_secs: 300,
+        item_docs_secs: 1800,
+        jitter_ratio: -0.5,
+    };
+    // 负值应该被当作 0 处理，返回原始值
+    assert_eq!(ttl_negative.apply_jitter(3600), 3600);
+
+    // 测试超过 1.0 的 jitter_ratio（应该被 clamp 到 1.0）
+    let ttl_high = DocCacheTtl {
+        crate_docs_secs: 3600,
+        search_results_secs: 300,
+        item_docs_secs: 1800,
+        jitter_ratio: 2.0,
+    };
+    // 200% jitter 意味着结果可以在 [0, 7200] 范围内，但最小值为 1
+    for _ in 0..100 {
+        let result = ttl_high.apply_jitter(3600);
+        assert!(result >= 1, "jitter result {result} should be at least 1");
+        assert!(
+            result <= 7200,
+            "jitter result {result} should be at most 7200"
+        );
+    }
+}
+
+#[test]
+fn test_apply_jitter_different_base_values() {
+    let ttl = DocCacheTtl {
+        crate_docs_secs: 3600,
+        search_results_secs: 300,
+        item_docs_secs: 1800,
+        jitter_ratio: 0.1,
+    };
+
+    // 测试不同的基础 TTL 值
+    let base_values = [60, 300, 1800, 3600, 7200];
+
+    for &base in &base_values {
+        let expected_min = (base as f64 * 0.9) as u64;
+        let expected_max = (base as f64 * 1.1) as u64;
+
+        for _ in 0..50 {
+            let result = ttl.apply_jitter(base);
+            assert!(
+                result >= expected_min && result <= expected_max,
+                "jitter result {result} for base {base} is outside expected range [{expected_min}, {expected_max}]"
+            );
+        }
+    }
+}
