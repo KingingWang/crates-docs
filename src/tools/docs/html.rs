@@ -14,7 +14,9 @@ const SKIP_TAGS: &[&str] = &["script", "style", "noscript", "iframe"];
 const NAV_TAGS: &[&str] = &["nav", "header", "footer", "aside"];
 
 /// UI elements that don't contribute to documentation content
-const UI_TAGS: &[&str] = &["button", "details", "summary"];
+/// Note: We don't include "details" here because docs.rs uses <details class="toggle top-doc">
+/// to wrap the main documentation content. We only remove "summary" tags but keep their content.
+const UI_TAGS: &[&str] = &["button", "summary"];
 
 /// Regex patterns for self-closing/void tags to remove
 static LINK_TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<link[^>]*>").unwrap());
@@ -83,13 +85,22 @@ fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     // Re-parse after removing nav tags
     updated_doc = Html::parse_document(&result);
 
-    // Remove UI elements (buttons, details, summary)
+    // Remove UI elements (buttons, summary)
+    // For buttons: remove completely
+    // For summary: remove the tag but keep the text content
     for tag in UI_TAGS {
         if let Ok(selector) = Selector::parse(tag) {
             let elements: Vec<_> = updated_doc.select(&selector).collect();
             for element in elements {
                 let element_html = element.html();
-                result = result.replace(&element_html, "");
+                if tag == &"summary" {
+                    // For summary tags, extract and keep the text content
+                    let text_content: String = element.text().collect();
+                    result = result.replace(&element_html, &text_content);
+                } else {
+                    // For other UI tags (like button), remove completely
+                    result = result.replace(&element_html, "");
+                }
             }
         }
     }
@@ -391,6 +402,63 @@ mod tests {
         assert!(
             cleaned.contains("Content"),
             "Body content should remain, got: {cleaned}"
+        );
+    }
+
+    #[test]
+    fn test_relative_link_regex() {
+        // Test that RELATIVE_LINK_REGEX only matches relative .html links
+        let re = &RELATIVE_LINK_REGEX;
+
+        // Should match - relative .html links
+        assert!(re.is_match("[module](module/index.html)"));
+        assert!(re.is_match("[struct](struct.Struct.html)"));
+
+        // Should NOT match
+        assert!(!re.is_match("[Section](#section)")); // Anchor link
+        assert!(
+            !re.is_match("[External](https://example.com)"),
+            "Should not match external URLs"
+        ); // External URL
+    }
+
+    #[test]
+    fn test_clean_markdown_preserves_content() {
+        // Test that clean_markdown doesn't remove too much content
+        let markdown = r"# Dioxus
+
+## At a glance
+
+Dioxus is a framework for building cross-platform apps.
+
+## Quick start
+
+To get started with Dioxus:
+
+```
+cargo install dioxus-cli
+```
+
+[External Link](https://dioxuslabs.com)
+
+[Anchor](#quick-start)
+";
+        let cleaned = clean_markdown(markdown);
+
+        // Should preserve main content
+        assert!(cleaned.contains("Dioxus is a framework"));
+        assert!(cleaned.contains("At a glance"));
+        assert!(cleaned.contains("Quick start"));
+        assert!(cleaned.contains("cargo install"));
+
+        // Should preserve external links and anchor links
+        assert!(
+            cleaned.contains("[External Link](https://dioxuslabs.com)"),
+            "Should preserve external links"
+        );
+        assert!(
+            cleaned.contains("[Anchor](#quick-start)"),
+            "Should preserve anchor links"
         );
     }
 }
