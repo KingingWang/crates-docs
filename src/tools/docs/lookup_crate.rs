@@ -29,22 +29,22 @@ use std::sync::Arc;
 pub struct LookupCrateTool {
     /// Crate name
     #[json_schema(
-        title = "Crate 名称",
-        description = "要查找的 Crate name，例如：serde、tokio、reqwest"
+        title = "Crate Name",
+        description = "Crate name to lookup, e.g.: serde, tokio, reqwest"
     )]
     pub crate_name: String,
 
     /// Version (optional, defaults to latest)
     #[json_schema(
-        title = "版本号",
-        description = "Specify crate version, e.g.: 1.0.0. Uses latest version if not specified"
+        title = "Version",
+        description = "Crate version, e.g.: 1.0.0. Uses latest version if not specified"
     )]
     pub version: Option<String>,
 
     /// Output format: markdown, text, or html
     #[json_schema(
-        title = "输出格式",
-        description = "Documentation output format: markdown (default), text (plain text), html",
+        title = "Output Format",
+        description = "Output format: markdown (default), text (plain text), html",
         default = "markdown"
     )]
     pub format: Option<String>,

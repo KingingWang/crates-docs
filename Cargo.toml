@@ -46,14 +46,11 @@ thiserror = "2.0"
 # 缓存系统
 moka = { version = "0.12", optional = true, features = ["sync"] }
 redis = { version = "1.0", optional = true, features = ["tokio-comp"] }
-lru = "0.16"
 
 # 日志和监控
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
-tracing-opentelemetry = { version = "0.32", optional = true }
-opentelemetry = { version = "0.31", optional = true }
 prometheus-client = "0.24"
 
 # 工具库

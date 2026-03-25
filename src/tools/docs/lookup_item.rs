@@ -12,8 +12,8 @@ use std::sync::Arc;
 /// Lookup item documentation tool
 #[rust_mcp_sdk::macros::mcp_tool(
     name = "lookup_item",
-    title = "查找 Crate 项目文档",
-    description = "从 docs.rs 获取 Rust crate 中特定项目（函数、结构体、trait、模块等）的文档。适用于查找特定 API 的详细用法和签名。支持搜索路径如 serde::Serialize、std::collections::HashMap 等。",
+    title = "Lookup Item Documentation",
+    description = "Get documentation for a specific item (function, struct, trait, module, etc.) from a Rust crate on docs.rs. Supports search paths like serde::Serialize, std::collections::HashMap, etc.",
     destructive_hint = false,
     idempotent_hint = true,
     open_world_hint = false,
@@ -29,29 +29,29 @@ use std::sync::Arc;
 pub struct LookupItemTool {
     /// Crate name
     #[json_schema(
-        title = "Crate 名称",
-        description = "要查找的 Crate name，例如：serde、tokio、std"
+        title = "Crate Name",
+        description = "Crate name to lookup, e.g.: serde, tokio, std"
     )]
     pub crate_name: String,
 
     /// Item path (e.g., `std::collections::HashMap`)
     #[json_schema(
-        title = "项目路径",
-        description = "要查找的项目路径，格式为 '模块::子模块::项目名'。例如：serde::Serialize、tokio::runtime::Runtime、std::collections::HashMap"
+        title = "Item Path",
+        description = "Item path in format 'module::submodule::item', e.g.: serde::Serialize, tokio::runtime::Runtime, std::collections::HashMap"
     )]
     pub item_path: String,
 
     /// Version (optional, defaults to latest)
     #[json_schema(
-        title = "版本号",
-        description = "指定 crate 版本号。不指定则使用最新版本"
+        title = "Version",
+        description = "Crate version. Uses latest version if not specified"
     )]
     pub version: Option<String>,
 
     /// Output format: markdown, text, or html
     #[json_schema(
-        title = "输出格式",
-        description = "Documentation output format: markdown (default), text (plain text), html",
+        title = "Output Format",
+        description = "Output format: markdown (default), text (plain text), html",
         default = "markdown"
     )]
     pub format: Option<String>,
