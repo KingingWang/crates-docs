@@ -2,11 +2,16 @@
 
 use crate::error::{Error, Result};
 use reqwest::Client;
+use reqwest_middleware::ClientBuilder;
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 
 /// HTTP client builder with retry support
+///
+/// This builder creates a `reqwest_middleware::ClientWithMiddleware` that includes
+/// automatic retry functionality for transient failures.
 pub struct HttpClientBuilder {
     timeout: Duration,
     connect_timeout: Duration,
@@ -123,8 +128,16 @@ impl HttpClientBuilder {
         self
     }
 
-    /// Build HTTP client
-    pub fn build(self) -> Result<Client> {
+    /// Build HTTP client with middleware chain
+    ///
+    /// This method builds a `reqwest_middleware::ClientWithMiddleware` that includes
+    /// automatic retry functionality using exponential backoff for transient failures.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `ClientWithMiddleware` that can be used like a regular `reqwest::Client`
+    /// but with automatic retry on transient errors.
+    pub fn build(self) -> Result<reqwest_middleware::ClientWithMiddleware> {
         let mut builder = Client::builder()
             .timeout(self.timeout)
             .connect_timeout(self.connect_timeout)
@@ -142,24 +155,52 @@ impl HttpClientBuilder {
             builder = builder.no_brotli();
         }
 
+        let client = builder
+            .build()
+            .map_err(|e| Error::http_request("BUILD", "client", 0, e.to_string()))?;
+
+        // Create retry policy with exponential backoff
+        let retry_policy = ExponentialBackoff::builder()
+            .retry_bounds(self.retry_initial_delay, self.retry_max_delay)
+            .build_with_max_retries(self.max_retries);
+
+        // Build client with retry middleware
+        Ok(ClientBuilder::new(client)
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build())
+    }
+
+    /// Build HTTP client without retry support
+    ///
+    /// This method returns a plain `reqwest::Client` without any middleware.
+    /// Use [`build`](Self::build) for retry support.
+    pub fn build_plain(self) -> Result<Client> {
+        let mut builder = Client::builder()
+            .timeout(self.timeout)
+            .connect_timeout(self.connect_timeout)
+            .pool_max_idle_per_host(self.pool_max_idle_per_host)
+            .pool_idle_timeout(self.pool_idle_timeout)
+            .user_agent(&self.user_agent);
+
+        if !self.enable_gzip {
+            builder = builder.no_gzip();
+        }
+
+        if !self.enable_brotli {
+            builder = builder.no_brotli();
+        }
+
         builder
             .build()
             .map_err(|e| Error::http_request("BUILD", "client", 0, e.to_string()))
     }
-
-    /// Build HTTP client with retry support
-    ///
-    /// Note: Retry logic is implemented at the application level for better control.
-    /// This method returns the standard `reqwest::Client`.
-    pub fn build_with_retry(self) -> Result<Client> {
-        // Build client with configured settings
-        // Retry logic should be implemented at the application level
-        // for better control over retry behavior
-        self.build()
-    }
 }
 
-/// Create HTTP client from performance config
+/// Create HTTP client builder from performance config
+///
+/// This function creates an `HttpClientBuilder` pre-configured with settings
+/// from the provided `PerformanceConfig`. The resulting client will include
+/// automatic retry functionality.
 #[must_use]
 pub fn create_http_client_from_config(
     config: &crate::config::PerformanceConfig,

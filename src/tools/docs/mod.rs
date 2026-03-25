@@ -33,15 +33,15 @@ use std::sync::Arc;
 
 /// 文档服务
 ///
-/// 提供 HTTP 客户端、缓存和文档缓存的集中管理。
+/// 提供 HTTP 客户端（带自动重试）、缓存和文档缓存的集中管理。
 ///
 /// # 字段
 ///
-/// - `client`: HTTP 客户端
+/// - `client`: 带重试中间件的 HTTP 客户端
 /// - `cache`: 通用缓存实例
 /// - `doc_cache`: 文档专用缓存
 pub struct DocService {
-    client: reqwest::Client,
+    client: reqwest_middleware::ClientWithMiddleware,
     cache: Arc<dyn Cache>,
     doc_cache: cache::DocCache,
 }
@@ -94,7 +94,7 @@ impl DocService {
             .map_err(|e| {
                 crate::error::Error::initialization(
                     "http_client",
-                    format!("Failed to create HTTP client: {e}"),
+                    format!("Failed to create HTTP client with retry: {e}"),
                 )
             })?;
         Ok(Self {
@@ -127,7 +127,7 @@ impl DocService {
             .map_err(|e| {
                 crate::error::Error::initialization(
                     "http_client",
-                    format!("Failed to create HTTP client: {e}"),
+                    format!("Failed to create HTTP client with retry: {e}"),
                 )
             })?;
         Ok(Self {
@@ -137,9 +137,9 @@ impl DocService {
         })
     }
 
-    /// 获取 HTTP 客户端
+    /// 获取 HTTP 客户端（带重试中间件）
     #[must_use]
-    pub fn client(&self) -> &reqwest::Client {
+    pub fn client(&self) -> &reqwest_middleware::ClientWithMiddleware {
         &self.client
     }
 

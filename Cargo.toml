@@ -34,6 +34,8 @@ rust-mcp-extra = { version = "0.2.3", optional = true }
 
 # HTTP 客户端
 reqwest = { version = "0.13", features = ["json"] }
+reqwest-middleware = "0.5"
+reqwest-retry = "0.9"
 tokio = { version = "1.50", features = ["full"] }
 
 # 序列化和配置
@@ -74,7 +76,7 @@ clap = { version = "4.5", features = ["derive", "env"] }
 chrono = "0.4"
 
 [dev-dependencies]
-tokio = { version = "1.40", features = ["full", "test-util"] }
+tokio = { version = "1.50", features = ["full", "test-util"] }
 reqwest = { version = "0.13", features = ["json"] }
 serde_json = "1.0"
 tempfile = "3.27.0"
