@@ -259,3 +259,258 @@ fn test_token_store_cleanup() {
     // 有效的 token 应该保留
     assert!(store.get_token("valid_user").is_some());
 }
+
+// ============================================================================
+// API Key 配置测试 (需要 api-key feature)
+// ============================================================================
+
+#[cfg(feature = "api-key")]
+mod api_key_tests {
+    use crates_docs::server::auth::{ApiKeyConfig, AuthConfig, AuthContext, AuthProvider};
+
+    fn generate_hashed_key() -> (String, String) {
+        let generator = ApiKeyConfig::default();
+        let generated = generator
+            .generate_key()
+            .expect("failed to generate API key");
+        (generated.key, generated.hash)
+    }
+
+    #[test]
+    fn test_api_key_config_default() {
+        let config = ApiKeyConfig::default();
+        assert!(!config.enabled);
+        assert!(config.keys.is_empty());
+        assert_eq!(config.header_name, "X-API-Key");
+        assert_eq!(config.query_param_name, "api_key");
+        assert!(!config.allow_query_param);
+        assert_eq!(config.key_prefix, "sk");
+    }
+
+    #[test]
+    fn test_api_key_config_validate_disabled() {
+        let config = ApiKeyConfig::default();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_api_key_config_validate_enabled_no_keys() {
+        let config = ApiKeyConfig {
+            enabled: true,
+            ..Default::default()
+        };
+        // Should succeed but log a warning
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_api_key_config_validate_empty_header_name() {
+        let config = ApiKeyConfig {
+            enabled: true,
+            keys: vec!["test_key".to_string()],
+            header_name: String::new(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_api_key_is_valid_disabled() {
+        let config = ApiKeyConfig::default();
+        // When disabled, all keys should be accepted
+        assert!(config.is_valid_key("any_key"));
+        assert!(config.is_valid_key("invalid_key"));
+    }
+
+    #[test]
+    fn test_api_key_is_valid_enabled() {
+        let (plain_key_1, hashed_key_1) = generate_hashed_key();
+        let (plain_key_2, hashed_key_2) = generate_hashed_key();
+
+        let config = ApiKeyConfig {
+            enabled: true,
+            keys: vec![hashed_key_1, hashed_key_2],
+            ..Default::default()
+        };
+
+        assert!(config.is_valid_key(&plain_key_1));
+        assert!(config.is_valid_key(&plain_key_2));
+        assert!(!config.is_valid_key("invalid_key"));
+        assert!(!config.is_valid_key("sk_wrong"));
+    }
+
+    #[test]
+    fn test_auth_config_with_api_key() {
+        let mut config = AuthConfig::default();
+        assert!(!config.is_enabled());
+
+        #[cfg(feature = "api-key")]
+        {
+            let (_, hashed_key) = generate_hashed_key();
+            config.api_key.enabled = true;
+            config.api_key.keys = vec![hashed_key];
+            assert!(config.is_enabled());
+        }
+    }
+
+    #[test]
+    fn test_auth_context_with_api_key() {
+        let ctx = AuthContext::new(AuthProvider::ApiKey);
+        assert!(ctx.is_authenticated());
+        assert!(ctx.api_key_id.is_none());
+    }
+
+    #[test]
+    fn test_auth_context_none() {
+        let ctx = AuthContext::new(AuthProvider::None);
+        assert!(!ctx.is_authenticated());
+    }
+}
+
+// ============================================================================
+// API Key 中间件测试 (需要 api-key feature)
+// ============================================================================
+
+#[cfg(feature = "api-key")]
+mod auth_middleware_tests {
+    use crates_docs::server::auth::ApiKeyConfig;
+    use crates_docs::server::auth_middleware::{ApiKeyMiddleware, AuthError};
+    use std::collections::HashMap;
+
+    fn create_test_config() -> (ApiKeyConfig, String) {
+        let generator = ApiKeyConfig::default();
+        let generated = generator
+            .generate_key()
+            .expect("failed to generate API key");
+        (
+            ApiKeyConfig {
+                enabled: true,
+                keys: vec![generated.hash],
+                ..Default::default()
+            },
+            generated.key,
+        )
+    }
+
+    #[test]
+    fn test_middleware_disabled() {
+        let config = ApiKeyConfig::default();
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let headers = HashMap::new();
+        assert!(middleware.validate_request(&headers, None));
+    }
+
+    #[test]
+    fn test_middleware_valid_key_header() {
+        let (config, valid_key) = create_test_config();
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let mut headers = HashMap::new();
+        headers.insert("X-API-Key".to_string(), valid_key);
+
+        assert!(middleware.validate_request(&headers, None));
+    }
+
+    #[test]
+    fn test_middleware_invalid_key_header() {
+        let (config, _) = create_test_config();
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let mut headers = HashMap::new();
+        headers.insert("X-API-Key".to_string(), "invalid_key".to_string());
+
+        assert!(!middleware.validate_request(&headers, None));
+    }
+
+    #[test]
+    fn test_middleware_missing_key() {
+        let (config, _) = create_test_config();
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let headers = HashMap::new();
+        assert!(!middleware.validate_request(&headers, None));
+    }
+
+    #[test]
+    fn test_middleware_query_param_allowed() {
+        let (mut config, valid_key) = create_test_config();
+        config.allow_query_param = true;
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let headers = HashMap::new();
+        let mut query_params = HashMap::new();
+        query_params.insert("api_key".to_string(), valid_key);
+
+        assert!(middleware.validate_request(&headers, Some(&query_params)));
+    }
+
+    #[test]
+    fn test_middleware_query_param_not_allowed() {
+        let (config, valid_key) = create_test_config();
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let headers = HashMap::new();
+        let mut query_params = HashMap::new();
+        query_params.insert("api_key".to_string(), valid_key);
+
+        assert!(!middleware.validate_request(&headers, Some(&query_params)));
+    }
+
+    #[test]
+    fn test_middleware_extract_key_from_header() {
+        let (config, valid_key) = create_test_config();
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let mut headers = HashMap::new();
+        headers.insert("X-API-Key".to_string(), valid_key.clone());
+
+        let key = middleware.extract_key(&headers, None);
+        assert_eq!(key, Some(valid_key));
+    }
+
+    #[test]
+    fn test_middleware_extract_key_from_query() {
+        let (mut config, valid_key) = create_test_config();
+        config.allow_query_param = true;
+        let middleware = ApiKeyMiddleware::new(config);
+
+        let headers = HashMap::new();
+        let mut query_params = HashMap::new();
+        query_params.insert("api_key".to_string(), valid_key.clone());
+
+        let key = middleware.extract_key(&headers, Some(&query_params));
+        assert_eq!(key, Some(valid_key));
+    }
+
+    #[test]
+    fn test_middleware_is_enabled() {
+        let (config, _) = create_test_config();
+        let middleware = ApiKeyMiddleware::new(config);
+        assert!(middleware.is_enabled());
+
+        let disabled_config = ApiKeyConfig::default();
+        let disabled_middleware = ApiKeyMiddleware::new(disabled_config);
+        assert!(!disabled_middleware.is_enabled());
+    }
+
+    #[test]
+    fn test_auth_error_unauthorized() {
+        let error = AuthError::unauthorized();
+        assert_eq!(error.message, "Unauthorized: API key required");
+        assert!(error.www_authenticate.is_some());
+    }
+
+    #[test]
+    fn test_auth_error_invalid_key() {
+        let error = AuthError::invalid_key();
+        assert_eq!(error.message, "Unauthorized: Invalid API key");
+        assert!(error.www_authenticate.is_some());
+    }
+
+    #[test]
+    fn test_auth_error_display() {
+        let error = AuthError::new("Test error");
+        assert_eq!(format!("{error}"), "Test error");
+    }
+}

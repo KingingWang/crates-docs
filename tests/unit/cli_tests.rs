@@ -32,6 +32,10 @@ fn test_cli_parse_serve_command() {
             oauth_client_id,
             oauth_client_secret,
             oauth_redirect_uri,
+            enable_api_key,
+            api_keys,
+            api_key_header,
+            api_key_query_param,
         } => {
             assert_eq!(mode, Some("http".to_string()));
             assert_eq!(host, Some("0.0.0.0".to_string()));
@@ -40,6 +44,10 @@ fn test_cli_parse_serve_command() {
             assert!(oauth_client_id.is_none());
             assert!(oauth_client_secret.is_none());
             assert!(oauth_redirect_uri.is_none());
+            assert!(enable_api_key.is_none());
+            assert!(api_keys.is_none());
+            assert!(api_key_header.is_none());
+            assert!(api_key_query_param.is_none());
         }
         _ => panic!("Expected Serve command"),
     }
@@ -274,6 +282,41 @@ fn test_cli_parse_health_command_defaults() {
             assert!(!verbose);
         }
         _ => panic!("Expected Health command"),
+    }
+}
+
+/// 测试 Cli 结构体解析 - GenerateApiKey 命令
+#[test]
+fn test_cli_parse_generate_api_key_command() {
+    let cli = crates_docs::cli::Cli::try_parse_from([
+        "crates-docs",
+        "generate-api-key",
+        "--prefix",
+        "ck",
+    ]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::GenerateApiKey { prefix } => {
+            assert_eq!(prefix, "ck");
+        }
+        _ => panic!("Expected GenerateApiKey command"),
+    }
+}
+
+/// 测试 Cli 结构体解析 - GenerateApiKey 命令默认值
+#[test]
+fn test_cli_parse_generate_api_key_command_defaults() {
+    let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "generate-api-key"]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::GenerateApiKey { prefix } => {
+            assert_eq!(prefix, "sk");
+        }
+        _ => panic!("Expected GenerateApiKey command"),
     }
 }
 
@@ -614,6 +657,13 @@ fn test_commands_enum_variants() {
             oauth_client_id: None,
             oauth_client_secret: None,
             oauth_redirect_uri: None,
+            enable_api_key: None,
+            api_keys: None,
+            api_key_header: None,
+            api_key_query_param: None,
+        },
+        crates_docs::cli::Commands::GenerateApiKey {
+            prefix: "sk".to_string(),
         },
         crates_docs::cli::Commands::Config {
             output: PathBuf::from("config.toml"),
@@ -640,6 +690,9 @@ fn test_commands_enum_variants() {
     for cmd in commands {
         match cmd {
             crates_docs::cli::Commands::Serve { .. } => {}
+            crates_docs::cli::Commands::GenerateApiKey { .. } => {}
+            crates_docs::cli::Commands::ListApiKeys { .. } => {}
+            crates_docs::cli::Commands::RevokeApiKey { .. } => {}
             crates_docs::cli::Commands::Config { .. } => {}
             crates_docs::cli::Commands::Test { .. } => {}
             crates_docs::cli::Commands::Health { .. } => {}

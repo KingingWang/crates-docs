@@ -103,6 +103,24 @@ provider = "Custom"
 # scopes = ["openid", "profile", "email"]
 # provider = "Keycloak"
 
+# API Key 认证配置
+# 注意：需要启用 api-key feature 才能使用此功能
+# [api_key]
+# # 是否启用 API Key 认证
+# enabled = true
+# # 有效的 API Key 哈希列表（Argon2 PHC 格式）
+# # 不要在配置文件中存储明文 key；请使用 `crates-docs generate-api-key`
+# # 生成一次性明文 key，并将输出的 hash 保存到这里
+# keys = ["$argon2id$v=19$m=47104,t=1,p=1$replace$with_generated_hash"]
+# # API Key 请求头名称
+# header_name = "X-API-Key"
+# # API Key 查询参数名称（不推荐使用，安全性较低）
+# query_param_name = "api_key"
+# # 是否允许通过查询参数传递 API Key（默认 false）
+# allow_query_param = false
+# # API Key 前缀（用于生成和校验结构化 key）
+# key_prefix = "sk"
+
 [logging]
 # 日志级别: trace, debug, info, warn, error
 level = "info"
@@ -148,3 +166,47 @@ enable_response_compression = true
 enable_metrics = true
 # 指标服务端口号（0 表示使用服务器端口）
 metrics_port = 0
+
+# ============================================================================
+# 环境变量配置（适用于 Docker 部署）
+# ============================================================================
+#
+# 以下环境变量可以覆盖配置文件中的设置，优先级：环境变量 > CLI 配置文件 > 默认值
+#
+# API Key 认证环境变量：
+#   CRATES_DOCS_API_KEY_ENABLED=true                    # 启用 API Key 认证
+#   CRATES_DOCS_API_KEYS=$argon2id$...,$argon2id$...   # API Key 哈希列表（逗号分隔）
+#   CRATES_DOCS_API_KEY_HEADER=X-API-Key                # API Key 请求头名称
+#   CRATES_DOCS_API_KEY_QUERY_PARAM_NAME=api_key        # API Key 查询参数名称
+#   CRATES_DOCS_API_KEY_ALLOW_QUERY=false               # 是否允许查询参数传递
+#   CRATES_DOCS_API_KEY_PREFIX=sk                       # API Key 前缀
+#
+# 先生成 key：
+#   crates-docs generate-api-key --prefix sk
+#
+# Docker 部署示例：
+#   docker run -d \
+#     -p 8080:8080 \
+#     -e CRATES_DOCS_API_KEY_ENABLED=true \
+#     -e CRATES_DOCS_API_KEYS='$argon2id$...generated_hash...' \
+#     crates-docs:latest
+#
+# Docker Compose 示例：
+#   services:
+#     crates-docs:
+#       image: crates-docs:latest
+#       ports:
+#         - "8080:8080"
+#       environment:
+#         - CRATES_DOCS_API_KEY_ENABLED=true
+#         - CRATES_DOCS_API_KEYS=$argon2id$...generated_hash...
+#         - CRATES_DOCS_HOST=0.0.0.0
+#         - CRATES_DOCS_PORT=8080
+#
+# CLI 参数示例：
+#   crates-docs serve \
+#     --enable-api-key \
+#     --api-keys '$argon2id$...generated_hash...' \
+#     --api-key-header "X-API-Key"
+#
+# ============================================================================

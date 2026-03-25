@@ -35,6 +35,47 @@ pub enum Commands {
         /// OAuth redirect URI
         #[arg(long)]
         oauth_redirect_uri: Option<String>,
+
+        /// Enable API Key authentication
+        #[arg(long)]
+        enable_api_key: Option<bool>,
+
+        /// API Key(s) for authentication (comma-separated for multiple keys)
+        #[arg(long)]
+        api_keys: Option<String>,
+
+        /// API Key header name (default: X-API-Key)
+        #[arg(long)]
+        api_key_header: Option<String>,
+
+        /// Allow API Key in query parameter
+        #[arg(long)]
+        api_key_query_param: Option<bool>,
+    },
+
+    /// Generate API key for hashed storage
+    GenerateApiKey {
+        /// Key prefix used when generating the API key
+        #[arg(long, default_value = "sk")]
+        prefix: String,
+    },
+
+    /// List API keys from configuration file
+    ListApiKeys {
+        /// Configuration file path
+        #[arg(short, long, default_value = "config.toml")]
+        config: PathBuf,
+    },
+
+    /// Revoke an API key from configuration file
+    RevokeApiKey {
+        /// Configuration file path
+        #[arg(short, long, default_value = "config.toml")]
+        config: PathBuf,
+
+        /// Key hash or key ID to revoke
+        #[arg(short, long)]
+        key: String,
     },
 
     /// Generate configuration file

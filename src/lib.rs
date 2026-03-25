@@ -48,6 +48,7 @@
 pub mod cache;
 pub mod cli;
 pub mod config;
+pub mod config_reload;
 pub mod error;
 pub mod metrics;
 pub mod server;
