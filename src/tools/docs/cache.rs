@@ -32,6 +32,7 @@ use std::time::Duration;
 /// - `crate_docs_secs`: crate 文档缓存时间（秒）
 /// - `search_results_secs`: 搜索结果缓存时间（秒）
 /// - `item_docs_secs`: 项目文档缓存时间（秒）
+/// - `jitter_ratio`: TTL 抖动比例（0.0-1.0），用于防止缓存雪崩
 #[derive(Debug, Clone, Copy)]
 pub struct DocCacheTtl {
     /// crate 文档 TTL（秒）
@@ -40,7 +41,15 @@ pub struct DocCacheTtl {
     pub search_results_secs: u64,
     /// 项目文档 TTL（秒）
     pub item_docs_secs: u64,
+    /// TTL 抖动比例（0.0-1.0），默认 0.1（10%）
+    ///
+    /// 实际 TTL = `base_ttl * (1 + random(-jitter_ratio, jitter_ratio))`
+    /// 例如：`base_ttl=3600`, `jitter_ratio=0.1` => 实际 TTL 范围 `[3240, 3960]`
+    pub jitter_ratio: f64,
 }
+
+/// 默认 TTL 抖动比例（10%）
+const DEFAULT_JITTER_RATIO: f64 = 0.1;
 
 impl Default for DocCacheTtl {
     fn default() -> Self {
@@ -48,6 +57,7 @@ impl Default for DocCacheTtl {
             crate_docs_secs: 3600,    // 1 小时
             search_results_secs: 300, // 5 分钟
             item_docs_secs: 1800,     // 30 分钟
+            jitter_ratio: DEFAULT_JITTER_RATIO,
         }
     }
 }
@@ -68,7 +78,37 @@ impl DocCacheTtl {
             crate_docs_secs: config.crate_docs_ttl_secs.unwrap_or(3600),
             search_results_secs: config.search_results_ttl_secs.unwrap_or(300),
             item_docs_secs: config.item_docs_ttl_secs.unwrap_or(1800),
+            jitter_ratio: DEFAULT_JITTER_RATIO,
         }
+    }
+
+    /// 计算带抖动的实际 TTL
+    ///
+    /// # 参数
+    ///
+    /// * `base_ttl` - 基础 TTL（秒）
+    ///
+    /// # 返回值
+    ///
+    /// 返回带抖动的实际 TTL（秒）
+    #[must_use]
+    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn apply_jitter(&self, base_ttl: u64) -> u64 {
+        if self.jitter_ratio <= 0.0 {
+            return base_ttl;
+        }
+
+        // 限制 jitter_ratio 在 [0.0, 1.0] 范围内
+        let ratio = self.jitter_ratio.clamp(0.0, 1.0);
+
+        // 生成 [-ratio, +ratio] 范围内的随机偏移
+        let rng = fastrand::f64();
+        let offset = (rng * 2.0 - 1.0) * ratio;
+
+        // 计算抖动后的 TTL，确保至少为 1 秒
+        (base_ttl as f64 * (1.0 + offset)).max(1.0) as u64
     }
 }
 
@@ -129,6 +169,7 @@ impl DocCache {
     ///     crate_docs_secs: 7200,
     ///     search_results_secs: 600,
     ///     item_docs_secs: 3600,
+    ///     jitter_ratio: 0.1,
     /// };
     /// let doc_cache = DocCache::with_ttl(cache, ttl);
     /// ```
@@ -170,13 +211,8 @@ impl DocCache {
         content: String,
     ) -> crate::error::Result<()> {
         let key = Self::crate_cache_key(crate_name, version);
-        self.cache
-            .set(
-                key,
-                content,
-                Some(Duration::from_secs(self.ttl.crate_docs_secs)),
-            )
-            .await
+        let ttl = Duration::from_secs(self.ttl.apply_jitter(self.ttl.crate_docs_secs));
+        self.cache.set(key, content, Some(ttl)).await
     }
 
     /// 获取缓存的搜索结果
@@ -212,13 +248,8 @@ impl DocCache {
         content: String,
     ) -> crate::error::Result<()> {
         let key = Self::search_cache_key(query, limit);
-        self.cache
-            .set(
-                key,
-                content,
-                Some(Duration::from_secs(self.ttl.search_results_secs)),
-            )
-            .await
+        let ttl = Duration::from_secs(self.ttl.apply_jitter(self.ttl.search_results_secs));
+        self.cache.set(key, content, Some(ttl)).await
     }
 
     /// 获取缓存的项目文档
@@ -262,13 +293,8 @@ impl DocCache {
         content: String,
     ) -> crate::error::Result<()> {
         let key = Self::item_cache_key(crate_name, item_path, version);
-        self.cache
-            .set(
-                key,
-                content,
-                Some(Duration::from_secs(self.ttl.item_docs_secs)),
-            )
-            .await
+        let ttl = Duration::from_secs(self.ttl.apply_jitter(self.ttl.item_docs_secs));
+        self.cache.set(key, content, Some(ttl)).await
     }
 
     /// 清除缓存

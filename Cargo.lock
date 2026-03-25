@@ -450,13 +450,14 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "crates-docs"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64",
  "chrono",
  "clap",
+ "fastrand",
  "flate2",
  "html2md",
  "mockall",
