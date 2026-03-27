@@ -9,18 +9,37 @@
 //! - `transport`: 传输层实现
 //! - `auth`: OAuth 认证支持
 //!
+//! # Handler 设计模式
+//!
+//! 使用组合模式消除代码重复：
+//! - `HandlerCore`: 封装共享核心处理逻辑
+//! - `CratesDocsHandler`: 标准 MCP 处理器（委托给 `HandlerCore`）
+//! - `CratesDocsHandlerCore`: 核心处理器（委托给 `HandlerCore`）
+//! - `HandlerConfig`: 配置类，支持 merge 操作
+//!
 //! # 示例
 //!
 //! ```rust,no_run
 //! use crates_docs::{AppConfig, CratesDocsServer};
+//! use crates_docs::server::handler::{CratesDocsHandler, HandlerConfig};
+//! use std::sync::Arc;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let config = AppConfig::default();
-//!     let server = CratesDocsServer::new(config)?;
-//!
+//!     let server = Arc::new(CratesDocsServer::new(config)?);
+//!     
+//!     // 使用 merge 配置创建 handler
+//!     let base_config = HandlerConfig::default();
+//!     let override_config = HandlerConfig::new().with_verbose_logging();
+//!     let handler = CratesDocsHandler::with_merged_config(
+//!         server,
+//!         base_config,
+//!         Some(override_config)
+//!     );
+//!     
 //!     // 运行 HTTP 服务器
-//!     server.run_http().await?;
+//!     crates_docs::server::transport::run_http_server(&handler.server()).await?;
 //!
 //!     Ok(())
 //! }
