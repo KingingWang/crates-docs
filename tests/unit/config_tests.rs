@@ -1,10 +1,10 @@
-//! 配置模块单元测试
+//! Configuration module unit tests
 
 use crates_docs::config::AppConfig;
 use tempfile::tempdir;
 
 // ============================================================================
-// 配置验证测试
+// Configuration validation tests
 // ============================================================================
 
 #[test]
@@ -73,7 +73,7 @@ fn test_config_validation_zero_cache_size() {
 }
 
 // ============================================================================
-// 文件加载/保存测试
+// File load/save tests
 // ============================================================================
 
 #[test]
@@ -132,7 +132,7 @@ fn test_config_save_to_file_nested_directory() {
 }
 
 // ============================================================================
-// 环境变量加载测试
+// Environment variable loading tests
 // ============================================================================
 
 #[test]
@@ -166,7 +166,7 @@ fn test_config_from_env_invalid_port() {
 }
 
 // ============================================================================
-// 配置合并测试
+// Configuration merge tests
 // ============================================================================
 
 #[test]
@@ -180,13 +180,13 @@ fn test_config_merge() {
     env_config.server.port = 9000;
 
     let merged = AppConfig::merge(Some(file_config), Some(env_config));
-    // 环境变量优先
+    // Environment variables take priority
     assert_eq!(merged.server.name, "env-server");
     assert_eq!(merged.server.port, 9000);
 }
 
 // ============================================================================
-// 默认值测试
+// Default value tests
 // ============================================================================
 
 #[test]
@@ -212,7 +212,7 @@ fn test_logging_config_default() {
     let config = crates_docs::config::LoggingConfig::default();
     assert_eq!(config.level, "info");
     assert!(config.enable_console);
-    // 默认 enable_file 为 false（仅输出到控制台）
+    // By default enable_file is false (output to console only)
     assert!(!config.enable_file);
 }
 
