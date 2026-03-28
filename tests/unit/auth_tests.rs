@@ -1,9 +1,9 @@
-//! OAuth 和认证模块单元测试
+//! OAuth and authentication module unit tests
 
 use crates_docs::server::auth::{AuthManager, OAuthConfig, OAuthProvider, TokenInfo, TokenStore};
 
 // ============================================================================
-// OAuth 配置测试
+// OAuth configuration tests
 // ============================================================================
 
 #[test]
@@ -15,7 +15,7 @@ fn test_oauth_config_github() {
     );
     assert!(config.enabled);
     assert_eq!(config.client_id, Some("client_id".to_string()));
-    // OAuthProvider 没有实现 PartialEq，使用 Debug 进行比较
+    // OAuthProvider does not implement PartialEq, use Debug for comparison
     assert!(matches!(config.provider, OAuthProvider::GitHub));
 }
 
@@ -146,7 +146,7 @@ fn test_oauth_config_validate_invalid_urls() {
 }
 
 // ============================================================================
-// AuthManager 测试
+// AuthManager tests
 // ============================================================================
 
 #[test]
@@ -171,10 +171,10 @@ fn test_auth_manager_new_and_accessors() {
 fn test_oauth_to_mcp_config_without_feature() {
     let config = OAuthConfig::default();
     let result = config.to_mcp_config();
-    // 默认 enabled=false，应返回错误
+    // Default enabled=false, should return error
     assert!(result.is_err());
     if let Err(e) = result {
-        // 结构化错误消息格式: "Configuration error for 'oauth': is not enabled"
+        // Structured error message format: "Configuration error for 'oauth': is not enabled"
         let err_msg = e.to_string();
         assert!(
             err_msg.contains("oauth") && err_msg.contains("not enabled"),
@@ -188,7 +188,7 @@ fn test_oauth_to_mcp_config_without_feature() {
 fn test_oauth_to_mcp_config_without_feature() {
     let config = OAuthConfig::default();
     let result = config.to_mcp_config();
-    // feature 未启用，应返回错误
+    // feature not enabled, should return error
     assert!(result.is_err());
     if let Err(e) = result {
         assert!(e.to_string().contains("oauth"));
@@ -196,14 +196,14 @@ fn test_oauth_to_mcp_config_without_feature() {
 }
 
 // ============================================================================
-// TokenStore 测试
+// TokenStore tests
 // ============================================================================
 
 #[test]
 fn test_token_store_operations() {
     let store = TokenStore::new();
 
-    // 测试存储和获取
+    // Test storage and retrieval
     let token = TokenInfo {
         access_token: "access123".to_string(),
         refresh_token: Some("refresh456".to_string()),
@@ -219,7 +219,7 @@ fn test_token_store_operations() {
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.access_token, "access123");
 
-    // 测试删除
+    // Test deletion
     store.remove_token("user1");
     assert!(store.get_token("user1").is_none());
 }
@@ -228,7 +228,7 @@ fn test_token_store_operations() {
 fn test_token_store_cleanup() {
     let store = TokenStore::new();
 
-    // 存储一个已过期的 token
+    // Store an expired token
     let expired_token = TokenInfo {
         access_token: "expired".to_string(),
         refresh_token: None,
@@ -238,7 +238,7 @@ fn test_token_store_cleanup() {
         user_email: None,
     };
 
-    // 存储一个有效的 token
+    // Store a valid token
     let valid_token = TokenInfo {
         access_token: "valid".to_string(),
         refresh_token: None,
@@ -251,17 +251,17 @@ fn test_token_store_cleanup() {
     store.store_token("expired_user".to_string(), expired_token);
     store.store_token("valid_user".to_string(), valid_token);
 
-    // 执行清理
+    // Perform cleanup
     store.cleanup_expired();
 
-    // 过期的 token 应该被删除
+    // Expired token should be deleted
     assert!(store.get_token("expired_user").is_none());
-    // 有效的 token 应该保留
+    // Valid token should be retained
     assert!(store.get_token("valid_user").is_some());
 }
 
 // ============================================================================
-// API Key 配置测试 (需要 api-key feature)
+// API Key configuration tests (requires api-key feature)
 // ============================================================================
 
 #[cfg(feature = "api-key")]
@@ -368,7 +368,7 @@ mod api_key_tests {
 }
 
 // ============================================================================
-// API Key 中间件测试 (需要 api-key feature)
+// API Key middleware tests (requires api-key feature)
 // ============================================================================
 
 #[cfg(feature = "api-key")]

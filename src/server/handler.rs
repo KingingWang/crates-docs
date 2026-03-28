@@ -1,19 +1,19 @@
-//! MCP 请求处理器实现
+//! MCP request handler implementation
 //!
-//! 提供 MCP 协议请求的处理逻辑，包括工具列表、工具调用、资源列表等。
+//! Provides MCP protocol request handling logic, including tool listing, tool invocation, and resource lists.
 //!
-//! # 主要结构体
+//! # Main Structs
 //!
-//! - `HandlerCore`: 共享核心处理逻辑（内部使用）
-//! - `CratesDocsHandler`: 标准 MCP 处理器
-//! - `CratesDocsHandlerCore`: 核心处理器（提供更细粒度的控制）
+//! - `HandlerCore`: Shared core handling logic (internal use)
+//! - `CratesDocsHandler`: Standard MCP handler
+//! - `CratesDocsHandlerCore`: Core handler (provides more fine-grained control)
 //!
-//! # 设计模式
+//! # Design Pattern
 //!
-//! 使用组合模式消除代码重复：
-//! - `HandlerCore` 封装所有共享的处理逻辑
-//! - `CratesDocsHandler` 和 `CratesDocsHandlerCore` 委托给 `HandlerCore`
-//! - 支持配置合并（merge）和可选的 metrics 集成
+//! Uses composition pattern to eliminate code duplication:
+//! - `HandlerCore` encapsulates all shared handling logic
+//! - `CratesDocsHandler` and `CratesDocsHandlerCore` delegate to `HandlerCore`
+//! - Supports config merging and optional metrics integration
 
 use crate::metrics::ServerMetrics;
 use crate::server::CratesDocsServer;
@@ -33,50 +33,50 @@ use std::sync::Arc;
 use tracing::{info_span, Instrument};
 use uuid::Uuid;
 
-/// 工具执行结果（支持不同返回类型转换）
+/// Tool execution result (supports different return type conversions)
 #[derive(Debug)]
 pub struct ToolExecutionResult {
-    /// 工具名称
+    /// Tool name
     pub tool_name: String,
-    /// 执行耗时
+    /// Execution duration
     pub duration: std::time::Duration,
-    /// 是否成功
+    /// Whether successful
     pub success: bool,
-    /// 原始结果（用于转换为不同类型）
+    /// Original result (for converting to different types)
     pub result: std::result::Result<CallToolResult, CallToolError>,
 }
 
 impl ToolExecutionResult {
-    /// 转换为 CallToolResult（用于 `ServerHandler`）
+    /// Convert to `CallToolResult` (for `ServerHandler`)
     pub fn into_call_tool_result(self) -> std::result::Result<CallToolResult, CallToolError> {
         self.result
     }
 
-    /// 转换为 ResultFromServer（用于 `ServerHandlerCore`）
+    /// Convert to `ResultFromServer` (for `ServerHandlerCore`)
     pub fn into_result_from_server(self) -> ResultFromServer {
         self.result.unwrap_or_else(CallToolResult::from).into()
     }
 }
 
-/// Handler 配置（支持合并）
+/// Handler configuration (supports merging)
 ///
-/// 用于配置 handler 的行为，如 metrics 集成、日志级别等。
+/// Used to configure handler behavior, such as metrics integration, log level, etc.
 #[derive(Debug, Clone, Default)]
 pub struct HandlerConfig {
-    /// 是否启用详细日志
+    /// Whether to enable verbose logging
     pub verbose_logging: bool,
-    /// 是否记录 metrics
+    /// Whether to record metrics
     pub enable_metrics: bool,
 }
 
 impl HandlerConfig {
-    /// 创建新的配置
+    /// Create new configuration
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// 启用详细日志
+    /// Enable verbose logging
     #[must_use]
     pub fn with_verbose_logging(self) -> Self {
         Self {
@@ -85,7 +85,7 @@ impl HandlerConfig {
         }
     }
 
-    /// 启用 metrics
+    /// Enable metrics
     #[must_use]
     pub fn with_metrics(self) -> Self {
         Self {
@@ -94,7 +94,7 @@ impl HandlerConfig {
         }
     }
 
-    /// 合并配置（other 优先覆盖 self）
+    /// Merge configuration (other takes precedence over self)
     #[must_use]
     pub fn merge(self, other: Option<Self>) -> Self {
         match other {
@@ -107,16 +107,16 @@ impl HandlerConfig {
     }
 }
 
-/// 共享核心处理逻辑
+/// Shared core handling logic
 ///
-/// 封装所有 MCP 请求处理的共享逻辑，消除 `CratesDocsHandler` 和
-/// `CratesDocsHandlerCore` 之间的代码重复。
+/// Encapsulates all MCP request handling shared logic, eliminating duplication between `CratesDocsHandler` and
+/// `CratesDocsHandlerCore`.
 ///
-/// # 设计
+/// # Design
 ///
-/// - 提供工具执行、列表查询等核心方法
-/// - 支持可选的 metrics 集成
-/// - 支持配置合并
+/// - Provides core methods for tool execution, list queries, etc.
+/// - Supports optional metrics integration
+/// - Supports configuration merging
 pub struct HandlerCore {
     server: Arc<CratesDocsServer>,
     config: HandlerConfig,
@@ -124,11 +124,11 @@ pub struct HandlerCore {
 }
 
 impl HandlerCore {
-    /// 创建新的核心处理器
+    /// Create new core handler
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `server` - 服务器实例
+    /// * `server` - Server instance
     #[must_use]
     pub fn new(server: Arc<CratesDocsServer>) -> Self {
         Self {
@@ -138,7 +138,7 @@ impl HandlerCore {
         }
     }
 
-    /// 使用配置创建核心处理器
+    /// Create core handler with configuration
     #[must_use]
     pub fn with_config(server: Arc<CratesDocsServer>, config: HandlerConfig) -> Self {
         Self {
@@ -148,7 +148,7 @@ impl HandlerCore {
         }
     }
 
-    /// 合并配置创建核心处理器
+    /// Create core handler with merged configuration
     #[must_use]
     pub fn with_merged_config(
         server: Arc<CratesDocsServer>,
@@ -162,7 +162,7 @@ impl HandlerCore {
         }
     }
 
-    /// 设置 metrics
+    /// Set metrics
     #[must_use]
     pub fn with_metrics(self, metrics: Arc<ServerMetrics>) -> Self {
         Self {
@@ -171,31 +171,31 @@ impl HandlerCore {
         }
     }
 
-    /// 获取服务器引用
+    /// Get server reference
     #[must_use]
     pub fn server(&self) -> &Arc<CratesDocsServer> {
         &self.server
     }
 
-    /// 获取工具注册表
+    /// Get tool registry
     #[must_use]
     pub fn tool_registry(&self) -> &ToolRegistry {
         self.server.tool_registry()
     }
 
-    /// 获取配置
+    /// Get configuration
     #[must_use]
     pub fn config(&self) -> &HandlerConfig {
         &self.config
     }
 
-    /// 获取 metrics（可选）
+    /// Get metrics (optional)
     #[must_use]
     pub fn metrics(&self) -> Option<&Arc<ServerMetrics>> {
         self.metrics.as_ref()
     }
 
-    /// 获取所有工具列表
+    /// Get all tools list
     #[must_use]
     pub fn list_tools(&self) -> ListToolsResult {
         ListToolsResult {
@@ -205,7 +205,7 @@ impl HandlerCore {
         }
     }
 
-    /// 获取空资源列表
+    /// Get empty resources list
     #[must_use]
     pub fn list_resources(&self) -> ListResourcesResult {
         ListResourcesResult {
@@ -215,7 +215,7 @@ impl HandlerCore {
         }
     }
 
-    /// 获取空提示列表
+    /// Get empty prompts list
     #[must_use]
     pub fn list_prompts(&self) -> ListPromptsResult {
         ListPromptsResult {
@@ -225,16 +225,16 @@ impl HandlerCore {
         }
     }
 
-    /// 执行工具调用（核心逻辑）
+    /// Execute tool call (core logic)
     ///
-    /// 此方法封装了工具执行的完整流程：
-    /// - tracing 追踪
-    /// - 计时统计
-    /// - metrics 记录（如果启用）
+    /// This method encapsulates the complete tool execution flow:
+    /// - tracing tracking
+    /// - timing statistics
+    /// - metrics recording (if enabled)
     ///
-    /// # 返回
+    /// # Returns
     ///
-    /// 返回 `ToolExecutionResult`，可转换为不同类型以适配不同的 trait
+    /// Returns `ToolExecutionResult`, can be converted to different types to adapt to different traits
     pub async fn execute_tool(&self, params: CallToolRequestParams) -> ToolExecutionResult {
         let trace_id = Uuid::new_v4().to_string();
         let tool_name = params.name.clone();
@@ -261,7 +261,7 @@ impl HandlerCore {
             let duration = start.elapsed();
             let success = result.is_ok();
 
-            // 记录日志
+            // Log results
             match &result {
                 Ok(_) => {
                     tracing::info!("Tool {} executed successfully in {:?}", tool_name, duration);
@@ -279,7 +279,7 @@ impl HandlerCore {
                 }
             }
 
-            // 记录 metrics（如果启用）
+            // Record metrics (if enabled)
             if let Some(metrics) = &self.metrics {
                 metrics.record_request(&tool_name, success, duration);
             }
@@ -296,26 +296,26 @@ impl HandlerCore {
     }
 }
 
-/// MCP 服务器处理器
+/// MCP server handler
 ///
-/// 实现标准 MCP 协议处理器接口，处理客户端请求。
-/// 委托所有核心逻辑给 `HandlerCore`。
+/// Implements standard MCP protocol handler interface, handles client requests.
+/// Delegates all core logic to `HandlerCore`.
 ///
-/// # 字段
+/// # Fields
 ///
-/// - `core`: 共享核心处理逻辑
+/// - `core`: Shared core handling logic
 pub struct CratesDocsHandler {
     core: HandlerCore,
 }
 
 impl CratesDocsHandler {
-    /// 创建新的处理器
+    /// Create new handler
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `server` - 服务器实例
+    /// * `server` - Server instance
     ///
-    /// # 示例
+    /// # Example
     ///
     /// ```rust,no_run
     /// use std::sync::Arc;
@@ -333,7 +333,7 @@ impl CratesDocsHandler {
         }
     }
 
-    /// 使用配置创建处理器
+    /// Create handler with configuration
     #[must_use]
     pub fn with_config(server: Arc<CratesDocsServer>, config: HandlerConfig) -> Self {
         Self {
@@ -341,7 +341,7 @@ impl CratesDocsHandler {
         }
     }
 
-    /// 合并配置创建处理器
+    /// Create handler with merged configuration
     #[must_use]
     pub fn with_merged_config(
         server: Arc<CratesDocsServer>,
@@ -353,7 +353,7 @@ impl CratesDocsHandler {
         }
     }
 
-    /// 设置 metrics
+    /// Set metrics
     #[must_use]
     pub fn with_metrics(self, metrics: Arc<ServerMetrics>) -> Self {
         Self {
@@ -361,13 +361,13 @@ impl CratesDocsHandler {
         }
     }
 
-    /// 获取核心处理器
+    /// Get core handler
     #[must_use]
     pub fn core(&self) -> &HandlerCore {
         &self.core
     }
 
-    /// 获取服务器引用
+    /// Get server reference
     #[must_use]
     pub fn server(&self) -> &Arc<CratesDocsServer> {
         self.core.server()
@@ -443,8 +443,8 @@ impl ServerHandler for CratesDocsHandler {
 
 /// Core handler implementation (provides more control)
 ///
-/// 实现更细粒度的 MCP 协议处理器接口。
-/// 委托所有核心逻辑给 `HandlerCore`。
+/// Implements more fine-grained MCP protocol handler interface.
+/// Delegates all core logic to `HandlerCore`.
 pub struct CratesDocsHandlerCore {
     core: HandlerCore,
 }
@@ -458,7 +458,7 @@ impl CratesDocsHandlerCore {
         }
     }
 
-    /// 使用配置创建核心处理器
+    /// Create core handler with configuration
     #[must_use]
     pub fn with_config(server: Arc<CratesDocsServer>, config: HandlerConfig) -> Self {
         Self {
@@ -466,7 +466,7 @@ impl CratesDocsHandlerCore {
         }
     }
 
-    /// 合并配置创建核心处理器
+    /// Create core handler with merged configuration
     #[must_use]
     pub fn with_merged_config(
         server: Arc<CratesDocsServer>,
@@ -478,7 +478,7 @@ impl CratesDocsHandlerCore {
         }
     }
 
-    /// 设置 metrics
+    /// Set metrics
     #[must_use]
     pub fn with_metrics(self, metrics: Arc<ServerMetrics>) -> Self {
         Self {
@@ -486,13 +486,13 @@ impl CratesDocsHandlerCore {
         }
     }
 
-    /// 获取核心处理器
+    /// Get core handler
     #[must_use]
     pub fn core(&self) -> &HandlerCore {
         &self.core
     }
 
-    /// 获取服务器引用
+    /// Get server reference
     #[must_use]
     pub fn server(&self) -> &Arc<CratesDocsServer> {
         self.core.server()
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_handler_config_merge() {
-        // 测试有 override 的情况
+        // Test with override case
         let base = HandlerConfig::default();
         let override_config = HandlerConfig::new().with_verbose_logging().with_metrics();
 
@@ -571,7 +571,7 @@ mod tests {
         assert!(merged.verbose_logging);
         assert!(merged.enable_metrics);
 
-        // 测试空 override（使用新的 base）
+        // Test empty override (use new base)
         let base2 = HandlerConfig::default();
         let merged_empty = base2.merge(None);
         assert!(!merged_empty.verbose_logging);
@@ -622,7 +622,7 @@ mod tests {
             })
             .await;
 
-        // 验证 metrics 被记录
+        // Verify metrics are recorded
         let metrics_output = metrics.export().unwrap();
         assert!(metrics_output.contains("mcp_requests_total"));
     }
@@ -717,7 +717,7 @@ mod tests {
 
         let tools = core.list_tools();
         assert!(!tools.tools.is_empty());
-        assert_eq!(tools.tools.len(), 4); // 4 个默认工具
+        assert_eq!(tools.tools.len(), 4); // 4 default tools
 
         let resources = core.list_resources();
         assert!(resources.resources.is_empty());

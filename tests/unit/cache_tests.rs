@@ -1,4 +1,4 @@
-//! 缓存模块单元测试
+//! Cache module unit tests
 
 use crates_docs::{
     cache::{create_cache, CacheConfig},
@@ -7,7 +7,7 @@ use crates_docs::{
 use std::sync::Arc;
 
 // ============================================================================
-// CacheConfig 测试
+// CacheConfig tests
 // ============================================================================
 
 #[test]
@@ -20,31 +20,31 @@ fn test_cache_config_default_values() {
 }
 
 // ============================================================================
-// DocCache 测试
+// DocCache tests
 // ============================================================================
 
 #[tokio::test]
 async fn test_doc_cache_crate_docs() {
     let config = CacheConfig::default();
-    let cache = create_cache(&config).expect("创建缓存失败");
+    let cache = create_cache(&config).expect("Failed to create cache");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
     let doc_cache = DocCache::new(cache_arc);
 
-    // 测试缓存未命中
+    // Test cache miss
     let result = doc_cache.get_crate_docs("serde", None).await;
     assert!(result.is_none());
 
-    // 设置缓存
+    // Set cache
     doc_cache
         .set_crate_docs("serde", None, "Serde documentation".to_string())
         .await
         .expect("set_crate_docs should succeed");
 
-    // 测试缓存命中
+    // Test cache hit
     let result = doc_cache.get_crate_docs("serde", None).await;
     assert_eq!(result, Some("Serde documentation".to_string()));
 
-    // 测试带版本的缓存
+    // Test cache with version
     doc_cache
         .set_crate_docs("tokio", Some("1.0.0"), "Tokio 1.0 docs".to_string())
         .await
@@ -52,7 +52,7 @@ async fn test_doc_cache_crate_docs() {
     let result = doc_cache.get_crate_docs("tokio", Some("1.0.0")).await;
     assert_eq!(result, Some("Tokio 1.0 docs".to_string()));
 
-    // 不同版本应该返回不同的缓存
+    // Different versions should return different cached values
     let result = doc_cache.get_crate_docs("tokio", Some("1.1.0")).await;
     assert!(result.is_none());
 }
@@ -60,17 +60,17 @@ async fn test_doc_cache_crate_docs() {
 #[tokio::test]
 async fn test_doc_cache_item_docs() {
     let config = CacheConfig::default();
-    let cache = create_cache(&config).expect("创建缓存失败");
+    let cache = create_cache(&config).expect("Failed to create cache");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
     let doc_cache = DocCache::new(cache_arc);
 
-    // 测试缓存未命中
+    // Test cache miss
     let result = doc_cache
         .get_item_docs("serde", "serde::Serialize", None)
         .await;
     assert!(result.is_none());
 
-    // 设置缓存
+    // Set cache
     doc_cache
         .set_item_docs(
             "serde",
@@ -81,13 +81,13 @@ async fn test_doc_cache_item_docs() {
         .await
         .expect("set_item_docs should succeed");
 
-    // 测试缓存命中
+    // Test cache hit
     let result = doc_cache
         .get_item_docs("serde", "serde::Serialize", None)
         .await;
     assert_eq!(result, Some("Serialize trait docs".to_string()));
 
-    // 测试带版本的缓存
+    // Test cache with version
     doc_cache
         .set_item_docs(
             "std",
@@ -104,7 +104,7 @@ async fn test_doc_cache_item_docs() {
 }
 
 // ============================================================================
-// create_cache 错误路径测试
+// create_cache error path tests
 // ============================================================================
 
 #[test]
@@ -121,7 +121,7 @@ fn test_create_cache_unsupported_type() {
     };
     let result = create_cache(&config);
     assert!(result.is_err());
-    // 检查错误消息包含预期内容（小写的 "unsupported"）
+    // Check that error message contains expected content (lowercase "unsupported")
     if let Err(e) = result {
         assert!(e.to_string().contains("unsupported cache type"));
     }
@@ -172,7 +172,7 @@ fn test_create_cache_redis_sync_error() {
 }
 
 // ============================================================================
-// TTL 抖动测试
+// TTL jitter tests
 // ============================================================================
 
 use crates_docs::tools::docs::cache::DocCacheTtl;
@@ -183,7 +183,7 @@ fn test_doc_cache_ttl_default_includes_jitter() {
     assert_eq!(ttl.crate_docs_secs, 3600);
     assert_eq!(ttl.search_results_secs, 300);
     assert_eq!(ttl.item_docs_secs, 1800);
-    // 默认 jitter 为 10%
+    // Default jitter is 10%
     assert!((ttl.jitter_ratio - 0.1).abs() < f64::EPSILON);
 }
 
@@ -196,7 +196,7 @@ fn test_apply_jitter_zero_ratio_returns_base_ttl() {
         jitter_ratio: 0.0,
     };
 
-    // jitter_ratio 为 0 时应该返回原始值
+    // When jitter_ratio is 0, should return original value
     assert_eq!(ttl.apply_jitter(3600), 3600);
     assert_eq!(ttl.apply_jitter(300), 300);
 }
@@ -210,10 +210,10 @@ fn test_apply_jitter_within_expected_range() {
         jitter_ratio: 0.1, // 10% jitter
     };
 
-    // 多次调用确保结果在预期范围内
+    // Call multiple times to ensure results are within expected range
     for _ in 0..100 {
         let result = ttl.apply_jitter(3600);
-        // 10% jitter 意味着结果应该在 [3240, 3960] 范围内
+        // 10% jitter means result should be in [3240, 3960] range
         assert!(
             result >= 3240,
             "jitter result {result} is below minimum 3240"
@@ -227,24 +227,24 @@ fn test_apply_jitter_within_expected_range() {
 
 #[test]
 fn test_apply_jitter_clamps_to_valid_range() {
-    // 测试负的 jitter_ratio（应该被 clamp 到 0）
+    // Test negative jitter_ratio (should be clamped to 0)
     let ttl_negative = DocCacheTtl {
         crate_docs_secs: 3600,
         search_results_secs: 300,
         item_docs_secs: 1800,
         jitter_ratio: -0.5,
     };
-    // 负值应该被当作 0 处理，返回原始值
+    // Negative values should be treated as 0, returning original value
     assert_eq!(ttl_negative.apply_jitter(3600), 3600);
 
-    // 测试超过 1.0 的 jitter_ratio（应该被 clamp 到 1.0）
+    // Test jitter_ratio above 1.0 (should be clamped to 1.0)
     let ttl_high = DocCacheTtl {
         crate_docs_secs: 3600,
         search_results_secs: 300,
         item_docs_secs: 1800,
         jitter_ratio: 2.0,
     };
-    // 200% jitter 意味着结果可以在 [0, 7200] 范围内，但最小值为 1
+    // 200% jitter means result can be in [0, 7200] range, but minimum is 1
     for _ in 0..100 {
         let result = ttl_high.apply_jitter(3600);
         assert!(result >= 1, "jitter result {result} should be at least 1");
@@ -264,7 +264,7 @@ fn test_apply_jitter_different_base_values() {
         jitter_ratio: 0.1,
     };
 
-    // 测试不同的基础 TTL 值
+    // Test different base TTL values
     let base_values = [60, 300, 1800, 3600, 7200];
 
     for &base in &base_values {

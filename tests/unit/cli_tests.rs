@@ -1,13 +1,13 @@
-//! CLI 模块单元测试
+//! CLI module unit tests
 
 use clap::Parser;
 use std::path::PathBuf;
 
 // ============================================================================
-// Cli 结构体测试
+// Cli struct tests
 // ============================================================================
 
-/// 测试 Cli 结构体解析 - Serve 命令
+/// Test Cli struct parsing - Serve command
 #[test]
 fn test_cli_parse_serve_command() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -53,7 +53,7 @@ fn test_cli_parse_serve_command() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Serve 命令带 OAuth 参数
+/// Test Cli struct parsing - Serve command with OAuth parameters
 #[test]
 fn test_cli_parse_serve_command_with_oauth() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -91,7 +91,7 @@ fn test_cli_parse_serve_command_with_oauth() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Config 命令
+/// Test Cli struct parsing - Config command
 #[test]
 fn test_cli_parse_config_command() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -113,7 +113,7 @@ fn test_cli_parse_config_command() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Config 命令默认值
+/// Test Cli struct parsing - Config command defaults
 #[test]
 fn test_cli_parse_config_command_defaults() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "config"]);
@@ -129,7 +129,7 @@ fn test_cli_parse_config_command_defaults() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Test 命令
+/// Test Cli struct parsing - Test command
 #[test]
 fn test_cli_parse_test_command() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -173,7 +173,7 @@ fn test_cli_parse_test_command() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Test 命令默认值
+/// Test Cli struct parsing - Test command defaults
 #[test]
 fn test_cli_parse_test_command_defaults() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "test"]);
@@ -195,7 +195,7 @@ fn test_cli_parse_test_command_defaults() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Test 命令带所有参数
+/// Test Cli struct parsing - Test command with all arguments
 #[test]
 fn test_cli_parse_test_command_all_args() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -241,7 +241,7 @@ fn test_cli_parse_test_command_all_args() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Health 命令
+/// Test Cli struct parsing - Health command
 #[test]
 fn test_cli_parse_health_command() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -266,7 +266,7 @@ fn test_cli_parse_health_command() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Health 命令默认值
+/// Test Cli struct parsing - Health command defaults
 #[test]
 fn test_cli_parse_health_command_defaults() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "health"]);
@@ -285,7 +285,7 @@ fn test_cli_parse_health_command_defaults() {
     }
 }
 
-/// 测试 Cli 结构体解析 - GenerateApiKey 命令
+/// Test Cli struct parsing - GenerateApiKey command
 #[test]
 fn test_cli_parse_generate_api_key_command() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -305,7 +305,7 @@ fn test_cli_parse_generate_api_key_command() {
     }
 }
 
-/// 测试 Cli 结构体解析 - GenerateApiKey 命令默认值
+/// Test Cli struct parsing - GenerateApiKey command defaults
 #[test]
 fn test_cli_parse_generate_api_key_command_defaults() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "generate-api-key"]);
@@ -320,7 +320,7 @@ fn test_cli_parse_generate_api_key_command_defaults() {
     }
 }
 
-/// 测试 Cli 结构体解析 - Version 命令
+/// Test Cli struct parsing - Version command
 #[test]
 fn test_cli_parse_version_command() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "version"]);
@@ -333,7 +333,7 @@ fn test_cli_parse_version_command() {
     }
 }
 
-/// 测试 Cli 全局参数 - config
+/// Test Cli global option - config
 #[test]
 fn test_cli_global_config_option() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -348,7 +348,7 @@ fn test_cli_global_config_option() {
     assert_eq!(cli.config, PathBuf::from("/custom/config.toml"));
 }
 
-/// 测试 Cli 全局参数 - debug
+/// Test Cli global option - debug
 #[test]
 fn test_cli_global_debug_option() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "--debug", "version"]);
@@ -358,7 +358,7 @@ fn test_cli_global_debug_option() {
     assert!(cli.debug);
 }
 
-/// 测试 Cli 全局参数 - verbose
+/// Test Cli global option - verbose
 #[test]
 fn test_cli_global_verbose_option() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "--verbose", "version"]);
@@ -368,7 +368,7 @@ fn test_cli_global_verbose_option() {
     assert!(cli.verbose);
 }
 
-/// 测试 Cli 全局参数组合
+/// Test Cli global options combined
 #[test]
 fn test_cli_global_options_combined() {
     let cli = crates_docs::cli::Cli::try_parse_from([
@@ -387,7 +387,7 @@ fn test_cli_global_options_combined() {
     assert!(cli.verbose);
 }
 
-/// 测试 Cli 默认配置路径
+/// Test Cli default config path
 #[test]
 fn test_cli_default_config_path() {
     let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "version"]);
@@ -400,10 +400,10 @@ fn test_cli_default_config_path() {
 }
 
 // ============================================================================
-// config_cmd 测试
+// config_cmd tests
 // ============================================================================
 
-/// 测试 config 命令 - 成功生成配置文件
+/// Test config command - successfully generate config file
 #[test]
 fn test_run_config_command_success() {
     let dir = tempfile::tempdir().unwrap();
@@ -415,13 +415,13 @@ fn test_run_config_command_success() {
     assert!(output_path.exists());
 }
 
-/// 测试 config 命令 - 文件已存在但不覆盖
+/// Test config command - file exists but no overwrite
 #[test]
 fn test_run_config_command_file_exists_no_force() {
     let dir = tempfile::tempdir().unwrap();
     let output_path = dir.path().join("existing-config.toml");
 
-    // 先创建文件
+    // Create the file first
     std::fs::write(&output_path, "existing content").unwrap();
     assert!(output_path.exists());
 
@@ -433,25 +433,25 @@ fn test_run_config_command_file_exists_no_force() {
     assert!(err.contains("--force"));
 }
 
-/// 测试 config 命令 - 文件已存在且强制覆盖
+/// Test config command - file exists with force overwrite
 #[test]
 fn test_run_config_command_file_exists_with_force() {
     let dir = tempfile::tempdir().unwrap();
     let output_path = dir.path().join("existing-config.toml");
 
-    // 先创建文件
+    // Create the file first
     std::fs::write(&output_path, "existing content").unwrap();
     assert!(output_path.exists());
 
     let result = crates_docs::cli::run_config_command(&output_path, true);
 
     assert!(result.is_ok());
-    // 验证文件被覆盖
+    // Verify file was overwritten
     let content = std::fs::read_to_string(&output_path).unwrap();
     assert!(content.contains("name = \"crates-docs\""));
 }
 
-/// 测试 config 命令 - 创建嵌套目录
+/// Test config command - create nested directory
 #[test]
 fn test_run_config_command_nested_directory() {
     let dir = tempfile::tempdir().unwrap();
@@ -464,24 +464,24 @@ fn test_run_config_command_nested_directory() {
 }
 
 // ============================================================================
-// health_cmd 测试
+// health_cmd tests
 // ============================================================================
 
-/// 测试 health 命令 - 默认检查类型
+/// Test health command - default check type
 #[tokio::test]
 async fn test_run_health_command_default() {
     let result = crates_docs::cli::run_health_command("all", false).await;
     assert!(result.is_ok());
 }
 
-/// 测试 health 命令 - 详细模式
+/// Test health command - verbose mode
 #[tokio::test]
 async fn test_run_health_command_verbose() {
     let result = crates_docs::cli::run_health_command("external", true).await;
     assert!(result.is_ok());
 }
 
-/// 测试 health 命令 - 各种检查类型
+/// Test health command - various check types
 #[tokio::test]
 async fn test_run_health_command_various_types() {
     let check_types = ["all", "external", "internal", "docs_rs", "crates_io"];
@@ -493,21 +493,21 @@ async fn test_run_health_command_various_types() {
 }
 
 // ============================================================================
-// version_cmd 测试
+// version_cmd tests
 // ============================================================================
 
-/// 测试 version 命令 - 验证输出包含版本信息
+/// Test version command - verify output contains version info
 #[test]
 fn test_run_version_command() {
-    // version 命令只是打印信息，我们验证它不会 panic
+    // version command just prints info, we verify it doesn't panic
     crates_docs::cli::run_version_command();
 }
 
 // ============================================================================
-// test_cmd 测试
+// test_cmd tests
 // ============================================================================
 
-/// 测试 test 命令 - 未知工具
+/// Test test command - unknown tool
 #[tokio::test]
 async fn test_run_test_command_unknown_tool() {
     let result = crates_docs::cli::run_test_command(
@@ -527,7 +527,7 @@ async fn test_run_test_command_unknown_tool() {
     assert!(err.contains("Unknown tool"));
 }
 
-/// 测试 test 命令 - lookup_crate 缺少 crate_name
+/// Test test command - lookup_crate missing crate_name
 #[tokio::test]
 async fn test_run_test_command_lookup_crate_missing_name() {
     let result = crates_docs::cli::run_test_command(
@@ -547,7 +547,7 @@ async fn test_run_test_command_lookup_crate_missing_name() {
     assert!(err.contains("--crate-name"));
 }
 
-/// 测试 test 命令 - search_crates 缺少 query
+/// Test test command - search_crates missing query
 #[tokio::test]
 async fn test_run_test_command_search_crates_missing_query() {
     let result = crates_docs::cli::run_test_command(
@@ -567,10 +567,10 @@ async fn test_run_test_command_search_crates_missing_query() {
     assert!(err.contains("--query"));
 }
 
-/// 测试 test 命令 - lookup_item 缺少参数
+/// Test test command - lookup_item missing arguments
 #[tokio::test]
 async fn test_run_test_command_lookup_item_missing_args() {
-    // 缺少 item_path
+    // Missing item_path
     let result = crates_docs::cli::run_test_command(
         "lookup_item",
         Some("serde"),
@@ -587,7 +587,7 @@ async fn test_run_test_command_lookup_item_missing_args() {
     let err = result.unwrap_err().to_string();
     assert!(err.contains("--crate-name") || err.contains("--item-path"));
 
-    // 缺少 crate_name
+    // Missing crate_name
     let result = crates_docs::cli::run_test_command(
         "lookup_item",
         None,
@@ -603,7 +603,7 @@ async fn test_run_test_command_lookup_item_missing_args() {
     assert!(result.is_err());
 }
 
-/// 测试 test 命令 - health_check 工具
+/// Test test command - health_check tool
 #[tokio::test]
 async fn test_run_test_command_health_check() {
     let result = crates_docs::cli::run_test_command(
@@ -618,11 +618,11 @@ async fn test_run_test_command_health_check() {
     )
     .await;
 
-    // health_check 应该成功执行
+    // health_check should execute successfully
     assert!(result.is_ok());
 }
 
-/// 测试 test 命令 - search_crates 接受排序参数
+/// Test test command - search_crates accepts sort parameter
 #[tokio::test]
 async fn test_run_test_command_search_crates_with_sort() {
     let result = crates_docs::cli::run_test_command(
@@ -641,13 +641,13 @@ async fn test_run_test_command_search_crates_with_sort() {
 }
 
 // ============================================================================
-// Commands 枚举测试
+// Commands enum tests
 // ============================================================================
 
-/// 测试 Commands 枚举变体匹配
+/// Test Commands enum variant matching
 #[test]
 fn test_commands_enum_variants() {
-    // 验证所有命令变体都可以正确创建
+    // Verify all command variants can be created correctly
     let commands: Vec<crates_docs::cli::Commands> = vec![
         crates_docs::cli::Commands::Serve {
             mode: None,
@@ -686,7 +686,7 @@ fn test_commands_enum_variants() {
         crates_docs::cli::Commands::Version,
     ];
 
-    // 验证每个命令都可以被正确匹配
+    // Verify each command can be matched correctly
     for cmd in commands {
         match cmd {
             crates_docs::cli::Commands::Serve { .. } => {}
@@ -702,24 +702,24 @@ fn test_commands_enum_variants() {
 }
 
 // ============================================================================
-// Cli 解析错误测试
+// Cli parsing error tests
 // ============================================================================
 
-/// 测试 Cli 解析 - 缺少子命令
+/// Test Cli parsing - missing subcommand
 #[test]
 fn test_cli_parse_missing_subcommand() {
     let result = crates_docs::cli::Cli::try_parse_from(["crates-docs"]);
     assert!(result.is_err());
 }
 
-/// 测试 Cli 解析 - 无效的子命令
+/// Test Cli parsing - invalid subcommand
 #[test]
 fn test_cli_parse_invalid_subcommand() {
     let result = crates_docs::cli::Cli::try_parse_from(["crates-docs", "invalid_command"]);
     assert!(result.is_err());
 }
 
-/// 测试 Cli 解析 - 无效的端口号
+/// Test Cli parsing - invalid port number
 #[test]
 fn test_cli_parse_invalid_port() {
     let result =
@@ -727,7 +727,7 @@ fn test_cli_parse_invalid_port() {
     assert!(result.is_err());
 }
 
-/// 测试 Cli 解析 - 无效的 limit
+/// Test Cli parsing - invalid limit
 #[test]
 fn test_cli_parse_invalid_limit() {
     let result =
@@ -735,7 +735,7 @@ fn test_cli_parse_invalid_limit() {
     assert!(result.is_err());
 }
 
-/// 测试 Cli 解析 - search_crates 排序参数
+/// Test Cli parsing - search_crates sort parameter
 #[test]
 fn test_cli_parse_test_command_with_sort() {
     let cli = crates_docs::cli::Cli::try_parse_from([
