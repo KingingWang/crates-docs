@@ -1,10 +1,10 @@
-//! 错误模块单元测试
+//! Error module unit tests
 
 use crates_docs::error::Error;
 use std::io;
 
 // ============================================================================
-// Error 转换测试
+// Error conversion tests
 // ============================================================================
 
 #[test]
@@ -43,7 +43,7 @@ fn test_error_from_anyhow_error() {
 }
 
 // ============================================================================
-// Error Display 测试
+// Error Display tests
 // ============================================================================
 
 #[test]
@@ -60,7 +60,7 @@ fn test_error_display() {
 
 #[test]
 fn test_error_variants_display() {
-    // 测试各种错误类型的 Display
+    // Test various error type displays
     let err = Error::config("field", "config error");
     assert!(!err.to_string().is_empty());
 
@@ -96,7 +96,7 @@ fn test_error_variants_display() {
 }
 
 // ============================================================================
-// Result 类型测试
+// Result type tests
 // ============================================================================
 
 #[test]

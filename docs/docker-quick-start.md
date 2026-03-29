@@ -1,53 +1,53 @@
-# Docker 快速上手指南
+# Docker Quick Start Guide
 
-## 一分钟开始
+## One-Minute Start
 
 ```bash
-# 构建并运行 (生产版本)
+# Build and run (production version)
 docker build -t crates-docs:latest . && \
 docker run -d -p 8080:8080 --name crates-docs crates-docs:latest
 
-# 查看状态
+# Check status
 docker ps
 curl http://localhost:8080/health
 ```
 
 ---
 
-## 文件速查
+## File Reference
 
-| 文件 | 用途 | 何时使用 |
-|------|------|----------|
-| `Dockerfile` | **主生产版本** (distroless) | 日常构建 |
-| `Dockerfile.alpine` | 开发调试版本 | 需要 shell 调试 |
-| `Dockerfile.scratch` | 极致最小化 | 最高安全要求 |
-| `docker-compose.yml` | 服务编排 | 本地开发/测试 |
-| `.dockerignore` | 构建优化 | 已配置，无需修改 |
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| `Dockerfile` | **Main production version** (distroless) | Daily builds |
+| `Dockerfile.alpine` | Development/debug version | When shell debugging is needed |
+| `Dockerfile.scratch` | Ultra-minimal version | Highest security requirements |
+| `docker-compose.yml` | Service orchestration | Local development/testing |
+| `.dockerignore` | Build optimization | Already configured, no modification needed |
 
 ---
 
-## 常用命令
+## Common Commands
 
-### 构建
+### Build
 
 ```bash
-# 标准构建
+# Standard build
 docker build -t crates-docs:latest .
 
-# 使用 BuildKit (更快)
+# Using BuildKit (faster)
 DOCKER_BUILDKIT=1 docker build -t crates-docs:latest .
 
-# 指定 Dockerfile
+# Specify Dockerfile
 docker build -f Dockerfile.alpine -t crates-docs:dev .
 ```
 
-### 运行
+### Run
 
 ```bash
-# 基本运行
+# Basic run
 docker run -d -p 8080:8080 crates-docs:latest
 
-# 带配置和日志卷
+# With config and log volumes
 docker run -d \
   -p 8080:8080 \
   -v $(pwd)/config.toml:/app/config.toml:ro \
@@ -56,146 +56,146 @@ docker run -d \
   crates-docs:latest
 ```
 
-### 管理
+### Manage
 
 ```bash
-# 查看日志
+# View logs
 docker logs -f crates-docs
 
-# 停止
+# Stop
 docker stop crates-docs
 
-# 删除容器
+# Remove container
 docker rm crates-docs
 
-# 删除镜像
+# Remove image
 docker rmi crates-docs:latest
 
-# 清理所有
+# Clean all
 docker system prune -a
 ```
 
 ---
 
-## Docker Compose 工作流
+## Docker Compose Workflow
 
 ```bash
-# 启动
+# Start
 docker-compose up -d
 
-# 查看日志
+# View logs
 docker-compose logs -f
 
-# 重建 (源码变更后)
+# Rebuild (after source changes)
 docker-compose up -d --build
 
-# 停止
+# Stop
 docker-compose down
 
-# 完全清理
+# Full cleanup
 docker-compose down -v
 ```
 
 ---
 
-## 故障排查
+## Troubleshooting
 
-### 构建失败
+### Build Failed
 
 ```bash
-# 清理缓存重建
+# Rebuild without cache
 docker build --no-cache -t crates-docs:latest .
 
-# 查看详细输出
+# View detailed output
 docker build --progress=plain -t crates-docs:latest .
 ```
 
-### 容器无法启动
+### Container Won't Start
 
 ```bash
-# 查看日志
+# View logs
 docker logs crates-docs
 
-# 交互式运行看错误
+# Run interactively to see errors
 docker run --rm -it crates-docs:latest
 ```
 
-### 无法进入容器
+### Cannot Enter Container
 
 ```bash
-# distroless/scratch 没有 shell
-# 方案 1: 使用 Alpine 版本调试
+# distroless/scratch has no shell
+# Option 1: Use Alpine version for debugging
 docker build -f Dockerfile.alpine -t crates-docs:debug .
 docker run -it crates-docs:debug sh
 
-# 方案 2: 使用 distroless debug 版本
+# Option 2: Use distroless debug image
 docker run --rm -it --entrypoint=sh gcr.io/distroless/cc:debug
 ```
 
 ---
 
-## 性能优化建议
+## Performance Optimization Tips
 
-### 加速构建
+### Speed Up Builds
 
 ```bash
-# 使用 BuildKit
+# Use BuildKit
 export DOCKER_BUILDKIT=1
 
-# 启用内联缓存
+# Enable inline cache
 docker build \
   --build-arg BUILDKIT_INLINE_CACHE=1 \
   --cache-from=crates-docs:latest \
   -t crates-docs:latest .
 ```
 
-### 减小镜像
+### Reduce Image Size
 
 ```bash
-# 使用多阶段构建 (已实现)
-# 使用 distroless 基础镜像 (已实现)
-# 使用 scratch 终极最小化 (可选)
+# Use multi-stage builds (already implemented)
+# Use distroless base image (already implemented)
+# Use scratch for ultimate minimal size (optional)
 docker build -f Dockerfile.scratch -t crates-docs:minimal .
 ```
 
 ---
 
-## 安全最佳实践
+## Security Best Practices
 
-✅ **已实现**:
-- 非 root 用户运行 (nobody, uid 65534)
-- 最小化基础镜像 (distroless/scratch)
-- 静态链接二进制
-- 多阶段构建分离构建和运行时
+✅ **Implemented**:
+- Non-root user execution (nobody, uid 65534)
+- Minimal base image (distroless/scratch)
+- Statically linked binary
+- Multi-stage build separates build and runtime
 
-🔒 **额外建议**:
+🔒 **Additional Recommendations**:
 ```bash
-# 使用只读文件系统
+# Use read-only filesystem
 docker run --read-only -v /tmp:/tmp crates-docs:latest
 
-# 限制资源
+# Limit resources
 docker run --memory=512m --cpus=1.0 crates-docs:latest
 
-# 禁用特权
+# Disable privileges
 docker run --security-opt=no-new-privileges:true crates-docs:latest
 ```
 
 ---
 
-## 快速参考卡片
+## Quick Reference Card
 
 ```bash
-# 构建
+# Build
 DOCKER_BUILDKIT=1 docker build -t crates-docs:latest .
 
-# 运行
+# Run
 docker run -d -p 8080:8080 --name crates-docs crates-docs:latest
 
-# 查看
+# Check
 docker logs -f crates-docs
 curl http://localhost:8080/health
 
-# 停止
+# Stop
 docker stop crates-docs && docker rm crates-docs
 
 # Compose
@@ -206,14 +206,14 @@ docker-compose down
 
 ---
 
-## 获取帮助
+## Get Help
 
-- 📖 [完整优化文档](DOCKER_OPTIMIZATION.md)
-- 🚀 [详细优化总结](OPTIMIZATION_SUMMARY.md)
-- 🐛 [故障排查](#故障排查)
+- 📖 [Full Optimization Documentation](DOCKER_OPTIMIZATION.md)
+- 🚀 [Detailed Optimization Summary](OPTIMIZATION_SUMMARY.md)
+- 🐛 [Troubleshooting](#troubleshooting)
 
 ---
 
-**完成日期**: 2026-03-29  
-**优化版本**: v2.0  
-**Dockerfile 数量**: 3 (distroless, scratch, alpine)
+**Completion Date**: 2026-03-29  
+**Optimized Version**: v2.0  
+**Dockerfile Count**: 3 (distroless, scratch, alpine)

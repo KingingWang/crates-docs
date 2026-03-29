@@ -1,16 +1,16 @@
-//! 库级别测试
+//! Library-level tests
 
 use crates_docs::{NAME, VERSION};
 
 // ============================================================================
-// 常量测试
+// Constant tests
 // ============================================================================
 
 #[test]
 fn test_version_constant() {
-    // 验证版本号不为空且格式正确
+    // Verify version is not empty and format is correct
     assert!(!VERSION.is_empty());
-    // 版本号应该符合 semver 格式
+    // Version should follow semver format
     let parts: Vec<&str> = VERSION.split('.').collect();
     assert!(parts.len() >= 2, "Version should have at least major.minor");
 }
@@ -21,7 +21,7 @@ fn test_name_constant() {
 }
 
 // ============================================================================
-// Re-exports 测试
+// Re-exports tests
 // ============================================================================
 
 #[test]
@@ -45,7 +45,7 @@ fn test_server_config_reexport() {
 }
 
 // ============================================================================
-// init_logging_with_config 测试
+// init_logging_with_config tests
 // ============================================================================
 
 #[test]
@@ -58,7 +58,7 @@ fn test_init_logging_with_console_only() {
         max_file_size_mb: 100,
         max_files: 10,
     };
-    // 日志初始化是全局的，多次调用会失败，这里只验证不 panic
+    // Logging initialization is global, multiple calls will fail, just verify no panic
     let _ = crates_docs::init_logging_with_config(&config);
 }
 
@@ -116,7 +116,7 @@ fn test_init_logging_with_error_level() {
 
 #[test]
 fn test_init_logging_with_invalid_level() {
-    // 无效级别应该默认为 info
+    // Invalid level should default to info
     let config = crates_docs::config::LoggingConfig {
         level: "invalid".to_string(),
         file_path: None,
@@ -130,7 +130,7 @@ fn test_init_logging_with_invalid_level() {
 
 #[test]
 fn test_init_logging_no_console_no_file() {
-    // 不启用控制台也不启用文件
+    // Neither console nor file logging enabled
     let config = crates_docs::config::LoggingConfig {
         level: "info".to_string(),
         file_path: None,
@@ -144,7 +144,7 @@ fn test_init_logging_no_console_no_file() {
 
 #[test]
 fn test_init_logging_with_file_only() {
-    // 仅文件日志 - 使用临时目录
+    // File logging only - use temp directory
     let temp_dir = tempfile::tempdir().unwrap();
     let log_path = temp_dir
         .path()
@@ -165,7 +165,7 @@ fn test_init_logging_with_file_only() {
 
 #[test]
 fn test_init_logging_with_console_and_file() {
-    // 同时启用控制台和文件日志
+    // Enable both console and file logging
     let temp_dir = tempfile::tempdir().unwrap();
     let log_path = temp_dir
         .path()
@@ -186,7 +186,7 @@ fn test_init_logging_with_console_and_file() {
 
 #[test]
 fn test_init_logging_file_only_no_path() {
-    // 仅文件日志但没有路径 - 使用默认路径
+    // File logging only but no path - use default path
     let config = crates_docs::config::LoggingConfig {
         level: "info".to_string(),
         file_path: None,

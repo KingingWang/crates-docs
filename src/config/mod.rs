@@ -1,30 +1,30 @@
-//! 配置模块
+//! Configuration module
 //!
-//! 提供应用程序配置管理，支持从文件加载、环境变量和默认值。
+//! Provides application configuration management, supports loading from files, environment variables, and default values.
 //!
-//! # 配置来源优先级
+//! # Configuration Source Priority
 //!
-//! 1. 环境变量（最高优先级）
-//! 2. 配置文件
-//! 3. 默认值（最低优先级）
+//! 1. Environment variables (highest priority)
+//! 2. Configuration file
+//! 3. Default values (lowest priority)
 //!
-//! # 支持的配置格式
+//! # Supported Configuration Formats
 //!
-//! - TOML 配置文件
-//! - 环境变量（前缀 `CRATES_DOCS_`）
+//! - TOML configuration file
+//! - Environment variables (prefix `CRATES_DOCS_`)
 //!
-//! # 示例
+//! # Examples
 //!
 //! ```rust,no_run
 //! use crates_docs::config::AppConfig;
 //!
-//! // 从文件加载配置
+//! // Load configuration from file
 //! let config = AppConfig::from_file("config.toml").expect("Failed to load config");
 //!
-//! // 从环境变量加载配置
+//! // Load configuration from environment variables
 //! let config = AppConfig::from_env().expect("Failed to load config from env");
 //!
-//! // 使用默认配置
+//! // Use default configuration
 //! let config = AppConfig::default();
 //! ```
 
@@ -35,61 +35,61 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-/// 应用程序配置
+/// Application configuration
 ///
-/// 包含服务器、缓存、认证、日志和性能配置。
+/// Contains server, cache, authentication, logging, and performance configuration.
 ///
-/// # 字段
+/// # Fields
 ///
-/// - `server`: 服务器配置
-/// - `cache`: 缓存配置
-/// - `auth`: 认证配置（OAuth 和 API Key）
-/// - `logging`: 日志配置
-/// - `performance`: 性能配置
+/// - `server`: Server configuration
+/// - `cache`: Cache configuration
+/// - `auth`: Authentication configuration (OAuth and API Key)
+/// - `logging`: Logging configuration
+/// - `performance`: Performance configuration
 ///
-/// # 热重载支持
+/// # Hot Reload Support
 ///
-/// 以下配置项支持热重载（运行时无需重启）：
-/// - `logging` 部分：所有字段
-/// - `auth` 部分：所有字段（包括 API Key 和 OAuth）
-/// - `cache` 部分：TTL 相关字段（`default_ttl`, `crate_docs_ttl_secs`, `item_docs_ttl_secs`, `search_results_ttl_secs`）
-/// - `performance` 部分：`rate_limit_per_second`, `concurrent_request_limit`, `enable_metrics`, `enable_response_compression`
+/// The following configuration items support hot reload (runtime update without restart):
+/// - `logging` section: All fields
+/// - `auth` section: All fields (including API Key and OAuth)
+/// - `cache` section: TTL-related fields (`default_ttl`, `crate_docs_ttl_secs`, `item_docs_ttl_secs`, `search_results_ttl_secs`)
+/// - `performance` section: `rate_limit_per_second`, `concurrent_request_limit`, `enable_metrics`, `enable_response_compression`
 ///
-/// 以下配置项**不支持**热重载（需要重启服务器）：
-/// - `server` 部分：所有字段（host, port, `transport_mode`, `max_connections` 等）
-/// - `cache` 部分：`cache_type`, `memory_size`, `redis_url`（缓存初始化参数）
-/// - `performance` 部分：`http_client_*`, `cache_max_size`, `cache_default_ttl_secs`, `metrics_port`
+/// The following configuration items **do not** support hot reload (require server restart):
+/// - `server` section: All fields (host, port, `transport_mode`, `max_connections`, etc.)
+/// - `cache` section: `cache_type`, `memory_size`, `redis_url` (cache initialization parameters)
+/// - `performance` section: `http_client_*`, `cache_max_size`, `cache_default_ttl_secs`, `metrics_port`
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct AppConfig {
-    /// 服务器配置
+    /// Server configuration
     pub server: ServerConfig,
 
-    /// 缓存配置
+    /// Cache configuration
     pub cache: CacheConfig,
 
-    /// 认证配置（OAuth 和 API Key）
+    /// Authentication configuration (OAuth and API Key)
     #[serde(default)]
     pub auth: AuthConfig,
 
-    /// OAuth 配置（向后兼容，优先使用 auth.oauth）
+    /// OAuth configuration (backwards compatible, prefer using auth.oauth)
     #[serde(default)]
     pub oauth: OAuthConfig,
 
-    /// 日志配置
+    /// Logging configuration
     pub logging: LoggingConfig,
 
-    /// 性能配置
+    /// Performance configuration
     pub performance: PerformanceConfig,
 }
 
-/// 服务器配置
+/// Server configuration
 ///
-/// # 热重载支持
+/// # Hot Reload Support
 ///
-/// ⚠️ **不支持热重载** - 服务器配置项改变后需要重启服务器才能生效。
+/// ⚠️ **Does not support hot reload** - Server configuration changes require server restart to take effect.
 ///
-/// 原因：这些配置涉及服务器监听套接字、传输层初始化等核心参数，
-/// 运行时更改可能导致连接中断或状态不一致。
+/// Reason: These configurations involve server listening socket, transport layer initialization and other core parameters,
+/// runtime changes may cause connection interruption or state inconsistency.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
     /// Server name
@@ -164,21 +164,21 @@ fn default_icons() -> Vec<Icon> {
     ]
 }
 
-/// 日志配置
+/// Logging configuration
 ///
-/// # 热重载支持
+/// # Hot Reload Support
 ///
-/// ✅ **支持热重载** - 所有日志配置项都可以在运行时动态更新。
+/// ✅ **Supports hot reload** - All logging configuration items can be dynamically updated at runtime.
 ///
-/// 支持热重载的字段：
-/// - `level`: 日志级别（trace/debug/info/warn/error）
-/// - `file_path`: 日志文件路径
-/// - `enable_console`: 控制台日志开关
-/// - `enable_file`: 文件日志开关
-/// - `max_file_size_mb`: 日志文件最大大小
-/// - `max_files`: 保留的日志文件数量
+/// Hot reload supported fields:
+/// - `level`: Log level (trace/debug/info/warn/error)
+/// - `file_path`: Log file path
+/// - `enable_console`: Console logging toggle
+/// - `enable_file`: File logging toggle
+/// - `max_file_size_mb`: Maximum log file size
+/// - `max_files`: Number of log files to retain
 ///
-/// 注意：文件日志路径更改后，新日志会写入新文件，但不会自动关闭旧文件句柄。
+/// Note: After file logging path changes, new logs will be written to the new file, but old file handles will not be automatically closed.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LoggingConfig {
     /// Log level
@@ -200,27 +200,27 @@ pub struct LoggingConfig {
     pub max_files: usize,
 }
 
-/// 性能配置
+/// Performance configuration
 ///
-/// # 热重载支持
+/// # Hot Reload Support
 ///
-/// ## 支持热重载的字段 ✅
+/// ## Hot reload supported fields ✅
 ///
-/// 以下字段可以在运行时动态更新：
-/// - `rate_limit_per_second`: 请求速率限制（每秒请求数）
-/// - `concurrent_request_limit`: 并发请求限制
-/// - `enable_metrics`: Prometheus 指标收集开关
-/// - `enable_response_compression`: 响应压缩开关
+/// The following fields can be dynamically updated at runtime:
+/// - `rate_limit_per_second`: Request rate limit (requests per second)
+/// - `concurrent_request_limit`: Concurrent request limit
+/// - `enable_metrics`: Prometheus metrics collection toggle
+/// - `enable_response_compression`: Response compression toggle
 ///
-/// ## 不支持热重载的字段 ❌
+/// ## Hot reload not supported fields ❌
 ///
-/// 以下字段需要重启服务器才能生效：
-/// - `http_client_*`: HTTP 客户端配置（连接池大小、超时等）
-/// - `cache_max_size`: 缓存最大大小
-/// - `cache_default_ttl_secs`: 缓存默认 TTL
-/// - `metrics_port`: 指标服务端口
+/// The following fields require server restart to take effect:
+/// - `http_client_*`: HTTP client configuration (pool size, timeouts, etc.)
+/// - `cache_max_size`: Cache maximum size
+/// - `cache_default_ttl_secs`: Cache default TTL
+/// - `metrics_port`: Metrics server port
 ///
-/// 原因：这些配置涉及底层连接池、缓存实例的初始化参数。
+/// Reason: These configurations involve underlying connection pool, cache instance initialization parameters.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PerformanceConfig {
     /// HTTP client connection pool size
@@ -300,7 +300,7 @@ impl Default for LoggingConfig {
             level: "info".to_string(),
             file_path: Some("./logs/crates-docs.log".to_string()),
             enable_console: true,
-            enable_file: false, // 默认仅输出到控制台
+            enable_file: false, // Default: console output only
             max_file_size_mb: 100,
             max_files: 10,
         }

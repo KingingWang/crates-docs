@@ -1,16 +1,16 @@
-//! 文档查询工具模块
+//! Document lookup tool module
 //!
-//! 提供用于查询 Rust crate 文档的工具和服务。
+//! Provides tools and services for querying Rust crate documentation.
 //!
-//! # 子模块
+//! # Submodules
 //!
-//! - `cache`: 文档缓存
-//! - `html`: HTML 处理
-//! - `lookup_crate`: Crate 文档查找
-//! - `lookup_item`: 项目文档查找
-//! - `search`: Crate 搜索
+//! - `cache`: Document cache
+//! - `html`: HTML processing
+//! - `lookup_crate`: Crate documentation lookup
+//! - `lookup_item`: Item documentation lookup
+//! - `search`: Crate search
 //!
-//! # 示例
+//! # Examples
 //!
 //! ```rust,no_run
 //! use std::sync::Arc;
@@ -31,15 +31,15 @@ use crate::cache::{Cache, CacheConfig};
 use crate::config::PerformanceConfig;
 use std::sync::Arc;
 
-/// 文档服务
+/// Document service
 ///
-/// 提供 HTTP 客户端（带自动重试）、缓存和文档缓存的集中管理。
+/// Provides centralized management of HTTP client (with auto-retry), cache, and document cache.
 ///
-/// # 字段
+/// # Fields
 ///
-/// - `client`: 带重试中间件的 HTTP 客户端（共享引用以实现连接池复用）
-/// - `cache`: 通用缓存实例
-/// - `doc_cache`: 文档专用缓存
+/// - `client`: HTTP client with retry middleware (shared reference for connection pool reuse)
+/// - `cache`: Generic cache instance
+/// - `doc_cache`: Document-specific cache
 pub struct DocService {
     client: Arc<reqwest_middleware::ClientWithMiddleware>,
     cache: Arc<dyn Cache>,
@@ -47,17 +47,17 @@ pub struct DocService {
 }
 
 impl DocService {
-    /// 创建新的文档服务（使用默认 TTL）
+    /// Create new document service (with default TTL)
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `cache` - 缓存实例
+    /// * `cache` - cache instance
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果 HTTP 客户端创建失败，返回错误
+    /// Returns error if HTTP client creation fails
     ///
-    /// # 示例
+    /// # Examples
     ///
     /// ```rust,no_run
     /// use std::sync::Arc;
@@ -77,16 +77,16 @@ impl DocService {
         Self::with_config(cache, &CacheConfig::default())
     }
 
-    /// 创建新的文档服务（使用自定义缓存配置）
+    /// Create new document service (with custom cache config)
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `cache` - 缓存实例
-    /// * `cache_config` - 缓存配置
+    /// * `cache` - cache instance
+    /// * `cache_config` - cache configuration
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果 HTTP 客户端创建失败，返回错误
+    /// Returns error if HTTP client creation fails
     ///
     /// # Note
     ///
@@ -107,17 +107,17 @@ impl DocService {
         })
     }
 
-    /// 创建新的文档服务（使用完整配置）
+    /// Create new document service (with full config)
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `cache` - 缓存实例
-    /// * `cache_config` - 缓存配置
-    /// * `perf_config` - 性能配置（仅用于初始化全局 HTTP 客户端，如果尚未初始化）
+    /// * `cache` - cache instance
+    /// * `cache_config` - cache configuration
+    /// * `perf_config` - performance configuration（used only for initializing global HTTP client if not yet initialized）
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果 HTTP 客户端创建失败，返回错误
+    /// Returns error if HTTP client creation fails
     ///
     /// # Note
     ///
@@ -140,19 +140,19 @@ impl DocService {
         })
     }
 
-    /// 获取 HTTP 客户端（带重试中间件）
+    /// Get HTTP client (with retry middleware)
     #[must_use]
     pub fn client(&self) -> &reqwest_middleware::ClientWithMiddleware {
         &self.client
     }
 
-    /// 获取缓存实例
+    /// Get cache instance
     #[must_use]
     pub fn cache(&self) -> &Arc<dyn Cache> {
         &self.cache
     }
 
-    /// 获取文档缓存
+    /// Get document cache
     #[must_use]
     pub fn doc_cache(&self) -> &cache::DocCache {
         &self.doc_cache
@@ -166,10 +166,10 @@ impl Default for DocService {
     }
 }
 
-/// 重新导出工具类型
+/// Re-export tool types
 pub use lookup_crate::LookupCrateTool;
 pub use lookup_item::LookupItemTool;
 pub use search::SearchCratesTool;
 
-/// 重新导出缓存类型
+/// Re-export cache types
 pub use cache::DocCacheTtl;

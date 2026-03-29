@@ -154,7 +154,7 @@ impl LookupItemToolImpl {
         let url = Self::build_search_url(crate_name, item_path, version);
         let html = self.fetch_html(&url).await?;
         Ok(format!(
-            "搜索结果: {}\n\n{}",
+            "Search results: {}\n\n{}",
             item_path,
             html::html_to_text(&html)
         ))

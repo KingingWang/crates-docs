@@ -1,13 +1,13 @@
-//! 端到端测试模块
+//! End-to-end test module
 //!
-//! 提供完整的端到端测试，包括服务器启动、传输模式测试和外部 API 集成测试。
+//! Provides complete end-to-end tests including server startup, transport mode tests, and external API integration tests.
 
 use std::net::TcpListener;
 use std::time::Duration;
 
-/// 获取随机可用端口
+/// Get a random available port
 ///
-/// 通过绑定到端口 0 让操作系统分配一个可用端口，然后立即释放
+/// Binds to port 0 to let the OS assign an available port, then immediately releases it
 pub fn get_random_port() -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to random port");
     let port = listener.local_addr().unwrap().port();
@@ -15,17 +15,17 @@ pub fn get_random_port() -> u16 {
     port
 }
 
-/// 等待服务器启动
+/// Wait for server to start
 ///
-/// 通过尝试连接指定端口来检测服务器是否已启动
+/// Detects if server has started by attempting to connect to the specified port
 ///
 /// # Arguments
-/// * `port` - 服务器端口
-/// * `timeout` - 最大等待时间
+/// * `port` - Server port
+/// * `timeout` - Maximum wait time
 ///
 /// # Returns
-/// * `Ok(())` - 服务器成功启动
-/// * `Err(String)` - 超时或连接失败
+/// * `Ok(())` - Server started successfully
+/// * `Err(String)` - Timeout or connection failed
 pub async fn wait_for_server(port: u16, timeout: Duration) -> Result<(), String> {
     let start = std::time::Instant::now();
     let addr = format!("127.0.0.1:{}", port);
@@ -43,17 +43,17 @@ pub async fn wait_for_server(port: u16, timeout: Duration) -> Result<(), String>
     ))
 }
 
-/// 等待服务器健康检查通过
+/// Wait for server health check to pass
 ///
-/// 发送 HTTP 健康检查请求直到成功或超时
+/// Sends HTTP health check requests until success or timeout
 ///
 /// # Arguments
-/// * `port` - 服务器端口
-/// * `timeout` - 最大等待时间
+/// * `port` - Server port
+/// * `timeout` - Maximum wait time
 ///
 /// # Returns
-/// * `Ok(())` - 健康检查通过
-/// * `Err(String)` - 超时或检查失败
+/// * `Ok(())` - Health check passed
+/// * `Err(String)` - Timeout or check failed
 pub async fn wait_for_health_check(port: u16, timeout: Duration) -> Result<(), String> {
     let client = reqwest::Client::new();
     let url = format!("http://127.0.0.1:{}/health", port);
@@ -77,9 +77,9 @@ pub async fn wait_for_health_check(port: u16, timeout: Duration) -> Result<(), S
     ))
 }
 
-/// 创建测试用的 HTTP 客户端
+/// Create test HTTP client
 ///
-/// 配置了合理的超时设置
+/// Configured with reasonable timeout settings
 pub fn create_test_client() -> reqwest::Client {
     reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -88,15 +88,15 @@ pub fn create_test_client() -> reqwest::Client {
         .expect("Failed to create test client")
 }
 
-/// 生成 MCP JSON-RPC 请求
+/// Generate MCP JSON-RPC request
 ///
 /// # Arguments
-/// * `id` - 请求 ID
-/// * `method` - 方法名
-/// * `params` - 参数（可选）
+/// * `id` - Request ID
+/// * `method` - Method name
+/// * `params` - Parameters (optional)
 ///
 /// # Returns
-/// JSON 对象
+/// JSON object
 pub fn create_mcp_request(
     id: u64,
     method: &str,
@@ -115,13 +115,13 @@ pub fn create_mcp_request(
     request
 }
 
-/// 生成 MCP 初始化请求
+/// Generate MCP initialize request
 ///
 /// # Arguments
-/// * `id` - 请求 ID
+/// * `id` - Request ID
 ///
 /// # Returns
-/// JSON 对象
+/// JSON object
 pub fn create_initialize_request(id: u64) -> serde_json::Value {
     serde_json::json!({
         "jsonrpc": "2.0",
@@ -138,13 +138,13 @@ pub fn create_initialize_request(id: u64) -> serde_json::Value {
     })
 }
 
-/// 生成 tools/list 请求
+/// Generate tools/list request
 ///
 /// # Arguments
-/// * `id` - 请求 ID
+/// * `id` - Request ID
 ///
 /// # Returns
-/// JSON 对象
+/// JSON object
 pub fn create_tools_list_request(id: u64) -> serde_json::Value {
     serde_json::json!({
         "jsonrpc": "2.0",
@@ -153,15 +153,15 @@ pub fn create_tools_list_request(id: u64) -> serde_json::Value {
     })
 }
 
-/// 生成 tools/call 请求
+/// Generate tools/call request
 ///
 /// # Arguments
-/// * `id` - 请求 ID
-/// * `name` - 工具名称
-/// * `arguments` - 工具参数
+/// * `id` - Request ID
+/// * `name` - Tool name
+/// * `arguments` - Tool arguments
 ///
 /// # Returns
-/// JSON 对象
+/// JSON object
 pub fn create_tools_call_request(
     id: u64,
     name: &str,
@@ -178,19 +178,19 @@ pub fn create_tools_call_request(
     })
 }
 
-/// 从 SSE 响应中提取 JSON 数据
+/// Extract JSON data from SSE response
 ///
-/// SSE 格式示例：
+/// SSE format example:
 /// ```text
 /// id: xxx
 /// data: {"jsonrpc":"2.0",...}
 /// ```
 ///
 /// # Arguments
-/// * `body_text` - SSE 响应文本
+/// * `body_text` - SSE response text
 ///
 /// # Returns
-/// 提取的 JSON 字符串
+/// Extracted JSON string
 pub fn extract_sse_json(body_text: &str) -> &str {
     body_text
         .lines()
@@ -200,6 +200,6 @@ pub fn extract_sse_json(body_text: &str) -> &str {
 }
 
 pub mod external_api_tests;
-/// 测试模块
+/// Test modules
 pub mod server_start_tests;
 pub mod transport_tests;

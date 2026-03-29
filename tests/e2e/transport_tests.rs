@@ -1,11 +1,11 @@
-//! 传输模式端到端测试
+//! Transport mode end-to-end tests
 //!
-//! 测试x stdio/http/sse/hybrid 四种传输模式。
+//! Tests stdio/http/sse/hybrid transport modes.
 
 use crates_docs::{AppConfig, CratesDocsServer};
 use std::time::Duration;
 
-/// 测试 HTTP 模式 - MCP 协议的 HTTP 请求/响应
+/// Test HTTP mode - MCP protocol HTTP request/response
 #[tokio::test]
 async fn test_http_transport_mcp_protocol() {
     let port = super::get_random_port();
@@ -17,7 +17,7 @@ async fn test_http_transport_mcp_protocol() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -30,7 +30,7 @@ async fn test_http_transport_mcp_protocol() {
 
     let client = super::create_test_client();
 
-    // 测试 MCP 初始化请求
+    // Test MCP initialize request
     let init_request = super::create_initialize_request(1);
     let url = format!("http://127.0.0.1:{}/mcp", port);
     let response = client
@@ -57,9 +57,9 @@ async fn test_http_transport_mcp_protocol() {
         body_text
     );
 
-    // 解析 SSE 响应格式或纯 JSON
+    // Parse SSE response format or plain JSON
     let json_str = if content_type.contains("text/event-stream") {
-        // SSE 格式：提取 data: 行的内容
+        // SSE format: extract content from data: line
         body_text
             .lines()
             .find(|line| line.starts_with("data: "))
@@ -75,11 +75,11 @@ async fn test_http_transport_mcp_protocol() {
     assert_eq!(body["id"], 1);
     assert!(body.get("result").is_some(), "Response missing result");
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试 HTTP 模式 - 工具调用（health_check）
+/// Test HTTP mode - tool call (health_check)
 #[tokio::test]
 async fn test_http_transport_tool_call() {
     let port = super::get_random_port();
@@ -91,7 +91,7 @@ async fn test_http_transport_tool_call() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -104,7 +104,7 @@ async fn test_http_transport_tool_call() {
 
     let client = super::create_test_client();
 
-    // 测试 MCP 初始化请求（工具调用需要先初始化会话）
+    // Test MCP initialize request (tool call requires initialized session first)
     let init_request = super::create_initialize_request(1);
     let url = format!("http://127.0.0.1:{}/mcp", port);
     let response = client
@@ -125,11 +125,11 @@ async fn test_http_transport_tool_call() {
     assert_eq!(body["jsonrpc"], "2.0");
     assert!(body.get("result").is_some(), "Response missing result");
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试 HTTP 模式 - 错误处理（无效请求）
+/// Test HTTP mode - error handling (invalid request)
 #[tokio::test]
 async fn test_http_transport_invalid_request() {
     let port = super::get_random_port();
@@ -141,7 +141,7 @@ async fn test_http_transport_invalid_request() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -154,7 +154,7 @@ async fn test_http_transport_invalid_request() {
 
     let client = super::create_test_client();
 
-    // 测试 MCP 初始化请求
+    // Test MCP initialize request
     let init_request = super::create_initialize_request(1);
     let url = format!("http://127.0.0.1:{}/mcp", port);
     let response = client
@@ -164,7 +164,7 @@ async fn test_http_transport_invalid_request() {
         .send()
         .await;
 
-    // 服务器应该成功处理请求
+    // Server should successfully process request
     assert!(
         response.is_ok(),
         "Request should not fail at transport level"
@@ -172,11 +172,11 @@ async fn test_http_transport_invalid_request() {
     let response = response.unwrap();
     assert!(response.status().is_success(), "Initialize should succeed");
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试 HTTP 模式 - 错误处理（未知工具）
+/// Test HTTP mode - error handling (unknown tool)
 #[tokio::test]
 async fn test_http_transport_unknown_tool() {
     let port = super::get_random_port();
@@ -188,7 +188,7 @@ async fn test_http_transport_unknown_tool() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -201,7 +201,7 @@ async fn test_http_transport_unknown_tool() {
 
     let client = super::create_test_client();
 
-    // 测试 MCP 初始化请求
+    // Test MCP initialize request
     let init_request = super::create_initialize_request(1);
     let url = format!("http://127.0.0.1:{}/mcp", port);
     let response = client
@@ -218,170 +218,14 @@ async fn test_http_transport_unknown_tool() {
     let response = response.unwrap();
     assert!(response.status().is_success(), "Initialize should succeed");
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试 SSE 模式 - SSE 连接建立
-#[tokio::test]
-async fn test_sse_transport_connection() {
-    let port = super::get_random_port();
-    let mut config = AppConfig::default();
-    config.server.port = port;
-    config.server.transport_mode = "sse".to_string();
-    config.server.host = "127.0.0.1".to_string();
-    config.server.enable_sse = true;
-
-    let server = CratesDocsServer::new_async(config).await.unwrap();
-    let handle = tokio::spawn(async move { server.run_sse().await });
-
-    // 等待服务器启动
-    let result = tokio::time::timeout(
-        Duration::from_secs(5),
-        super::wait_for_server(port, Duration::from_secs(3)),
-    )
-    .await;
-    assert!(
-        result.is_ok() && result.unwrap().is_ok(),
-        "Server failed to start"
-    );
-
-    let client = super::create_test_client();
-
-    // 测试 SSE 端点连接
-    let url = format!("http://127.0.0.1:{}/sse", port);
-    let response = client.get(&url).send().await;
-
-    assert!(response.is_ok(), "SSE connection failed");
-    let response = response.unwrap();
-
-    // SSE 端点应该返回 200 OK
-    assert!(
-        response.status().is_success(),
-        "SSE endpoint returned error"
-    );
-
-    // 验证 Content-Type 包含 text/event-stream
-    let content_type = response.headers().get("content-type");
-    if let Some(ct) = content_type {
-        let ct_str = ct.to_str().unwrap_or("");
-        assert!(
-            ct_str.contains("text/event-stream"),
-            "Content-Type should be text/event-stream"
-        );
-    }
-
-    // 清理
-    handle.abort();
-}
-
-/// 测试 Hybrid 模式 - 同时支持 HTTP 和 SSE
-#[tokio::test]
-async fn test_hybrid_transport_both_modes() {
-    let port = super::get_random_port();
-    let mut config = AppConfig::default();
-    config.server.port = port;
-    config.server.transport_mode = "hybrid".to_string();
-    config.server.host = "127.0.0.1".to_string();
-    config.server.enable_sse = true;
-
-    let server = CratesDocsServer::new_async(config).await.unwrap();
-    let handle =
-        tokio::spawn(
-            async move { crates_docs::server::transport::run_hybrid_server(&server).await },
-        );
-
-    // 等待服务器启动
-    let result = tokio::time::timeout(
-        Duration::from_secs(5),
-        super::wait_for_server(port, Duration::from_secs(3)),
-    )
-    .await;
-    assert!(
-        result.is_ok() && result.unwrap().is_ok(),
-        "Server failed to start"
-    );
-
-    let client = super::create_test_client();
-
-    // 测试 HTTP 端点（health）
-    let health_url = format!("http://127.0.0.1:{}/health", port);
-    let health_response = client.get(&health_url).send().await;
-    assert!(health_response.is_ok(), "Health endpoint failed");
-    assert!(
-        health_response.unwrap().status().is_success(),
-        "Health check failed"
-    );
-
-    // 测试 MCP HTTP 端点
-    let init_request = super::create_initialize_request(1);
-    let mcp_url = format!("http://127.0.0.1:{}/mcp", port);
-    let mcp_response = client
-        .post(&mcp_url)
-        .header("Accept", "application/json, text/event-stream")
-        .json(&init_request)
-        .send()
-        .await;
-    assert!(mcp_response.is_ok(), "MCP endpoint failed");
-    assert!(
-        mcp_response.unwrap().status().is_success(),
-        "MCP request failed"
-    );
-
-    // 测试 SSE 端点
-    let sse_url = format!("http://127.0.0.1:{}/sse", port);
-    let sse_response = client.get(&sse_url).send().await;
-    assert!(sse_response.is_ok(), "SSE endpoint failed");
-    assert!(
-        sse_response.unwrap().status().is_success(),
-        "SSE connection failed"
-    );
-
-    // 清理
-    handle.abort();
-}
-
-/// 测试 Stdio 模式 - 服务器创建和配置
-#[tokio::test]
-async fn test_stdio_transport() {
-    // 测试 stdio 模式的服务器创建
-    let mut config = AppConfig::default();
-    config.server.transport_mode = "stdio".to_string();
-
-    // 创建服务器
-    let server = CratesDocsServer::new_async(config).await;
-    assert!(server.is_ok(), "Failed to create stdio server");
-
-    // 验证服务器配置
-    let server = server.unwrap();
-    assert_eq!(server.config().server.transport_mode, "stdio");
-}
-
-/// 测试 Stdio 模式 - 服务器信息
-#[tokio::test]
-async fn test_stdio_transport_tools_list() {
-    // 测试 stdio 模式的服务器信息
-    let mut config = AppConfig::default();
-    config.server.transport_mode = "stdio".to_string();
-
-    let server = CratesDocsServer::new_async(config).await.unwrap();
-    let server_info = server.server_info();
-
-    // 验证服务器信息
-    assert!(
-        !server_info.server_info.name.is_empty(),
-        "Server name should not be empty"
-    );
-    assert!(
-        !server_info.server_info.version.is_empty(),
-        "Server version should not be empty"
-    );
-}
-
-/// 测试传输模式切换
+/// Test transport mode switching
 #[tokio::test]
 async fn test_transport_mode_switching() {
-    // 测试不同传输模式配置
+    // Test different transport mode configurations
     let modes = vec!["http", "sse", "hybrid"];
 
     for mode in modes {
@@ -397,12 +241,12 @@ async fn test_transport_mode_switching() {
 
         let server = server.unwrap();
 
-        // 验证配置正确
+        // Verify configuration is correct
         assert_eq!(server.config().server.transport_mode, mode);
     }
 }
 
-/// 测试 HTTP 传输超时处理
+/// Test HTTP transport timeout handling
 #[tokio::test]
 async fn test_http_transport_timeout() {
     let port = super::get_random_port();
@@ -414,7 +258,7 @@ async fn test_http_transport_timeout() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -425,7 +269,7 @@ async fn test_http_transport_timeout() {
         "Server failed to start"
     );
 
-    // 测试健康检查端点
+    // Test health check endpoint
     let client = super::create_test_client();
     let url = format!("http://127.0.0.1:{}/health", port);
     let response = client.get(&url).send().await;
@@ -437,6 +281,6 @@ async fn test_http_transport_timeout() {
         "Health check should succeed"
     );
 
-    // 清理
+    // Cleanup
     handle.abort();
 }

@@ -1,27 +1,27 @@
-//! 服务器启动端到端测试
+//! Server startup end-to-end tests
 //!
-//! 测试服务器实际启动和端口监听功能。
+//! Tests actual server startup and port listening functionality.
 
 use crates_docs::{AppConfig, CratesDocsServer};
 use std::time::Duration;
 
-/// 测试 HTTP 服务器实际启动和端口监听
+/// Test HTTP server actual startup and port listening
 #[tokio::test]
 async fn test_http_server_actual_start() {
-    // 使用随机端口
+    // Use random port
     let port = super::get_random_port();
     let mut config = AppConfig::default();
     config.server.port = port;
     config.server.transport_mode = "http".to_string();
     config.server.host = "127.0.0.1".to_string();
 
-    // 创建服务器
+    // Create server
     let server = CratesDocsServer::new_async(config).await.unwrap();
 
-    // 在后台运行服务器
+    // Run server in background
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待服务器启动（带超时）
+    // Wait for server to start (with timeout)
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -31,7 +31,7 @@ async fn test_http_server_actual_start() {
     assert!(result.is_ok(), "Server startup timed out");
     assert!(result.unwrap().is_ok(), "Server failed to start");
 
-    // 发送测试请求验证服务器响应
+    // Send test request to verify server response
     let client = super::create_test_client();
     let url = format!("http://127.0.0.1:{}/health", port);
     let response = client.get(&url).send().await;
@@ -40,11 +40,11 @@ async fn test_http_server_actual_start() {
     let response = response.unwrap();
     assert!(response.status().is_success(), "Health check failed");
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试服务器能响应健康检查请求
+/// Test server can respond to health check requests
 #[tokio::test]
 async fn test_server_health_check() {
     let port = super::get_random_port();
@@ -56,7 +56,7 @@ async fn test_server_health_check() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待健康检查通过
+    // Wait for health check to pass
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_health_check(port, Duration::from_secs(3)),
@@ -66,7 +66,7 @@ async fn test_server_health_check() {
     assert!(result.is_ok(), "Health check timed out");
     assert!(result.unwrap().is_ok(), "Health check failed");
 
-    // 验证健康检查响应内容
+    // Verify health check response content
     let client = super::create_test_client();
     let url = format!("http://127.0.0.1:{}/health", port);
     let response = client
@@ -77,11 +77,11 @@ async fn test_server_health_check() {
 
     assert_eq!(response.status().as_u16(), 200);
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试服务器能正确处理 MCP 协议请求
+/// Test server can correctly handle MCP protocol requests
 #[tokio::test]
 async fn test_server_mcp_protocol() {
     let port = super::get_random_port();
@@ -93,7 +93,7 @@ async fn test_server_mcp_protocol() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -104,7 +104,7 @@ async fn test_server_mcp_protocol() {
         "Server failed to start"
     );
 
-    // 发送 MCP 初始化请求
+    // Send MCP initialize request
     let client = super::create_test_client();
     let init_request = super::create_initialize_request(1);
     let url = format!("http://127.0.0.1:{}/mcp", port);
@@ -123,7 +123,7 @@ async fn test_server_mcp_protocol() {
         "MCP request returned error status"
     );
 
-    // 验证响应是有效的 JSON（可能是 SSE 格式）
+    // Verify response is valid JSON (may be SSE format)
     let body_text = response.text().await.expect("Failed to read response");
     let json_str = super::extract_sse_json(&body_text);
     let body: serde_json::Value =
@@ -135,11 +135,11 @@ async fn test_server_mcp_protocol() {
     assert_eq!(body["jsonrpc"], "2.0", "Invalid jsonrpc version");
     assert!(body.get("id").is_some(), "Response missing id field");
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试 SSE 服务器启动
+/// Test SSE server startup
 #[tokio::test]
 async fn test_sse_server_actual_start() {
     let port = super::get_random_port();
@@ -152,7 +152,7 @@ async fn test_sse_server_actual_start() {
     let server = CratesDocsServer::new_async(config).await.unwrap();
     let handle = tokio::spawn(async move { server.run_sse().await });
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -162,19 +162,19 @@ async fn test_sse_server_actual_start() {
     assert!(result.is_ok(), "SSE server startup timed out");
     assert!(result.unwrap().is_ok(), "SSE server failed to start");
 
-    // 测试 SSE 端点
+    // Test SSE endpoint
     let client = super::create_test_client();
     let url = format!("http://127.0.0.1:{}/sse", port);
     let response = client.get(&url).send().await;
 
-    // SSE 端点可能返回 200 或需要特定处理
+    // SSE endpoint may return 200 or require specific handling
     assert!(response.is_ok(), "Failed to connect to SSE endpoint");
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试 Hybrid 模式服务器启动
+/// Test Hybrid mode server startup
 #[tokio::test]
 async fn test_hybrid_server_actual_start() {
     let port = super::get_random_port();
@@ -190,7 +190,7 @@ async fn test_hybrid_server_actual_start() {
             async move { crates_docs::server::transport::run_hybrid_server(&server).await },
         );
 
-    // 等待服务器启动
+    // Wait for server to start
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port, Duration::from_secs(3)),
@@ -200,7 +200,7 @@ async fn test_hybrid_server_actual_start() {
     assert!(result.is_ok(), "Hybrid server startup timed out");
     assert!(result.unwrap().is_ok(), "Hybrid server failed to start");
 
-    // 测试 HTTP 端点
+    // Test HTTP endpoint
     let client = super::create_test_client();
     let url = format!("http://127.0.0.1:{}/health", port);
     let response = client.get(&url).send().await;
@@ -211,11 +211,11 @@ async fn test_hybrid_server_actual_start() {
         "Health check failed"
     );
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试服务器启动超时处理
+/// Test server startup timeout handling
 #[tokio::test]
 async fn test_server_startup_timeout() {
     let port = super::get_random_port();
@@ -226,36 +226,36 @@ async fn test_server_startup_timeout() {
 
     let server = CratesDocsServer::new_async(config).await.unwrap();
 
-    // 启动服务器但不等待它完成启动
+    // Start server but don't wait for it to complete startup
     let handle = tokio::spawn(async move { server.run_http().await });
 
-    // 立即尝试连接（应该失败或超时）
+    // Immediately try to connect (should fail or timeout)
     let client = super::create_test_client();
     let url = format!("http://127.0.0.1:{}/health", port);
     let result = tokio::time::timeout(Duration::from_millis(100), client.get(&url).send()).await;
 
-    // 连接应该超时或失败，因为我们没有等待服务器启动
-    // 这个结果可能是超时或连接被拒绝，都是可接受的
+    // Connection should timeout or fail because we didn't wait for server to start
+    // This result could be timeout or connection refused, both are acceptable
     match result {
         Ok(Ok(_)) => {
-            // 如果连接成功，说明服务器启动非常快，这也是可以的
+            // If connection succeeds, server started very fast, which is also fine
         }
         Ok(Err(_)) | Err(_) => {
-            // 连接失败或超时是预期的
+            // Connection failure or timeout is expected
         }
     }
 
-    // 清理
+    // Cleanup
     handle.abort();
 }
 
-/// 测试多个服务器实例使用不同端口
+/// Test multiple server instances using different ports
 #[tokio::test]
 async fn test_multiple_servers_different_ports() {
     let port1 = super::get_random_port();
     let port2 = super::get_random_port();
 
-    // 确保端口不同
+    // Ensure ports are different
     assert_ne!(port1, port2, "Random ports should be different");
 
     let mut config1 = AppConfig::default();
@@ -275,7 +275,7 @@ async fn test_multiple_servers_different_ports() {
 
     let handle2 = tokio::spawn(async move { server2.run_http().await });
 
-    // 等待两个服务器都启动
+    // Wait for both servers to start
     let result1 = tokio::time::timeout(
         Duration::from_secs(5),
         super::wait_for_server(port1, Duration::from_secs(3)),
@@ -296,7 +296,7 @@ async fn test_multiple_servers_different_ports() {
         "Server 2 failed to start"
     );
 
-    // 验证两个服务器都响应
+    // Verify both servers respond
     let client = super::create_test_client();
     let url1 = format!("http://127.0.0.1:{}/health", port1);
     let url2 = format!("http://127.0.0.1:{}/health", port2);
@@ -312,7 +312,7 @@ async fn test_multiple_servers_different_ports() {
         "Server 2 health check failed"
     );
 
-    // 清理
+    // Cleanup
     handle1.abort();
     handle2.abort();
 }

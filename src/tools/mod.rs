@@ -1,15 +1,15 @@
-//! MCP 工具模块
+//! MCP tool module
 //!
-//! 提供用于 Rust crate 文档查询的 MCP 工具。
+//! Provides MCP tools for Rust crate documentation lookup.
 //!
-//! # 工具列表
+//! # Tool List
 //!
-//! - `docs::lookup_crate::LookupCrateToolImpl`: 查找 crate 文档
-//! - `docs::search::SearchCratesToolImpl`: 搜索 crate
-//! - `docs::lookup_item::LookupItemToolImpl`: 查找特定项目
-//! - `health::HealthCheckToolImpl`: 健康检查
+//! - `docs::lookup_crate::LookupCrateToolImpl`: Lookup crate documentation
+//! - `docs::search::SearchCratesToolImpl`: Search crates
+//! - `docs::lookup_item::LookupItemToolImpl`: Lookup specific items
+//! - `health::HealthCheckToolImpl`: Health check
 //!
-//! # 示例
+//! # Examples
 //!
 //! ```rust,no_run
 //! use std::sync::Arc;
@@ -30,50 +30,50 @@ use rust_mcp_sdk::schema::{CallToolError, CallToolResult, Tool as McpTool};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// 工具 trait
+/// Tool trait
 ///
-/// 定义 MCP 工具的基本接口，包括获取工具定义和执行工具。
+/// Defines the basic interface for MCP tools, including getting tool definition and executing the tool.
 ///
-/// # 实现
+/// # Implementations
 ///
-/// 所有工具都需要实现此 trait 才能注册到 [`ToolRegistry`]。
+/// All tools need to implement this trait to be registered with [`ToolRegistry`].
 #[async_trait]
 pub trait Tool: Send + Sync {
-    /// 获取工具定义
+    /// Get tool definition
     ///
-    /// 返回工具的元数据，包括名称、描述、参数等。
+    /// Returns the tool's metadata, including name, description, parameters, etc.
     fn definition(&self) -> McpTool;
 
-    /// 执行工具
+    /// Execute tool
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `arguments` - 工具参数（JSON 格式）
+    /// * `arguments` - Tool arguments (JSON format)
     ///
-    /// # 返回值
+    /// # Returns
     ///
-    /// 返回工具执行结果或错误
+    /// Returns tool execution result or error
     async fn execute(
         &self,
         arguments: serde_json::Value,
     ) -> std::result::Result<CallToolResult, CallToolError>;
 }
 
-/// 工具注册表
+/// Tool registry
 ///
-/// 使用 `HashMap` 实现 O(1) 查找的工具注册表。
+/// A tool registry using `HashMap` for O(1) lookup.
 ///
-/// # 字段
+/// # Fields
 ///
-/// - `tools`: 存储工具的字典，键为工具名称
+/// - `tools`: Dictionary storing tools, keyed by tool name
 pub struct ToolRegistry {
     tools: HashMap<String, Box<dyn Tool>>,
 }
 
 impl ToolRegistry {
-    /// 创建新的工具注册表
+    /// Create a new tool registry
     ///
-    /// # 示例
+    /// # Examples
     ///
     /// ```rust
     /// use crates_docs::tools::ToolRegistry;
@@ -88,17 +88,17 @@ impl ToolRegistry {
         }
     }
 
-    /// 注册工具
+    /// Register a tool
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `tool` - 要实现 [`Tool`] trait 的工具实例
+    /// * `tool` - Tool instance implementing [`Tool`] trait
     ///
-    /// # 返回值
+    /// # Returns
     ///
-    /// 返回自身以支持链式调用
+    /// Returns self for chaining
     ///
-    /// # 示例
+    /// # Examples
     ///
     /// ```rust,no_run
     /// use crates_docs::tools::ToolRegistry;
@@ -115,26 +115,26 @@ impl ToolRegistry {
         self
     }
 
-    /// 获取所有工具定义
+    /// Get all tool definitions
     ///
-    /// # 返回值
+    /// # Returns
     ///
-    /// 返回所有注册工具的元数据列表
+    /// Returns a list of metadata for all registered tools
     #[must_use]
     pub fn get_tools(&self) -> Vec<McpTool> {
         self.tools.values().map(|t| t.definition()).collect()
     }
 
-    /// 按名称执行工具
+    /// Execute tool by name
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `name` - 工具名称
-    /// * `arguments` - 工具参数（JSON 格式）
+    /// * `name` - Tool name
+    /// * `arguments` - Tool arguments (JSON format)
     ///
-    /// # 返回值
+    /// # Returns
     ///
-    /// 返回工具执行结果，如果工具不存在返回错误
+    /// Returns tool execution result, or error if tool not found
     pub async fn execute_tool(
         &self,
         name: &str,
@@ -146,27 +146,27 @@ impl ToolRegistry {
         }
     }
 
-    /// 检查工具是否存在
+    /// Check if tool exists
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `name` - 工具名称
+    /// * `name` - Tool name
     ///
-    /// # 返回值
+    /// # Returns
     ///
-    /// 如果工具存在返回 `true`，否则返回 `false`
+    /// Returns `true` if tool exists, `false` otherwise
     #[must_use]
     pub fn has_tool(&self, name: &str) -> bool {
         self.tools.contains_key(name)
     }
 
-    /// 获取注册工具数量
+    /// Get number of registered tools
     #[must_use]
     pub fn len(&self) -> usize {
         self.tools.len()
     }
 
-    /// 检查注册表是否为空
+    /// Check if registry is empty
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.tools.is_empty()
@@ -179,19 +179,19 @@ impl Default for ToolRegistry {
     }
 }
 
-/// 创建默认工具注册表
+/// Create default tool registry
 ///
-/// 注册所有内置工具：
-/// - `lookup_crate`: 查找 crate 文档
-/// - `search_crates`: 搜索 crate
-/// - `lookup_item`: 查找特定项目
-/// - `health_check`: 健康检查
+/// Registers all built-in tools:
+/// - `lookup_crate`: Lookup crate documentation
+/// - `search_crates`: Search crates
+/// - `lookup_item`: Lookup specific items
+/// - `health_check`: Health check
 ///
-/// # 参数
+/// # Arguments
 ///
-/// * `service` - 文档服务实例
+/// * `service` - Document service instance
 ///
-/// # 示例
+/// # Examples
 ///
 /// ```rust,no_run
 /// use std::sync::Arc;

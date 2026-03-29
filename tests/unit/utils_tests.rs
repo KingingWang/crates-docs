@@ -1,4 +1,4 @@
-//! 工具函数模块单元测试
+//! Utility function module unit tests
 
 use crates_docs::utils::{
     compression::{gzip_compress, gzip_decompress},
@@ -10,7 +10,7 @@ use crates_docs::utils::{
 use std::time::{Duration, Instant};
 
 // ============================================================================
-// HttpClientBuilder 测试
+// HttpClientBuilder tests
 // ============================================================================
 
 #[test]
@@ -44,7 +44,7 @@ fn test_http_client_builder_new_and_disable_compression() {
 }
 
 // ============================================================================
-// RateLimiter 测试
+// RateLimiter tests
 // ============================================================================
 
 #[test]
@@ -81,7 +81,7 @@ fn test_rate_limiter_try_acquire_exhaustion() {
 }
 
 // ============================================================================
-// 压缩工具测试
+// Compression utility tests
 // ============================================================================
 
 #[test]
@@ -103,32 +103,32 @@ fn test_gzip_empty_data() {
 }
 
 // ============================================================================
-// 字符串工具测试
+// String utility tests
 // ============================================================================
 
 #[test]
 fn test_string_truncate_edge_cases() {
-    // 正常截断
+    // Normal truncation
     let result = truncate_with_ellipsis("Hello, World!", 5);
     assert_eq!(result, "He...");
 
-    // 不需要截断
+    // No truncation needed
     let result = truncate_with_ellipsis("Hi", 10);
     assert_eq!(result, "Hi");
 
-    // 空字符串
+    // Empty string
     let result = truncate_with_ellipsis("", 5);
     assert_eq!(result, "");
 
-    // 长度刚好
+    // Exact length
     let result = truncate_with_ellipsis("Hello", 5);
     assert_eq!(result, "Hello");
 
-    // max_len 为 0 - 当 max_len <= 3 时返回 "..."
+    // max_len is 0 - when max_len <= 3, returns "..."
     let result = truncate_with_ellipsis("Hello", 0);
     assert_eq!(result, "...");
 
-    // max_len 小于 3 - 返回 "..."
+    // max_len less than 3 - returns "..."
     let result = truncate_with_ellipsis("Hello", 2);
     assert_eq!(result, "...");
 }
@@ -145,16 +145,16 @@ fn test_string_is_blank() {
 #[test]
 fn test_parse_number() {
     use crates_docs::utils::string::parse_number;
-    // parse_number 接受字符串和默认值，返回解析结果或默认值
+    // parse_number accepts string and default value, returns parsed result or default
     assert_eq!(parse_number("42", 0), 42);
     assert_eq!(parse_number("2.5", 0.0), 2.5);
-    // 无法解析时返回默认值
+    // Returns default value when parsing fails
     assert_eq!(parse_number("not a number", 99), 99);
     assert_eq!(parse_number("", 99), 99);
 }
 
 // ============================================================================
-// 时间工具测试
+// Time utility tests
 // ============================================================================
 
 #[test]
@@ -184,50 +184,50 @@ fn test_elapsed_ms() {
 }
 
 // ============================================================================
-// 验证工具测试
+// Validation utility tests
 // ============================================================================
 
 #[test]
 fn test_validate_crate_name_edge_cases() {
-    // 有效名称
+    // Valid names
     assert!(validate_crate_name("serde").is_ok());
     assert!(validate_crate_name("tokio").is_ok());
     assert!(validate_crate_name("my-crate").is_ok());
     assert!(validate_crate_name("a").is_ok());
-    assert!(validate_crate_name("123crate").is_ok()); // 数字开头是允许的
+    assert!(validate_crate_name("123crate").is_ok()); // Starting with digits is allowed
 
-    // 无效名称
+    // Invalid names
     assert!(validate_crate_name("").is_err());
-    assert!(validate_crate_name("crate@name").is_err()); // @ 是无效字符
+    assert!(validate_crate_name("crate@name").is_err()); // @ is invalid character
 }
 
 #[test]
 fn test_validate_version_edge_cases() {
-    // 有效版本 - 只要包含数字就有效
+    // Valid versions - valid as long as contains digits
     assert!(validate_version("1.0.0").is_ok());
     assert!(validate_version("0.1.0").is_ok());
     assert!(validate_version("1.2.3-beta").is_ok());
-    assert!(validate_version("v1.0.0").is_ok()); // 包含数字，有效
-    assert!(validate_version("1.0").is_ok()); // 包含数字，有效
+    assert!(validate_version("v1.0.0").is_ok()); // Contains digits, valid
+    assert!(validate_version("1.0").is_ok()); // Contains digits, valid
 
-    // 无效版本
+    // Invalid versions
     assert!(validate_version("").is_err());
-    assert!(validate_version("beta").is_err()); // 不包含数字
+    assert!(validate_version("beta").is_err()); // No digits
 }
 
 #[test]
 fn test_validate_search_query_edge_cases() {
-    // 有效查询 - 只检查空字符串
+    // Valid queries - only checks for empty string
     assert!(validate_search_query("web framework").is_ok());
     assert!(validate_search_query("serde").is_ok());
-    assert!(validate_search_query("   ").is_ok()); // 不是空字符串，有效
+    assert!(validate_search_query("   ").is_ok()); // Not empty string, valid
 
-    // 无效查询
+    // Invalid queries
     assert!(validate_search_query("").is_err());
 }
 
 // ============================================================================
-// 性能计数器测试
+// Performance counter tests
 // ============================================================================
 
 #[test]
@@ -264,7 +264,7 @@ fn test_performance_counter_success_rate() {
 
     let counter = PerformanceCounter::new();
 
-    // 记录 5 次成功，5 次失败
+    // Record 5 successes, 5 failures
     for i in 0..10 {
         let start = counter.record_request_start();
         counter.record_request_complete(start, i < 5);
@@ -297,7 +297,7 @@ fn test_performance_counter_reset() {
 fn test_performance_stats_default() {
     use crates_docs::utils::metrics::PerformanceStats;
 
-    // PerformanceStats 没有 new 方法，使用默认值
+    // PerformanceStats has no new method, use default values
     let stats = PerformanceStats {
         total_requests: 0,
         successful_requests: 0,

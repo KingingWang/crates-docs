@@ -1,4 +1,4 @@
-//! 工具模块单元测试
+//! Tool module unit tests
 
 use crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl;
 use crates_docs::tools::docs::lookup_item::LookupItemToolImpl;
@@ -10,7 +10,7 @@ use crates_docs::tools::{create_default_registry, ToolRegistry};
 use std::sync::Arc;
 
 // ============================================================================
-// 工具参数测试
+// Tool parameter tests
 // ============================================================================
 
 #[test]
@@ -76,7 +76,7 @@ fn test_health_check_tool_params() {
 }
 
 // ============================================================================
-// ToolRegistry 测试
+// ToolRegistry tests
 // ============================================================================
 
 #[test]
@@ -108,7 +108,7 @@ fn test_tool_registry_default_and_unknown_tool() {
 }
 
 // ============================================================================
-// 工具执行错误路径测试
+// Tool execution error path tests
 // ============================================================================
 
 #[test]
@@ -159,7 +159,7 @@ fn test_lookup_and_search_tools_invalid_arguments() {
 }
 
 // ============================================================================
-// DocService 测试
+// DocService tests
 // ============================================================================
 
 #[test]
@@ -168,7 +168,7 @@ fn test_doc_service_accessors_and_default() {
 
     let cache = create_cache(&CacheConfig::default()).unwrap();
     let cache: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
-    let service = DocService::new(cache.clone()).expect("创建 DocService 失败");
+    let service = DocService::new(cache.clone()).expect("Failed to create DocService");
 
     let _client = service.client();
     assert!(Arc::ptr_eq(service.cache(), &cache));
@@ -180,7 +180,7 @@ fn test_doc_service_accessors_and_default() {
 }
 
 // ============================================================================
-// 工具定义测试
+// Tool definition tests
 // ============================================================================
 
 #[test]
@@ -220,7 +220,7 @@ fn test_health_check_tool_definition() {
 }
 
 // ============================================================================
-// 工具默认值测试
+// Tool default values tests
 // ============================================================================
 
 #[test]
