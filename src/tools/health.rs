@@ -66,7 +66,6 @@ pub struct HealthCheckToolImpl {
 }
 
 impl HealthCheckToolImpl {
-    /// Create a new health check tool
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -74,14 +73,17 @@ impl HealthCheckToolImpl {
         }
     }
 
-    /// Check docs.rs service
     #[allow(clippy::cast_possible_truncation)]
-    async fn check_docs_rs(&self) -> HealthCheck {
+    async fn check_http_service(
+        name: &'static str,
+        url: &str,
+        healthy_msg: &'static str,
+    ) -> HealthCheck {
         let start = Instant::now();
         let client = reqwest::Client::new();
 
         match client
-            .get("https://docs.rs/")
+            .get(url)
             .header("User-Agent", format!("CratesDocsMCP/{}", crate::VERSION))
             .timeout(Duration::from_secs(5))
             .send()
@@ -91,15 +93,15 @@ impl HealthCheckToolImpl {
                 let duration = start.elapsed();
                 if response.status().is_success() {
                     HealthCheck {
-                        name: "docs.rs".to_string(),
+                        name: name.to_string(),
                         status: "healthy".to_string(),
                         duration_ms: duration.as_millis() as u64,
-                        message: Some("Service is healthy".to_string()),
+                        message: Some(healthy_msg.to_string()),
                         error: None,
                     }
                 } else {
                     HealthCheck {
-                        name: "docs.rs".to_string(),
+                        name: name.to_string(),
                         status: "unhealthy".to_string(),
                         duration_ms: duration.as_millis() as u64,
                         message: None,
@@ -110,7 +112,7 @@ impl HealthCheckToolImpl {
             Err(e) => {
                 let duration = start.elapsed();
                 HealthCheck {
-                    name: "docs.rs".to_string(),
+                    name: name.to_string(),
                     status: "unhealthy".to_string(),
                     duration_ms: duration.as_millis() as u64,
                     message: None,
@@ -120,50 +122,19 @@ impl HealthCheckToolImpl {
         }
     }
 
-    /// Check crates.io service
-    #[allow(clippy::cast_possible_truncation)]
-    async fn check_crates_io(&self) -> HealthCheck {
-        let start = Instant::now();
-        let client = reqwest::Client::new();
+    #[inline]
+    async fn check_docs_rs(&self) -> HealthCheck {
+        Self::check_http_service("docs.rs", "https://docs.rs/", "Service is healthy").await
+    }
 
-        match client
-            .get("https://crates.io/api/v1/crates?q=serde&per_page=1")
-            .header("User-Agent", format!("CratesDocsMCP/{}", crate::VERSION))
-            .timeout(Duration::from_secs(5))
-            .send()
-            .await
-        {
-            Ok(response) => {
-                let duration = start.elapsed();
-                if response.status().is_success() {
-                    HealthCheck {
-                        name: "crates.io".to_string(),
-                        status: "healthy".to_string(),
-                        duration_ms: duration.as_millis() as u64,
-                        message: Some("API is healthy".to_string()),
-                        error: None,
-                    }
-                } else {
-                    HealthCheck {
-                        name: "crates.io".to_string(),
-                        status: "unhealthy".to_string(),
-                        duration_ms: duration.as_millis() as u64,
-                        message: None,
-                        error: Some(format!("HTTP status code: {}", response.status())),
-                    }
-                }
-            }
-            Err(e) => {
-                let duration = start.elapsed();
-                HealthCheck {
-                    name: "crates.io".to_string(),
-                    status: "unhealthy".to_string(),
-                    duration_ms: duration.as_millis() as u64,
-                    message: None,
-                    error: Some(format!("Request failed: {e}")),
-                }
-            }
-        }
+    #[inline]
+    async fn check_crates_io(&self) -> HealthCheck {
+        Self::check_http_service(
+            "crates.io",
+            "https://crates.io/api/v1/crates?q=serde&per_page=1",
+            "API is healthy",
+        )
+        .await
     }
 
     /// Check memory usage
@@ -177,39 +148,29 @@ impl HealthCheckToolImpl {
         }
     }
 
-    /// Perform all health checks
     async fn perform_checks(&self, check_type: &str, verbose: bool) -> HealthStatus {
-        let mut checks = Vec::new();
-
-        match check_type {
+        let checks = match check_type {
             "all" => {
-                checks.push(self.check_docs_rs().await);
-                checks.push(self.check_crates_io().await);
-                checks.push(Self::check_memory());
+                let (docs_rs, crates_io) =
+                    tokio::join!(self.check_docs_rs(), self.check_crates_io());
+                vec![docs_rs, crates_io, Self::check_memory()]
             }
             "external" => {
-                checks.push(self.check_docs_rs().await);
-                checks.push(self.check_crates_io().await);
+                let (docs_rs, crates_io) =
+                    tokio::join!(self.check_docs_rs(), self.check_crates_io());
+                vec![docs_rs, crates_io]
             }
-            "internal" => {
-                checks.push(Self::check_memory());
-            }
-            "docs_rs" => {
-                checks.push(self.check_docs_rs().await);
-            }
-            "crates_io" => {
-                checks.push(self.check_crates_io().await);
-            }
-            _ => {
-                checks.push(HealthCheck {
-                    name: "unknown_check".to_string(),
-                    status: "unknown".to_string(),
-                    duration_ms: 0,
-                    message: None,
-                    error: Some(format!("Unknown check type: {check_type}")),
-                });
-            }
-        }
+            "internal" => vec![Self::check_memory()],
+            "docs_rs" => vec![self.check_docs_rs().await],
+            "crates_io" => vec![self.check_crates_io().await],
+            _ => vec![HealthCheck {
+                name: "unknown_check".to_string(),
+                status: "unknown".to_string(),
+                duration_ms: 0,
+                message: None,
+                error: Some(format!("Unknown check type: {check_type}")),
+            }],
+        };
 
         // Determine overall status
         let overall_status = if checks.iter().all(|c| c.status == "healthy") {

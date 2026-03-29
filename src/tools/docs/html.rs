@@ -5,6 +5,7 @@
 
 use regex::Regex;
 use scraper::{Html, Selector};
+use std::borrow::Cow;
 use std::sync::LazyLock;
 
 /// Tags whose content should be completely removed during HTML cleaning
@@ -54,6 +55,7 @@ pub fn clean_html(html: &str) -> String {
 }
 
 /// Remove unwanted elements from HTML using scraper for parsing
+#[inline]
 fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     let mut result = original_html.to_string();
 
@@ -149,19 +151,17 @@ pub fn html_to_text(html: &str) -> String {
     clean_whitespace(&text_parts.join(" "))
 }
 
-/// Extract text from an element, excluding content in skip tags
+#[inline]
 fn extract_text_excluding_skip_tags(
     element: &scraper::element_ref::ElementRef,
     text_parts: &mut Vec<String>,
 ) {
     let tag_name = element.value().name().to_lowercase();
 
-    // Skip unwanted tags entirely
     if SKIP_TAGS.contains(&tag_name.as_str()) {
         return;
     }
 
-    // Get direct text content
     for text in element.text() {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
@@ -170,7 +170,7 @@ fn extract_text_excluding_skip_tags(
     }
 }
 
-/// Check if an element is a block-level element
+#[inline]
 #[allow(dead_code)]
 fn is_block_element(tag: &str) -> bool {
     const BLOCK_ELEMENTS: &[&str] = &[
@@ -237,21 +237,12 @@ pub fn extract_documentation(html: &str) -> String {
 }
 
 /// Clean markdown output by removing relative links and UI artifacts
+#[inline]
 fn clean_markdown(markdown: &str) -> String {
-    let result = markdown.to_string();
-
-    // Remove source links like [Source](../src/...)
-    let result = SOURCE_LINK_REGEX.replace_all(&result, "").to_string();
-
-    // Remove relative documentation links like [de](de/index.html)
-    let result = RELATIVE_LINK_REGEX.replace_all(&result, "").to_string();
-
-    // Remove section markers like [§](#xxx)
-    let result = SECTION_MARKER_REGEX.replace_all(&result, "").to_string();
-
-    // Clean up multiple blank lines
+    let result = SOURCE_LINK_REGEX.replace_all(markdown, Cow::Borrowed(""));
+    let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = SECTION_MARKER_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = result.replace("\n\n\n", "\n\n");
-
     result.trim().to_string()
 }
 
@@ -259,6 +250,7 @@ fn clean_markdown(markdown: &str) -> String {
 ///
 /// Looks for `<section id="main-content">` which contains the actual documentation.
 /// Falls back to full HTML if main content section is not found.
+#[inline]
 fn extract_main_content(html: &str) -> String {
     let document = Html::parse_document(html);
 
@@ -289,13 +281,13 @@ pub fn extract_search_results(html: &str, item_path: &str) -> String {
     let cleaned_markdown = clean_markdown(&markdown);
 
     if cleaned_markdown.trim().is_empty() {
-        format!("未找到项目 '{item_path}' 的文档")
+        format!("Documentation for '{item_path}' not found")
     } else {
-        format!("## 搜索结果: {item_path}\n\n{cleaned_markdown}")
+        format!("## Search Results: {item_path}\n\n{cleaned_markdown}")
     }
 }
 
-/// Clean extra whitespace from text
+#[inline]
 fn clean_whitespace(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -360,7 +352,7 @@ mod tests {
     fn test_extract_search_results_found() {
         let html = "<html><body><h1>Result</h1></body></html>";
         let result = extract_search_results(html, "serde::Serialize");
-        assert!(result.contains("搜索结果"));
+        assert!(result.contains("Search Results"));
         assert!(result.contains("serde::Serialize"));
         assert!(result.contains("Result"));
     }
@@ -369,7 +361,7 @@ mod tests {
     fn test_extract_search_results_not_found() {
         let html = "<html><body></body></html>";
         let result = extract_search_results(html, "nonexistent");
-        assert!(result.contains("未找到项目"));
+        assert!(result.contains("not found"));
         assert!(result.contains("nonexistent"));
     }
 

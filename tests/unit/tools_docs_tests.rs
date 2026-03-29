@@ -174,7 +174,7 @@ fn test_extract_search_results_found() {
 fn test_extract_search_results_not_found() {
     let html = "<html><body></body></html>";
     let result = extract_search_results(html, "nonexistent");
-    assert!(result.contains("未找到项目"));
+    assert!(result.contains("not found"));
     assert!(result.contains("nonexistent"));
 }
 
