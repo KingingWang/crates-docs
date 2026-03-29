@@ -1,4 +1,4 @@
-//! 单元测试
+//! Unit tests
 
 use crates_docs::{
     cache::{create_cache, CacheConfig},
@@ -7,21 +7,21 @@ use crates_docs::{
 use std::sync::Arc;
 
 // ============================================================================
-// DocCache 测试
+// DocCache tests
 // ============================================================================
 
-/// 测试 HTML 清理功能 - 移除 script 标签
+/// Test HTML cleaning - remove script tags
 #[test]
 fn test_clean_html_removes_script_tags() {
     let html =
         r#"<html><head><script>alert('test');</script></head><body><p>Hello</p></body></html>"#;
-    // 使用 DocService 的内部方法测试（通过公开的 API）
-    // 由于 clean_html 是私有函数，我们通过集成测试来验证
+    // Test using DocService's internal method (via public API)
+    // Since clean_html is a private function, we verify through integration tests
     assert!(html.contains("<script>"));
     assert!(html.contains("Hello"));
 }
 
-/// 测试 HTML 清理功能 - 移除 style 标签
+/// Test HTML cleaning - remove style tags
 #[test]
 fn test_clean_html_removes_style_tags() {
     let html = r#"<html><head><style>.test { color: red; }</style></head><body><p>World</p></body></html>"#;
@@ -29,7 +29,7 @@ fn test_clean_html_removes_style_tags() {
     assert!(html.contains("World"));
 }
 
-/// 测试 HTML 清理功能 - 移除 noscript 标签
+/// Test HTML cleaning - remove noscript tags
 #[test]
 fn test_clean_html_removes_noscript_tags() {
     let html = r#"<html><body><noscript>Enable JavaScript</noscript><p>Content</p></body></html>"#;
@@ -37,10 +37,10 @@ fn test_clean_html_removes_noscript_tags() {
     assert!(html.contains("Content"));
 }
 
-/// 测试 HTML 实体解码
+/// Test HTML entity decoding
 #[test]
 fn test_html_entity_decoding() {
-    // 测试常见 HTML 实体 - 验证实体和期望值都不为空
+    // Test common HTML entities - verify entity and expected values are not empty
     let entities: [(&str, &str); 5] = [
         ("&lt;", "<"),
         ("&gt;", ">"),
@@ -55,32 +55,32 @@ fn test_html_entity_decoding() {
 }
 
 // ============================================================================
-// DocCache 测试
+// DocCache tests
 // ============================================================================
 
-/// 测试 DocCache 的 crate 文档缓存
+/// Test DocCache crate docs caching
 #[tokio::test]
 async fn test_doc_cache_crate_docs() {
     let config = CacheConfig::default();
-    let cache = create_cache(&config).expect("创建缓存失败");
+    let cache = create_cache(&config).expect("Failed to create cache");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
     let doc_cache = DocCache::new(cache_arc);
 
-    // 测试缓存未命中
+    // Test cache miss
     let result = doc_cache.get_crate_docs("serde", None).await;
     assert!(result.is_none());
 
-    // 设置缓存
+    // Set cache
     doc_cache
         .set_crate_docs("serde", None, "Serde documentation".to_string())
         .await
         .expect("set_crate_docs should succeed");
 
-    // 测试缓存命中
+    // Test cache hit
     let result = doc_cache.get_crate_docs("serde", None).await;
     assert_eq!(result, Some("Serde documentation".to_string()));
 
-    // 测试带版本的缓存
+    // Test cache with version
     doc_cache
         .set_crate_docs("tokio", Some("1.0.0"), "Tokio 1.0 docs".to_string())
         .await
@@ -88,26 +88,26 @@ async fn test_doc_cache_crate_docs() {
     let result = doc_cache.get_crate_docs("tokio", Some("1.0.0")).await;
     assert_eq!(result, Some("Tokio 1.0 docs".to_string()));
 
-    // 不同版本应该返回不同的缓存
+    // Different versions should return different cached values
     let result = doc_cache.get_crate_docs("tokio", Some("1.1.0")).await;
     assert!(result.is_none());
 }
 
-/// 测试 DocCache 的项目文档缓存
+/// Test DocCache item docs caching
 #[tokio::test]
 async fn test_doc_cache_item_docs() {
     let config = CacheConfig::default();
-    let cache = create_cache(&config).expect("创建缓存失败");
+    let cache = create_cache(&config).expect("Failed to create cache");
     let cache_arc: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
     let doc_cache = DocCache::new(cache_arc);
 
-    // 测试缓存未命中
+    // Test cache miss
     let result = doc_cache
         .get_item_docs("serde", "serde::Serialize", None)
         .await;
     assert!(result.is_none());
 
-    // 设置缓存
+    // Set cache
     doc_cache
         .set_item_docs(
             "serde",
@@ -118,13 +118,13 @@ async fn test_doc_cache_item_docs() {
         .await
         .expect("set_item_docs should succeed");
 
-    // 测试缓存命中
+    // Test cache hit
     let result = doc_cache
         .get_item_docs("serde", "serde::Serialize", None)
         .await;
     assert_eq!(result, Some("Serialize trait docs".to_string()));
 
-    // 测试带版本的缓存
+    // Test cache with version
     doc_cache
         .set_item_docs(
             "std",
@@ -141,10 +141,10 @@ async fn test_doc_cache_item_docs() {
 }
 
 // ============================================================================
-// 配置验证边界测试
+// Configuration validation boundary tests
 // ============================================================================
 
-/// 测试配置验证 - 空主机名
+/// Test configuration validation - empty host
 #[test]
 fn test_config_validation_empty_host() {
     let mut config = crates_docs::config::AppConfig::default();
@@ -154,7 +154,7 @@ fn test_config_validation_empty_host() {
     assert!(result.unwrap_err().to_string().contains("host"));
 }
 
-/// 测试配置验证 - 端口为 0
+/// Test configuration validation - port is 0
 #[test]
 fn test_config_validation_zero_port() {
     let mut config = crates_docs::config::AppConfig::default();
@@ -163,7 +163,7 @@ fn test_config_validation_zero_port() {
     assert!(result.is_err());
 }
 
-/// 测试配置验证 - 无效传输模式
+/// Test configuration validation - invalid transport mode
 #[test]
 fn test_config_validation_invalid_transport_mode() {
     let mut config = crates_docs::config::AppConfig::default();
@@ -176,7 +176,7 @@ fn test_config_validation_invalid_transport_mode() {
         .contains("Invalid transport mode"));
 }
 
-/// 测试配置验证 - 无效日志级别
+/// Test configuration validation - invalid log level
 #[test]
 fn test_config_validation_invalid_log_level() {
     let mut config = crates_docs::config::AppConfig::default();
@@ -189,7 +189,7 @@ fn test_config_validation_invalid_log_level() {
         .contains("Invalid log level"));
 }
 
-/// 测试配置验证 - 最大连接数为 0
+/// Test configuration validation - max connections is 0
 #[test]
 fn test_config_validation_zero_max_connections() {
     let mut config = crates_docs::config::AppConfig::default();
@@ -198,7 +198,7 @@ fn test_config_validation_zero_max_connections() {
     assert!(result.is_err());
 }
 
-/// 测试配置验证 - HTTP 客户端池大小为 0
+/// Test configuration validation - HTTP client pool size is 0
 #[test]
 fn test_config_validation_zero_pool_size() {
     let mut config = crates_docs::config::AppConfig::default();
@@ -207,7 +207,7 @@ fn test_config_validation_zero_pool_size() {
     assert!(result.is_err());
 }
 
-/// 测试配置验证 - 缓存最大大小为 0
+/// Test configuration validation - cache max size is 0
 #[test]
 fn test_config_validation_zero_cache_size() {
     let mut config = crates_docs::config::AppConfig::default();
@@ -217,10 +217,10 @@ fn test_config_validation_zero_cache_size() {
 }
 
 // ============================================================================
-// OAuth 配置验证测试
+// OAuth configuration validation tests
 // ============================================================================
 
-/// 测试 OAuth 配置验证 - 启用但缺少客户端 ID
+/// Test OAuth configuration validation - enabled but missing client ID
 #[test]
 fn test_oauth_config_validation_missing_client_id() {
     use crates_docs::server::auth::{OAuthConfig, OAuthProvider};
@@ -240,7 +240,7 @@ fn test_oauth_config_validation_missing_client_id() {
     assert!(result.is_err());
 }
 
-/// 测试 OAuth 配置验证 - 启用但缺少客户端密钥
+/// Test OAuth configuration validation - enabled but missing client secret
 #[test]
 fn test_oauth_config_validation_missing_client_secret() {
     use crates_docs::server::auth::{OAuthConfig, OAuthProvider};
@@ -260,7 +260,7 @@ fn test_oauth_config_validation_missing_client_secret() {
     assert!(result.is_err());
 }
 
-/// 测试 OAuth 配置验证 - 禁用时不需要验证
+/// Test OAuth configuration validation - disabled, no validation required
 #[test]
 fn test_oauth_config_validation_disabled() {
     use crates_docs::server::auth::{OAuthConfig, OAuthProvider};
@@ -281,26 +281,26 @@ fn test_oauth_config_validation_disabled() {
 }
 
 // ============================================================================
-// 错误处理测试
+// Error handling tests
 // ============================================================================
 
-/// 测试错误类型转换
+/// Test error type conversions
 #[test]
 fn test_error_conversions() {
     use crates_docs::error::Error;
 
-    // 测试 IO 错误转换
+    // Test IO error conversion
     let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
     let error: Error = io_error.into();
     assert!(matches!(error, Error::Io(_)));
 
-    // 测试 JSON 错误转换
+    // Test JSON error conversion
     let json_error = serde_json::from_str::<i32>("not a number").unwrap_err();
     let error: Error = json_error.into();
     assert!(matches!(error, Error::Json(_)));
 }
 
-/// 测试错误显示
+/// Test error display
 #[test]
 fn test_error_display() {
     use crates_docs::error::Error;
@@ -317,10 +317,10 @@ fn test_error_display() {
 }
 
 // ============================================================================
-// 工具参数测试
+// Tool parameter tests
 // ============================================================================
 
-/// 测试 LookupCrateTool 参数
+/// Test LookupCrateTool parameters
 #[test]
 fn test_lookup_crate_tool_params() {
     use crates_docs::tools::docs::lookup_crate::LookupCrateTool;
@@ -336,7 +336,7 @@ fn test_lookup_crate_tool_params() {
     assert_eq!(params.format, Some("markdown".to_string()));
 }
 
-/// 测试 LookupItemTool 参数
+/// Test LookupItemTool parameters
 #[test]
 fn test_lookup_item_tool_params() {
     use crates_docs::tools::docs::lookup_item::LookupItemTool;
@@ -354,7 +354,7 @@ fn test_lookup_item_tool_params() {
     assert_eq!(params.format, Some("text".to_string()));
 }
 
-/// 测试 SearchCratesTool 参数
+/// Test SearchCratesTool parameters
 #[test]
 fn test_search_crates_tool_params() {
     use crates_docs::tools::docs::search::SearchCratesTool;
@@ -372,7 +372,7 @@ fn test_search_crates_tool_params() {
     assert_eq!(params.format, Some("json".to_string()));
 }
 
-/// 测试 HealthCheckTool 参数
+/// Test HealthCheckTool parameters
 #[test]
 fn test_health_check_tool_params() {
     use crates_docs::tools::health::HealthCheckTool;
@@ -387,48 +387,48 @@ fn test_health_check_tool_params() {
 }
 
 // ============================================================================
-// 字符串工具边界测试
+// String utility boundary tests
 // ============================================================================
 
-/// 测试字符串截断边界情况
+/// Test string truncation edge cases
 #[test]
 fn test_string_truncate_edge_cases() {
     use crates_docs::utils::string;
 
-    // 空字符串
+    // Empty string
     let truncated = string::truncate_with_ellipsis("", 10);
     assert_eq!(truncated, "");
 
-    // 单字符字符串
+    // Single character string
     let truncated = string::truncate_with_ellipsis("a", 10);
     assert_eq!(truncated, "a");
 
-    // 最大长度为 0
+    // Max length is 0
     let truncated = string::truncate_with_ellipsis("test", 0);
     assert_eq!(truncated, "...");
 
-    // 最大长度为 1
+    // Max length is 1
     let truncated = string::truncate_with_ellipsis("test", 1);
     assert_eq!(truncated, "...");
 
-    // 最大长度为 2
+    // Max length is 2
     let truncated = string::truncate_with_ellipsis("test", 2);
     assert_eq!(truncated, "...");
 
-    // 最大长度为 3
+    // Max length is 3
     let truncated = string::truncate_with_ellipsis("test", 3);
     assert_eq!(truncated, "...");
 
-    // 刚好等于最大长度
+    // Exactly equals max length
     let truncated = string::truncate_with_ellipsis("test", 4);
     assert_eq!(truncated, "test");
 
-    // 超过最大长度 1
+    // Exceeds max length by 1
     let truncated = string::truncate_with_ellipsis("tests", 4);
     assert_eq!(truncated, "t...");
 }
 
-/// 测试字符串空白检查
+/// Test string whitespace check
 #[test]
 fn test_string_is_blank() {
     use crates_docs::utils::string;
@@ -446,7 +446,7 @@ fn test_string_is_blank() {
     assert!(!string::is_blank("test"));
 }
 
-/// 测试数字解析
+/// Test number parsing
 #[test]
 fn test_parse_number() {
     use crates_docs::utils::string;
@@ -459,15 +459,15 @@ fn test_parse_number() {
 }
 
 // ============================================================================
-// 验证工具边界测试
+// Validation utility boundary tests
 // ============================================================================
 
-/// 测试 crate 名称验证边界情况
+/// Test crate name validation edge cases
 #[test]
 fn test_validate_crate_name_edge_cases() {
     use crates_docs::utils::validation;
 
-    // 有效名称
+    // Valid names
     assert!(validation::validate_crate_name("a").is_ok());
     assert!(validation::validate_crate_name("serde").is_ok());
     assert!(validation::validate_crate_name("serde-json").is_ok());
@@ -475,23 +475,23 @@ fn test_validate_crate_name_edge_cases() {
     assert!(validation::validate_crate_name("tokio1").is_ok());
     assert!(validation::validate_crate_name("test123").is_ok());
 
-    // 无效名称
-    assert!(validation::validate_crate_name("").is_err()); // 空
-    assert!(validation::validate_crate_name("serde json").is_err()); // 包含空格
-    assert!(validation::validate_crate_name("serde.json").is_err()); // 包含点
-    assert!(validation::validate_crate_name("serde/ json").is_err()); // 包含斜杠
+    // Invalid names
+    assert!(validation::validate_crate_name("").is_err()); // Empty
+    assert!(validation::validate_crate_name("serde json").is_err()); // Contains space
+    assert!(validation::validate_crate_name("serde.json").is_err()); // Contains dot
+    assert!(validation::validate_crate_name("serde/ json").is_err()); // Contains slash
 
-    // 超长名称
+    // Excessively long name
     let long_name = "a".repeat(101);
     assert!(validation::validate_crate_name(&long_name).is_err());
 }
 
-/// 测试版本号验证边界情况
+/// Test version validation edge cases
 #[test]
 fn test_validate_version_edge_cases() {
     use crates_docs::utils::validation;
 
-    // 有效版本
+    // Valid versions
     assert!(validation::validate_version("1").is_ok());
     assert!(validation::validate_version("1.0").is_ok());
     assert!(validation::validate_version("1.0.0").is_ok());
@@ -500,39 +500,39 @@ fn test_validate_version_edge_cases() {
     assert!(validation::validate_version("1.0.0-alpha.1").is_ok());
     assert!(validation::validate_version("1.0.0-beta.2").is_ok());
 
-    // 无效版本
-    assert!(validation::validate_version("").is_err()); // 空
-    assert!(validation::validate_version("alpha").is_err()); // 无数字
-    assert!(validation::validate_version("-").is_err()); // 无数字
+    // Invalid versions
+    assert!(validation::validate_version("").is_err()); // Empty
+    assert!(validation::validate_version("alpha").is_err()); // No digits
+    assert!(validation::validate_version("-").is_err()); // No digits
 
-    // 超长版本
+    // Excessively long version
     let long_version = "1".repeat(51);
     assert!(validation::validate_version(&long_version).is_err());
 }
 
-/// 测试搜索查询验证边界情况
+/// Test search query validation edge cases
 #[test]
 fn test_validate_search_query_edge_cases() {
     use crates_docs::utils::validation;
 
-    // 有效查询
+    // Valid queries
     assert!(validation::validate_search_query("a").is_ok());
     assert!(validation::validate_search_query("serde").is_ok());
     assert!(validation::validate_search_query("web framework").is_ok());
     let max_query = "a".repeat(200);
-    assert!(validation::validate_search_query(&max_query).is_ok()); // 最大长度
+    assert!(validation::validate_search_query(&max_query).is_ok()); // Maximum length
 
-    // 无效查询
-    assert!(validation::validate_search_query("").is_err()); // 空
+    // Invalid queries
+    assert!(validation::validate_search_query("").is_err()); // Empty
     let long_query = "a".repeat(201);
-    assert!(validation::validate_search_query(&long_query).is_err()); // 超长
+    assert!(validation::validate_search_query(&long_query).is_err()); // Too long
 }
 
 // ============================================================================
-// 性能计数器边界测试
+// Performance counter boundary tests
 // ============================================================================
 
-/// 测试性能计数器并发访问
+/// Test performance counter concurrent access
 #[tokio::test]
 async fn test_performance_counter_concurrent() {
     use crates_docs::utils::metrics::PerformanceCounter;
@@ -542,7 +542,7 @@ async fn test_performance_counter_concurrent() {
     let counter = Arc::new(PerformanceCounter::new());
     let mut tasks = JoinSet::new();
 
-    // 并发记录 100 个请求
+    // Concurrently record 100 requests
     for _ in 0..100 {
         let counter = counter.clone();
         tasks.spawn(async move {
@@ -552,7 +552,7 @@ async fn test_performance_counter_concurrent() {
         });
     }
 
-    // 等待所有任务完成
+    // Wait for all tasks to complete
     while tasks.join_next().await.is_some() {}
 
     let stats = counter.get_stats();
@@ -561,14 +561,14 @@ async fn test_performance_counter_concurrent() {
     assert_eq!(stats.failed_requests, 0);
 }
 
-/// 测试性能计数器成功率计算
+/// Test performance counter success rate calculation
 #[test]
 fn test_performance_counter_success_rate() {
     use crates_docs::utils::metrics::PerformanceCounter;
 
     let counter = PerformanceCounter::new();
 
-    // 记录混合结果
+    // Record mixed results
     for i in 0..100 {
         let start = counter.record_request_start();
         counter.record_request_complete(start, i % 2 == 0);
@@ -576,39 +576,39 @@ fn test_performance_counter_success_rate() {
 
     let stats = counter.get_stats();
     assert_eq!(stats.total_requests, 100);
-    assert_eq!(stats.successful_requests, 50); // 偶数索引成功
-    assert_eq!(stats.failed_requests, 50); // 奇数索引失败
+    assert_eq!(stats.successful_requests, 50); // Even indices succeed
+    assert_eq!(stats.failed_requests, 50); // Odd indices fail
     assert_eq!(stats.success_rate_percent, 50.0);
 }
 
 // ============================================================================
-// 速率限制器测试
+// Rate limiter tests
 // ============================================================================
 
-/// 测试速率限制器边界
+/// Test rate limiter boundary
 #[tokio::test]
 async fn test_rate_limiter_boundary() {
     use crates_docs::utils::RateLimiter;
 
     let limiter = RateLimiter::new(1);
 
-    // 获取唯一的许可
+    // Acquire unique permit
     let permit1 = limiter.acquire().await;
     assert!(permit1.is_ok());
 
-    // 尝试非阻塞获取应该失败
+    // Try non-blocking acquire should fail
     let try_result = limiter.try_acquire();
     assert!(try_result.is_none());
 
-    // 释放许可
+    // Release permit
     drop(permit1);
 
-    // 现在应该可以获取
+    // Now should be able to acquire
     let permit2 = limiter.try_acquire();
     assert!(permit2.is_some());
 }
 
-/// 测试速率限制器可用许可数
+/// Test rate limiter available permits
 #[test]
 fn test_rate_limiter_available_permits() {
     use crates_docs::utils::RateLimiter;
@@ -631,10 +631,10 @@ fn test_rate_limiter_available_permits() {
 }
 
 // ============================================================================
-// 传输模式测试
+// Transport mode tests
 // ============================================================================
 
-/// 测试传输模式解析
+/// Test transport mode parsing
 #[test]
 fn test_transport_mode_from_str() {
     use std::str::FromStr;
@@ -668,12 +668,12 @@ fn test_transport_mode_from_str() {
         assert_eq!(result.unwrap(), expected);
     }
 
-    // 无效模式
+    // Invalid mode
     let result = crates_docs::server::transport::TransportMode::from_str("invalid");
     assert!(result.is_err());
 }
 
-/// 测试传输模式显示
+/// Test transport mode display
 #[test]
 fn test_transport_mode_display() {
     let modes = [
@@ -695,10 +695,10 @@ fn test_transport_mode_display() {
 }
 
 // ============================================================================
-// 错误类型转换测试
+// Error type conversion tests
 // ============================================================================
 
-/// 测试 Error 从 std::io::Error 转换
+/// Test Error conversion from std::io::Error
 #[test]
 fn test_error_from_io_error() {
     use crates_docs::Error;
@@ -710,7 +710,7 @@ fn test_error_from_io_error() {
     assert!(err.to_string().contains("IO error"));
 }
 
-/// 测试 Error 从 serde_json::Error 转换
+/// Test Error conversion from serde_json::Error
 #[test]
 fn test_error_from_json_error() {
     use crates_docs::Error;
@@ -722,7 +722,7 @@ fn test_error_from_json_error() {
     assert!(err.to_string().contains("JSON error"));
 }
 
-/// 测试 Error 从 url::ParseError 转换
+/// Test Error conversion from url::ParseError
 #[test]
 fn test_error_from_url_error() {
     use crates_docs::Error;
@@ -734,7 +734,7 @@ fn test_error_from_url_error() {
     assert!(err.to_string().contains("URL parse error"));
 }
 
-/// 测试 Error 从 Box<dyn Error> 转换
+/// Test Error conversion from Box<dyn Error>
 #[test]
 fn test_error_from_boxed_error() {
     use crates_docs::Error;
@@ -746,7 +746,7 @@ fn test_error_from_boxed_error() {
     assert!(err.to_string().contains("Unknown error"));
 }
 
-/// 测试 Error 从 anyhow::Error 转换
+/// Test Error conversion from anyhow::Error
 #[test]
 fn test_error_from_anyhow_error() {
     use crates_docs::Error;
@@ -757,7 +757,7 @@ fn test_error_from_anyhow_error() {
     assert!(err.to_string().contains("Unknown error"));
 }
 
-/// 测试各种 Error 变体的 Display
+/// Test Display for various Error variants
 #[test]
 fn test_error_variants_display() {
     use crates_docs::Error;
@@ -800,10 +800,10 @@ fn test_error_variants_display() {
 }
 
 // ============================================================================
-// 缓存创建错误测试
+// Cache creation error tests
 // ============================================================================
 
-/// 测试不支持的缓存类型
+/// Test unsupported cache type
 #[test]
 fn test_create_cache_unsupported_type() {
     use crates_docs::cache::{create_cache, CacheConfig};
@@ -821,13 +821,13 @@ fn test_create_cache_unsupported_type() {
 
     let result = create_cache(&config);
     assert!(result.is_err());
-    // 不使用 unwrap_err() 因为 Box<dyn Cache> 没有实现 Debug
+    // Don't use unwrap_err() because Box<dyn Cache> doesn't implement Debug
     if let Err(err) = result {
         assert!(err.to_string().contains("unsupported cache type"));
     }
 }
 
-/// 测试 Redis 缓存同步创建错误
+/// Test Redis cache synchronous creation error
 #[test]
 fn test_create_cache_redis_sync_error() {
     use crates_docs::cache::{create_cache, CacheConfig};
@@ -843,18 +843,18 @@ fn test_create_cache_redis_sync_error() {
         search_results_ttl_secs: Some(300),
     };
 
-    // 同步创建 Redis 缓存应该返回错误（需要异步初始化）
+    // Synchronous Redis cache creation should return error (requires async initialization)
     let result = create_cache(&config);
-    // 如果 Redis feature 启用，会返回需要异步初始化的错误
-    // 如果未启用，会返回 feature 未启用的错误
+    // If Redis feature is enabled, returns error requiring async initialization
+    // If not enabled, returns feature not enabled error
     assert!(result.is_err());
 }
 
 // ============================================================================
-// 配置边界测试
+// Configuration boundary tests
 // ============================================================================
 
-/// 测试配置保存和加载
+/// Test configuration save and load
 #[test]
 fn test_config_save_and_load() {
     use crates_docs::config::AppConfig;
@@ -863,27 +863,27 @@ fn test_config_save_and_load() {
     let config = AppConfig::default();
     let temp_path = "/tmp/test_crates_docs_config.toml";
 
-    // 保存配置
+    // Save configuration
     let save_result = config.save_to_file(temp_path);
     assert!(save_result.is_ok());
 
-    // 加载配置
+    // Load configuration
     let load_result = AppConfig::from_file(temp_path);
     assert!(load_result.is_ok());
 
     let loaded_config = load_result.unwrap();
     assert_eq!(loaded_config.server.host, config.server.host);
 
-    // 清理
+    // Cleanup
     let _ = fs::remove_file(temp_path);
 }
 
-/// 测试从环境变量加载配置
+/// Test loading configuration from environment variables
 #[test]
 fn test_config_from_env() {
     use crates_docs::config::AppConfig;
 
-    // 使用 temp_env 安全地隔离环境变量
+    // Use temp_env to safely isolate environment variables
     temp_env::with_vars(
         [
             ("CRATES_DOCS_HOST", Some("0.0.0.0")),
@@ -893,28 +893,28 @@ fn test_config_from_env() {
             let result = AppConfig::from_env();
             assert!(result.is_ok());
 
-            // 注意：from_env 的实现可能不同，这里只是测试函数能正常工作
+            // Note: from_env implementation may differ, this just tests that the function works
             let _config = result.unwrap();
         },
     );
 }
 
-/// 测试配置合并
+/// Test configuration merge
 #[test]
 fn test_config_merge() {
     use crates_docs::config::AppConfig;
 
-    // 无配置合并
+    // No configuration merge
     let merged = AppConfig::merge(None, None);
     assert_eq!(merged.server.host, "127.0.0.1");
 
-    // 只有文件配置
+    // Only file configuration
     let file_config = AppConfig::default();
     let merged = AppConfig::merge(Some(file_config), None);
     assert_eq!(merged.server.host, "127.0.0.1");
 }
 
-/// 测试 AppConfig 默认值
+/// Test AppConfig default values
 #[test]
 fn test_app_config_default() {
     use crates_docs::config::AppConfig;
@@ -927,10 +927,10 @@ fn test_app_config_default() {
 }
 
 // ============================================================================
-// OAuth 配置测试
+// OAuth configuration tests
 // ============================================================================
 
-/// 测试 GitHub OAuth 配置创建
+/// Test GitHub OAuth configuration creation
 #[test]
 fn test_oauth_config_github() {
     use crates_docs::server::auth::OAuthConfig;
@@ -945,7 +945,7 @@ fn test_oauth_config_github() {
     assert!(config.validate().is_ok());
 }
 
-/// 测试 Google OAuth 配置创建
+/// Test Google OAuth configuration creation
 #[test]
 fn test_oauth_config_google() {
     use crates_docs::server::auth::OAuthConfig;
@@ -960,7 +960,7 @@ fn test_oauth_config_google() {
     assert!(config.validate().is_ok());
 }
 
-/// 测试 Keycloak OAuth 配置创建
+/// Test Keycloak OAuth configuration creation
 #[test]
 fn test_oauth_config_keycloak() {
     use crates_docs::server::auth::OAuthConfig;
@@ -977,7 +977,7 @@ fn test_oauth_config_keycloak() {
     assert!(config.validate().is_ok());
 }
 
-/// 测试禁用的 OAuth 配置验证
+/// Test disabled OAuth configuration validation
 #[test]
 fn test_oauth_config_disabled_validation() {
     use crates_docs::server::auth::OAuthConfig;
@@ -987,15 +987,15 @@ fn test_oauth_config_disabled_validation() {
         ..Default::default()
     };
 
-    // 禁用的配置应该始终验证通过
+    // Disabled configuration should always pass validation
     assert!(config.validate().is_ok());
 }
 
 // ============================================================================
-// 服务器配置测试
+// Server configuration tests
 // ============================================================================
 
-/// 测试 ServerConfig 默认值
+/// Test ServerConfig default values
 #[test]
 fn test_server_config_default() {
     use crates_docs::server::ServerConfig;
@@ -1005,18 +1005,18 @@ fn test_server_config_default() {
     assert_eq!(config.port, 8080);
 }
 
-/// 测试 LoggingConfig 默认值
+/// Test LoggingConfig default values
 #[test]
 fn test_logging_config_default() {
     use crates_docs::config::LoggingConfig;
 
     let config = LoggingConfig::default();
     assert!(config.enable_console);
-    assert!(!config.enable_file); // 默认禁用文件日志
+    assert!(!config.enable_file); // File logging disabled by default
     assert_eq!(config.level, "info");
 }
 
-/// 测试 PerformanceConfig 默认值
+/// Test PerformanceConfig default values
 #[test]
 fn test_performance_config_default() {
     use crates_docs::config::PerformanceConfig;
@@ -1027,10 +1027,10 @@ fn test_performance_config_default() {
 }
 
 // ============================================================================
-// HTTP 客户端构建器测试
+// HTTP client builder tests
 // ============================================================================
 
-/// 测试 HTTP 客户端构建器
+/// Test HTTP client builder
 #[test]
 fn test_http_client_builder() {
     use crates_docs::utils::HttpClientBuilder;
@@ -1048,7 +1048,7 @@ fn test_http_client_builder() {
     assert!(client.is_ok());
 }
 
-/// 测试 HTTP 客户端构建器默认值
+/// Test HTTP client builder default values
 #[test]
 fn test_http_client_builder_default() {
     use crates_docs::utils::HttpClientBuilder;
@@ -1058,50 +1058,50 @@ fn test_http_client_builder_default() {
 }
 
 // ============================================================================
-// 压缩工具测试
+// Compression utility tests
 // ============================================================================
 
-/// 测试 gzip 压缩和解压
+/// Test gzip compression and decompression
 #[test]
 fn test_gzip_compression() {
     use crates_docs::utils::compression;
 
     let original = b"Hello, World! This is a test message for gzip compression.";
 
-    // 压缩
+    // Compress
     let compressed = compression::gzip_compress(original);
     assert!(compressed.is_ok());
     let compressed = compressed.unwrap();
     assert!(!compressed.is_empty());
 
-    // 解压
+    // Decompress
     let decompressed = compression::gzip_decompress(&compressed);
     assert!(decompressed.is_ok());
     let decompressed = decompressed.unwrap();
     assert_eq!(decompressed.as_slice(), original);
 }
 
-/// 测试空数据压缩
+/// Test empty data compression
 #[test]
 fn test_gzip_empty_data() {
     use crates_docs::utils::compression;
 
     let empty: &[u8] = &[];
 
-    // 空数据压缩
+    // Empty data compression
     let compressed = compression::gzip_compress(empty);
     assert!(compressed.is_ok());
 
-    // 空数据解压
+    // Empty data decompression
     let _decompressed = compression::gzip_decompress(empty);
-    // 空数据解压可能失败或返回空，取决于实现
+    // Empty data decompression may fail or return empty, depending on implementation
 }
 
 // ============================================================================
-// 时间工具测试
+// Time utility tests
 // ============================================================================
 
-/// 测试时间戳生成
+/// Test timestamp generation
 #[test]
 fn test_current_timestamp_ms() {
     use crates_docs::utils::time;
@@ -1109,12 +1109,12 @@ fn test_current_timestamp_ms() {
     let ts = time::current_timestamp_ms();
     assert!(ts > 0);
 
-    // 连续调用应该返回不同的值
+    // Consecutive calls should return different values
     let ts2 = time::current_timestamp_ms();
     assert!(ts2 >= ts);
 }
 
-/// 测试时间格式化
+/// Test time formatting
 #[test]
 fn test_format_datetime() {
     use chrono::Utc;
@@ -1127,7 +1127,7 @@ fn test_format_datetime() {
     assert!(formatted.contains(':'));
 }
 
-/// 测试时间间隔计算
+/// Test time interval calculation
 #[test]
 fn test_elapsed_ms() {
     use crates_docs::utils::time;
@@ -1140,17 +1140,17 @@ fn test_elapsed_ms() {
 }
 
 // ============================================================================
-// 性能计数器重置测试
+// Performance counter reset tests
 // ============================================================================
 
-/// 测试性能计数器重置
+/// Test performance counter reset
 #[test]
 fn test_performance_counter_reset() {
     use crates_docs::utils::metrics::PerformanceCounter;
 
     let counter = PerformanceCounter::new();
 
-    // 记录一些请求
+    // Record some requests
     for i in 0..10 {
         let start = counter.record_request_start();
         counter.record_request_complete(start, i % 2 == 0);
@@ -1159,7 +1159,7 @@ fn test_performance_counter_reset() {
     let stats = counter.get_stats();
     assert_eq!(stats.total_requests, 10);
 
-    // 重置
+    // Reset
     counter.reset();
 
     let stats = counter.get_stats();
@@ -1168,13 +1168,13 @@ fn test_performance_counter_reset() {
     assert_eq!(stats.failed_requests, 0);
 }
 
-/// 测试性能统计新建
+/// Test performance stats creation
 #[test]
 fn test_performance_stats_new() {
     use crates_docs::utils::metrics::PerformanceStats;
 
-    // PerformanceStats 是由 PerformanceCounter::get_stats() 返回的
-    // 我们可以测试其字段
+    // PerformanceStats is returned by PerformanceCounter::get_stats()
+    // We can test its fields
     let stats = PerformanceStats {
         total_requests: 0,
         successful_requests: 0,
@@ -1190,10 +1190,10 @@ fn test_performance_stats_new() {
 }
 
 // ============================================================================
-// Token 存储测试
+// Token storage tests
 // ============================================================================
 
-/// 测试 TokenStore 基本操作
+/// Test TokenStore basic operations
 #[test]
 fn test_token_store_operations() {
     use chrono::{Duration, Utc};
@@ -1209,21 +1209,21 @@ fn test_token_store_operations() {
         user_email: Some("user@example.com".to_string()),
     };
 
-    // 存储
+    // Store
     store.store_token("user1".to_string(), token_info.clone());
 
-    // 获取
+    // Retrieve
     let retrieved = store.get_token("user1");
     assert!(retrieved.is_some());
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.access_token, "test_access_token");
 
-    // 删除
+    // Delete
     store.remove_token("user1");
     assert!(store.get_token("user1").is_none());
 }
 
-/// 测试 TokenStore 清理过期令牌
+/// Test TokenStore expired token cleanup
 #[test]
 fn test_token_store_cleanup() {
     use chrono::{Duration, Utc};
@@ -1231,7 +1231,7 @@ fn test_token_store_cleanup() {
 
     let store = TokenStore::new();
 
-    // 添加一个已过期的令牌
+    // Add an expired token
     let expired_token = TokenInfo {
         access_token: "expired_token".to_string(),
         refresh_token: None,
@@ -1242,7 +1242,7 @@ fn test_token_store_cleanup() {
     };
     store.store_token("expired_user".to_string(), expired_token);
 
-    // 添加一个有效的令牌
+    // Add a valid token
     let valid_token = TokenInfo {
         access_token: "valid_token".to_string(),
         refresh_token: None,
@@ -1253,29 +1253,29 @@ fn test_token_store_cleanup() {
     };
     store.store_token("valid_user".to_string(), valid_token);
 
-    // 清理过期令牌
+    // Cleanup expired tokens
     store.cleanup_expired();
 
-    // 过期的令牌应该被删除
+    // Expired token should be deleted
     assert!(store.get_token("expired_user").is_none());
-    // 有效的令牌应该保留
+    // Valid token should be retained
     assert!(store.get_token("valid_user").is_some());
 }
 
 // ============================================================================
-// 版本常量测试
+// Version constant tests
 // ============================================================================
 
-/// 测试版本常量
+/// Test version constant
 #[test]
 fn test_version_constant() {
-    // 版本应该是有效的语义版本
+    // Version should be a valid semantic version
     let version = crates_docs::VERSION;
     assert!(!version.is_empty());
     assert!(version.contains('.'));
 }
 
-/// 测试名称常量
+/// Test name constant
 #[test]
 fn test_name_constant() {
     let name = crates_docs::NAME;
@@ -1283,7 +1283,7 @@ fn test_name_constant() {
 }
 
 // ============================================================================
-// 额外覆盖率测试
+// Additional coverage tests
 // ============================================================================
 
 #[test]
@@ -1501,9 +1501,9 @@ fn test_auth_manager_new_and_accessors() {
 fn test_oauth_to_mcp_config() {
     let config = crates_docs::server::auth::OAuthConfig::default();
     let result = config.to_mcp_config();
-    // 无论是否启用 auth feature，默认配置（enabled=false）应该返回错误
+    // Regardless of whether auth feature is enabled, default config (enabled=false) should return error
     assert!(result.is_err());
-    // 错误消息包含 "oauth"
+    // Error message contains "oauth"
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("oauth"));
 }
@@ -1516,7 +1516,7 @@ fn test_doc_service_accessors_and_default() {
 
     let cache = create_cache(&CacheConfig::default()).unwrap();
     let cache: Arc<dyn crates_docs::cache::Cache> = Arc::from(cache);
-    let service = DocService::new(cache.clone()).expect("创建 DocService 失败");
+    let service = DocService::new(cache.clone()).expect("Failed to create DocService");
 
     let _client = service.client();
     assert!(Arc::ptr_eq(service.cache(), &cache));

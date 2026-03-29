@@ -2,7 +2,7 @@
 name = "crates-docs"
 version = "0.7.2"
 edition = "2021"
-description = "高性能 Rust crate 文档查询 MCP 服务器，支持 Stdio/HTTP/SSE 传输和 OAuth 认证"
+description = "High-performance Rust crate documentation query MCP server, supports Stdio/HTTP/SSE transport and OAuth authentication"
 authors = ["KingingWang <KingingWang@foxmail.com>"]
 license = "MIT"
 repository = "https://github.com/KingingWang/crates-docs"
@@ -27,19 +27,19 @@ tls = ["rust-mcp-sdk/ssl"]
 logging = []
 
 [dependencies]
-# MCP 核心依赖
+# MCP core dependencies
 rust-mcp-sdk = { version = "0.9", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http", "sse"] }
 rust-mcp-macros = "0.9.0"
 rust-mcp-schema = "0.10"
 rust-mcp-extra = { version = "0.2.3", optional = true }
 
-# HTTP 客户端
+# HTTP client
 reqwest = { version = "0.13", features = ["json"] }
 reqwest-middleware = "0.5"
 reqwest-retry = "0.9"
 tokio = { version = "1.50", features = ["full"] }
 
-# 序列化和配置
+# Serialization and configuration
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.9"
@@ -48,20 +48,20 @@ anyhow = "1.0"
 thiserror = "2.0"
 notify = "7"
 
-# 缓存系统
+# Cache system
 moka = { version = "0.12", optional = true, features = ["sync"] }
 redis = { version = "1.0", optional = true, features = ["tokio-comp"] }
 
-# API Key 认证
+# API Key authentication
 api-keys-simplified = { version = "0.5", optional = true }
 
-# 日志和监控
+# Logging and monitoring
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 prometheus-client = "0.24"
 
-# 工具库
+# Utility libraries
 async-trait = "0.1"
 html2md = "0.2"
 scraper = "0.26"
@@ -75,7 +75,7 @@ urlencoding = "2.1"
 fastrand = "2.3"
 uuid = { version = "1.11", features = ["v4"] }
 
-# CLI 工具
+# CLI tools
 clap = { version = "4.5", features = ["derive", "env"] }
 
 [build-dependencies]

@@ -1,23 +1,23 @@
-//! 服务器模块
+//! Server module
 //!
-//! 提供 MCP 服务器实现，支持多种传输协议（stdio、HTTP、SSE、Hybrid）。
+//! Provides MCP server implementation with multiple transport protocols (stdio, HTTP, SSE, Hybrid).
 //!
-//! # 主要组件
+//! # Main Components
 //!
-//! - `CratesDocsServer`: 主服务器结构体
-//! - `handler`: MCP 请求处理
-//! - `transport`: 传输层实现
-//! - `auth`: OAuth 认证支持
+//! - `CratesDocsServer`: Main server struct
+//! - `handler`: MCP request handling
+//! - `transport`: Transport layer implementation
+//! - `auth`: OAuth authentication support
 //!
-//! # Handler 设计模式
+//! # Handler Design Pattern
 //!
-//! 使用组合模式消除代码重复：
-//! - `HandlerCore`: 封装共享核心处理逻辑
-//! - `CratesDocsHandler`: 标准 MCP 处理器（委托给 `HandlerCore`）
-//! - `CratesDocsHandlerCore`: 核心处理器（委托给 `HandlerCore`）
-//! - `HandlerConfig`: 配置类，支持 merge 操作
+//! Uses composition pattern to eliminate code duplication:
+//! - `HandlerCore`: Encapsulates shared core handling logic
+//! - `CratesDocsHandler`: Standard MCP handler (delegates to `HandlerCore`)
+//! - `CratesDocsHandlerCore`: Core handler (delegates to `HandlerCore`)
+//! - `HandlerConfig`: Configuration class, supports merge operation
 //!
-//! # 示例
+//! # Example
 //!
 //! ```rust,no_run
 //! use crates_docs::{AppConfig, CratesDocsServer};
@@ -29,7 +29,7 @@
 //!     let config = AppConfig::default();
 //!     let server = Arc::new(CratesDocsServer::new(config)?);
 //!     
-//!     // 使用 merge 配置创建 handler
+//!     // Create handler with merged config
 //!     let base_config = HandlerConfig::default();
 //!     let override_config = HandlerConfig::new().with_verbose_logging();
 //!     let handler = CratesDocsHandler::with_merged_config(
@@ -38,7 +38,7 @@
 //!         Some(override_config)
 //!     );
 //!     
-//!     // 运行 HTTP 服务器
+//!     // Run HTTP server
 //!     crates_docs::server::transport::run_http_server(&handler.server()).await?;
 //!
 //!     Ok(())
@@ -59,22 +59,22 @@ use rust_mcp_sdk::schema::{
 };
 use std::sync::Arc;
 
-/// 从配置模块重新导出 `ServerConfig` 以保持向后兼容
+/// Re-export `ServerConfig` from config module for backward compatibility
 pub use crate::config::ServerConfig;
 
-/// 从 handler 模块重新导出 `CratesDocsHandler`
+/// Re-export `CratesDocsHandler` from handler module
 pub use handler::CratesDocsHandler;
 
-/// Crates Docs MCP 服务器
+/// Crates Docs MCP Server
 ///
-/// 主服务器结构体，管理配置、工具注册表和缓存。
-/// 支持多种传输协议：stdio、HTTP、SSE、Hybrid。
+/// Main server struct, managing configuration, tool registry, and cache.
+/// Supports multiple transport protocols: stdio, HTTP, SSE, Hybrid.
 ///
-/// # 字段
+/// # Fields
 ///
-/// - `config`: 应用配置
-/// - `tool_registry`: 工具注册表
-/// - `cache`: 缓存实例
+/// - `config`: Application configuration
+/// - `tool_registry`: Tool registry
+/// - `cache`: Cache instance
 #[derive(Clone)]
 pub struct CratesDocsServer {
     config: AppConfig,
@@ -83,16 +83,16 @@ pub struct CratesDocsServer {
 }
 
 impl CratesDocsServer {
-    /// 从组件创建服务器（内部初始化逻辑）
+    /// Create server from components (internal initialization logic)
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `config` - 应用配置
-    /// * `cache` - 缓存实例
+    /// * `config` - Application configuration
+    /// * `cache` - Cache instance
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果文档服务创建失败，返回错误
+    /// Returns error if document service creation fails
     fn from_parts(config: AppConfig, cache: Arc<dyn Cache>) -> crate::error::Result<Self> {
         // Initialize global HTTP client with performance config for connection pool reuse
         // This ensures all HTTP requests share the same connection pool
@@ -115,21 +115,21 @@ impl CratesDocsServer {
         })
     }
 
-    /// 创建新的服务器实例（同步）
+    /// Create new server instance (synchronous)
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `config` - 应用配置
+    /// * `config` - Application configuration
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果缓存创建失败，返回错误
+    /// Returns error if cache creation fails
     ///
-    /// # 注意
+    /// # Note
     ///
-    /// 此方法仅支持内存缓存。如需使用 Redis，请使用 [`new_async`](Self::new_async) 方法。
+    /// This method only supports memory cache. For Redis, use [`new_async`](Self::new_async).
     ///
-    /// # 示例
+    /// # Example
     ///
     /// ```rust,no_run
     /// use crates_docs::{AppConfig, CratesDocsServer};
@@ -143,21 +143,21 @@ impl CratesDocsServer {
         Self::from_parts(config, cache)
     }
 
-    /// 创建新的服务器实例（异步）
+    /// Create new server instance (async)
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `config` - 应用配置
+    /// * `config` - Application configuration
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果缓存创建失败，返回错误
+    /// Returns error if cache creation fails
     ///
-    /// # 注意
+    /// # Note
     ///
-    /// 支持内存缓存和 Redis 缓存（需要启用 `cache-redis` feature）。
+    /// Supports memory cache and Redis cache (requires `cache-redis` feature).
     ///
-    /// # 示例
+    /// # Example
     ///
     /// ```rust,no_run
     /// use crates_docs::{AppConfig, CratesDocsServer};
@@ -189,27 +189,27 @@ impl CratesDocsServer {
         }
     }
 
-    /// 获取服务器配置
+    /// Get server configuration
     #[must_use]
     pub fn config(&self) -> &AppConfig {
         &self.config
     }
 
-    /// 获取工具注册表
+    /// Get tool registry
     #[must_use]
     pub fn tool_registry(&self) -> &Arc<ToolRegistry> {
         &self.tool_registry
     }
 
-    /// 获取缓存实例
+    /// Get cache instance
     #[must_use]
     pub fn cache(&self) -> &Arc<dyn Cache> {
         &self.cache
     }
 
-    /// 获取服务器信息
+    /// Get server info
     ///
-    /// 返回 MCP 初始化结果，包含服务器元数据和能力信息
+    /// Returns MCP initialization result with server metadata and capabilities
     #[must_use]
     pub fn server_info(&self) -> InitializeResult {
         InitializeResult {
@@ -239,29 +239,29 @@ impl CratesDocsServer {
         }
     }
 
-    /// 运行 Stdio 服务器
+    /// Run Stdio server
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果服务器启动失败，返回错误
+    /// Returns error if server startup fails
     pub async fn run_stdio(&self) -> Result<()> {
         transport::run_stdio_server(self).await
     }
 
-    /// 运行 HTTP 服务器
+    /// Run HTTP server
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果服务器启动失败，返回错误
+    /// Returns error if server startup fails
     pub async fn run_http(&self) -> Result<()> {
         transport::run_http_server(self).await
     }
 
-    /// 运行 SSE 服务器
+    /// Run SSE server
     ///
-    /// # 错误
+    /// # Errors
     ///
-    /// 如果服务器启动失败，返回错误
+    /// Returns error if server startup fails
     pub async fn run_sse(&self) -> Result<()> {
         transport::run_sse_server(self).await
     }

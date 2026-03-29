@@ -1,38 +1,38 @@
 //! Crates Docs MCP Server
 //!
-//! 一个高性能的 Rust crate 文档查询 MCP 服务器，支持多种传输协议和 OAuth 认证。
+//! A high-performance Rust crate documentation query MCP server, supporting multiple transport protocols and OAuth authentication.
 //!
-//! # 主要功能
+//! # Main Features
 //!
-//! - **Crate 文档查询**: 从 docs.rs 获取 crate 的完整文档
-//! - **Crate 搜索**: 从 crates.io 搜索 Rust crate
-//! - **项目文档查找**: 查找 crate 中的特定类型、函数或模块
-//! - **健康检查**: 检查服务器和外部服务状态
+//! - **Crate Documentation Query**: Fetch complete documentation for a crate from docs.rs
+//! - **Crate Search**: Search Rust crates from crates.io
+//! - **Item Documentation Lookup**: Find specific types, functions, or modules in a crate
+//! - **Health Check**: Check server and external service status
 //!
-//! # 传输协议支持
+//! # Transport Protocol Support
 //!
-//! - `stdio`: 标准输入输出（适合 MCP 客户端集成）
-//! - `http`: HTTP 传输（Streamable HTTP）
+//! - `stdio`: Standard input/output (suitable for MCP client integration)
+//! - `http`: HTTP transport (Streamable HTTP)
 //! - `sse`: Server-Sent Events
-//! - `hybrid`: 混合模式（HTTP + SSE）
+//! - `hybrid`: Hybrid mode (HTTP + SSE)
 //!
-//! # 缓存支持
+//! # Cache Support
 //!
-//! - **内存缓存**: 基于 `moka` 的高性能内存缓存，支持 `TinyLFU` 淘汰策略和按条目 TTL
-//! - **Redis 缓存**: 支持分布式部署（需要启用 `cache-redis` feature）
+//! - **Memory Cache**: High-performance memory cache based on `moka`, supporting `TinyLFU` eviction strategy and per-entry TTL
+//! - **Redis Cache**: Supports distributed deployment (requires `cache-redis` feature)
 //!
-//! # 示例
+//! # Example
 //!
 //! ```rust,no_run
 //! use crates_docs::{AppConfig, CratesDocsServer};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // 使用默认配置创建服务器
+//!     // Create server with default configuration
 //!     let config = AppConfig::default();
 //!     let server = CratesDocsServer::new(config)?;
 //!
-//!     // 运行 HTTP 服务器
+//!     // Run HTTP server
 //!     server.run_http().await?;
 //!
 //!     Ok(())
@@ -56,17 +56,17 @@ pub mod tools;
 pub mod utils;
 
 pub use crate::config::{AppConfig, ServerConfig};
-/// 重新导出错误类型
+/// Re-export error types
 pub use crate::error::{Error, Result};
-/// 重新导出服务器类型
+/// Re-export server types
 pub use crate::server::CratesDocsServer;
 
-/// 服务器版本号
+/// Server version
 ///
-/// 从 `CARGO_PKG_VERSION` 环境变量获取
+/// Obtained from `CARGO_PKG_VERSION` environment variable
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// 服务器名称
+/// Server name
 pub const NAME: &str = "crates-docs";
 
 /// Initialize the logging system (simple version using boolean parameter)

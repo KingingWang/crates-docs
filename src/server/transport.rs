@@ -1,15 +1,15 @@
-//! 传输模块
+//! Transport module
 //!
-//! 提供 Stdio、HTTP 和 SSE 传输协议支持。
+//! Provides Stdio, HTTP and SSE transport protocol support.
 //!
-//! # 支持的传输模式
+//! # Supported Transport Modes
 //!
-//! - **Stdio**: 标准输入输出，适合与 MCP 客户端集成
-//! - **HTTP**: Streamable HTTP，支持无状态请求
-//! - **SSE**: Server-Sent Events，支持服务器推送
-//! - **Hybrid**: 混合模式，同时支持 HTTP 和 SSE
+//! - **Stdio**: Standard input/output, suitable for MCP client integration
+//! - **HTTP**: Streamable HTTP, supports stateless requests
+//! - **SSE**: Server-Sent Events, supports server push
+//! - **Hybrid**: Hybrid mode, supports both HTTP and SSE
 //!
-//! # 示例
+//! # Example
 //!
 //! ```rust,no_run
 //! use crates_docs::server::transport::{run_stdio_server, TransportMode};
@@ -20,7 +20,7 @@
 //!     let config = AppConfig::default();
 //!     let server = CratesDocsServer::new(config)?;
 //!
-//!     // 运行 Stdio 服务器
+//!     // Run Stdio server
 //!     run_stdio_server(&server).await?;
 //!
 //!     Ok(())
@@ -38,19 +38,19 @@ use rust_mcp_sdk::{
 };
 use std::sync::Arc;
 
-/// 运行 Stdio 服务器
+/// Run Stdio server
 ///
-/// 通过标准输入输出与 MCP 客户端通信。
+/// Communicates with MCP clients via standard input/output.
 ///
-/// # 参数
+/// # Arguments
 ///
-/// * `server` - `CratesDocsServer` 实例
+/// * `server` - `CratesDocsServer` instance
 ///
-/// # 错误
+/// # Errors
 ///
-/// 如果服务器启动失败，返回错误
+/// Returns error if server startup fails
 ///
-/// # 示例
+/// # Example
 ///
 /// ```rust,no_run
 /// use crates_docs::server::transport::run_stdio_server;
@@ -101,7 +101,7 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
 ///
 /// # Arguments
 ///
-/// * `server` - `CratesDocsServer` 实例
+/// * `server` - `CratesDocsServer` instance
 /// * `protocol_name` - Protocol name for logging (e.g., "HTTP", "SSE", "Hybrid")
 /// * `sse_support` - Whether SSE support is enabled
 async fn run_hyper_server(
@@ -162,19 +162,19 @@ async fn run_hyper_server(
     Ok(())
 }
 
-/// 运行 HTTP 服务器（Streamable HTTP）
+/// Run HTTP server (Streamable HTTP)
 ///
-/// 启动支持 Streamable HTTP 协议的 MCP 服务器。
+/// Starts MCP server supporting Streamable HTTP protocol.
 ///
-/// # 参数
+/// # Arguments
 ///
-/// * `server` - `CratesDocsServer` 实例
+/// * `server` - `CratesDocsServer` instance
 ///
-/// # 错误
+/// # Errors
 ///
-/// 如果服务器启动失败，返回错误
+/// Returns error if server startup fails
 ///
-/// # 示例
+/// # Example
 ///
 /// ```rust,no_run
 /// use crates_docs::server::transport::run_http_server;
@@ -192,19 +192,19 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
     run_hyper_server(server, "HTTP", false).await
 }
 
-/// 运行 SSE 服务器（Server-Sent Events）
+/// Run SSE server (Server-Sent Events)
 ///
-/// 启动支持 Server-Sent Events 协议的 MCP 服务器。
+/// Starts MCP server supporting Server-Sent Events protocol.
 ///
-/// # 参数
+/// # Arguments
 ///
-/// * `server` - `CratesDocsServer` 实例
+/// * `server` - `CratesDocsServer` instance
 ///
-/// # 错误
+/// # Errors
 ///
-/// 如果服务器启动失败，返回错误
+/// Returns error if server startup fails
 ///
-/// # 示例
+/// # Example
 ///
 /// ```rust,no_run
 /// use crates_docs::server::transport::run_sse_server;
@@ -222,19 +222,19 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
     run_hyper_server(server, "SSE", true).await
 }
 
-/// 运行混合服务器（同时支持 HTTP 和 SSE）
+/// Run Hybrid server (supports both HTTP and SSE)
 ///
-/// 启动同时支持 HTTP 和 SSE 协议的 MCP 服务器。
+/// Starts MCP server supporting both HTTP and SSE protocols.
 ///
-/// # 参数
+/// # Arguments
 ///
-/// * `server` - `CratesDocsServer` 实例
+/// * `server` - `CratesDocsServer` instance
 ///
-/// # 错误
+/// # Errors
 ///
-/// 如果服务器启动失败，返回错误
+/// Returns error if server startup fails
 ///
-/// # 示例
+/// # Example
 ///
 /// ```rust,no_run
 /// use crates_docs::server::transport::run_hybrid_server;
@@ -252,18 +252,18 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
     run_hyper_server(server, "Hybrid", true).await
 }
 
-/// 传输模式
+/// Transport mode
 ///
-/// 定义 MCP 服务器支持的传输协议类型。
+/// Defines the transport protocol types supported by MCP server.
 ///
-/// # 变体
+/// # Variants
 ///
-/// - `Stdio`: 标准输入输出，适合与 MCP 客户端集成
-/// - `Http`: Streamable HTTP，支持无状态请求
-/// - `Sse`: Server-Sent Events，支持服务器推送
-/// - `Hybrid`: 混合模式，同时支持 HTTP 和 SSE
+/// - `Stdio`: Standard input/output, suitable for MCP client integration
+/// - `Http`: Streamable HTTP, supports stateless requests
+/// - `Sse`: Server-Sent Events, supports server push
+/// - `Hybrid`: Hybrid mode, supports both HTTP and SSE
 ///
-/// # 示例
+/// # Example
 ///
 /// ```rust
 /// use crates_docs::server::transport::TransportMode;
@@ -275,13 +275,13 @@ pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 pub enum TransportMode {
-    /// Stdio 传输（用于 CLI 集成）
+    /// Stdio transport (for CLI integration)
     Stdio,
-    /// HTTP 传输（Streamable HTTP）
+    /// HTTP transport (Streamable HTTP)
     Http,
-    /// SSE 传输（Server-Sent Events）
+    /// SSE transport (Server-Sent Events)
     Sse,
-    /// 混合模式（同时支持 HTTP 和 SSE）
+    /// Hybrid mode (supports both HTTP and SSE)
     Hybrid,
 }
 

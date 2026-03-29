@@ -149,18 +149,18 @@ impl ConfigReloader {
     ///
     /// Returns a description of what changed
     ///
-    /// # 热重载支持范围
+    /// # Hot Reload Support Scope
     ///
-    /// 本方法检测以下配置项的变化（支持热重载）：
-    /// - API Key 认证配置（需要 api-key feature）
-    /// - OAuth 配置
-    /// - 日志级别和开关
-    /// - 缓存 TTL 配置
-    /// - 限流和并发限制
-    /// - 指标和压缩开关
+    /// This method detects changes in the following configuration items (supports hot reload):
+    /// - API Key authentication configuration (requires api-key feature)
+    /// - OAuth configuration
+    /// - Log level and toggles
+    /// - Cache TTL configuration
+    /// - Rate limiting and concurrent request limits
+    /// - Metrics and compression toggles
     ///
-    /// 注意：服务器基础配置（host, port 等）的改变会被检测到并记录，
-    /// 但这些配置需要重启服务器才能生效。
+    /// Note: Server basic configuration (host, port, etc.) changes will be detected and logged,
+    /// but these configurations require server restart to take effect.
     #[allow(clippy::too_many_lines)]
     fn detect_changes(&self, new_config: &AppConfig) -> ConfigChange {
         let mut changes: Vec<String> = Vec::new();

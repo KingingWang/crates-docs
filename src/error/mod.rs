@@ -1,22 +1,22 @@
-//! 错误处理模块
+//! Error handling module
 //!
-//! 定义应用程序错误类型和结果类型别名。
+//! Defines application error types and result type alias.
 //!
-//! # 错误类型
+//! # Error Types
 //!
-//! 提供多种错误变体，涵盖初始化、配置、HTTP 请求、缓存等场景。
+//! Provides various error variants covering initialization, configuration, HTTP requests, cache, etc.
 //!
-//! # 示例
+//! # Example
 //!
 //! ```rust
 //! use crates_docs::error::{Error, Result};
 //!
 //! fn may_fail() -> Result<String> {
-//!     // 可能失败的操作
+//!     // Operation that may fail
 //!     Ok("success".to_string())
 //! }
 //!
-//! // 创建结构化错误
+//! // Create structured error
 //! fn create_config_error() -> Error {
 //!     Error::config("field_name", "invalid value")
 //! }
@@ -28,117 +28,117 @@
 
 use thiserror::Error;
 
-/// 应用程序错误类型
+/// Application error type
 ///
-/// 包含所有可能的错误变体，使用 `thiserror` 派生宏实现 `std::error::Error`。
+/// Contains all possible error variants, implements `std::error::Error` via `thiserror` derive macro.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// HTTP 请求错误
+    /// HTTP request error
     #[error("HTTP request failed: {method} {url} - status {status}: {message}")]
     HttpRequest {
-        /// HTTP 方法
+        /// HTTP method
         method: String,
-        /// 请求 URL
+        /// Request URL
         url: String,
-        /// HTTP 状态码
+        /// HTTP status code
         status: u16,
-        /// 错误消息
+        /// Error message
         message: String,
     },
 
-    /// 缓存操作错误
+    /// Cache operation error
     #[error("Cache operation '{operation}' failed for key '{key}': {message}")]
     Cache {
-        /// 操作类型 ("get", "set", "delete", "clear")
+        /// Operation type ("get", "set", "delete", "clear")
         operation: String,
-        /// 缓存键
+        /// Cache key
         key: String,
-        /// 错误消息
+        /// Error message
         message: String,
     },
 
-    /// MCP 协议错误
+    /// MCP protocol error
     #[error("MCP protocol error in '{context}': {message}")]
     Mcp {
-        /// 错误发生的上下文
+        /// Context where error occurred
         context: String,
-        /// 错误消息
+        /// Error message
         message: String,
     },
 
-    /// 初始化错误
+    /// Initialization error
     #[error("Initialization failed for '{component}': {message}")]
     Initialization {
-        /// 初始化失败的组件
+        /// Component that failed initialization
         component: String,
-        /// 错误消息
+        /// Error message
         message: String,
     },
 
-    /// 配置错误
+    /// Configuration error
     #[error("Configuration error for '{field}': {message}")]
     Config {
-        /// 配置字段名
+        /// Configuration field name
         field: String,
-        /// 错误消息
+        /// Error message
         message: String,
     },
 
-    /// 解析错误
+    /// Parse error
     #[error("Parse failed for '{input}'{position}: {message}")]
     Parse {
-        /// 解析的输入源
+        /// Input source being parsed
         input: String,
-        /// 位置信息
+        /// Position information
         position: String,
-        /// 错误消息
+        /// Error message
         message: String,
     },
 
-    /// 认证错误
+    /// Authentication error
     #[error("Authentication failed for '{provider}': {message}")]
     Auth {
-        /// 认证提供者
+        /// Authentication provider
         provider: String,
-        /// 错误消息
+        /// Error message
         message: String,
     },
 
-    /// IO 错误
+    /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// JSON 序列化/反序列化错误
+    /// JSON serialization/deserialization error
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
-    /// URL 解析错误
+    /// URL parse error
     #[error("URL parse error: {0}")]
     Url(#[from] url::ParseError),
 
-    /// Reqwest HTTP 客户端错误
+    /// Reqwest HTTP client error
     #[error("HTTP client error: {0}")]
     Reqwest(#[from] reqwest::Error),
 
-    /// 其他错误
+    /// Other error
     #[error("Unknown error: {0}")]
     Other(String),
 }
 
-/// 结果类型别名
+/// Result type alias
 ///
-/// `Result<T>` 是 `std::result::Result<T, Error>` 的简写。
+/// `Result<T>` is shorthand for `std::result::Result<T, Error>`.
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
-    /// 创建 HTTP 请求错误
+    /// Create HTTP request error
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `method` - HTTP 方法 (GET, POST, 等)
-    /// * `url` - 请求的 URL
-    /// * `status` - HTTP 状态码
-    /// * `message` - 错误消息
+    /// * `method` - HTTP method (GET, POST, etc.)
+    /// * `url` - Request URL
+    /// * `status` - HTTP status code
+    /// * `message` - Error message
     #[must_use]
     pub fn http_request(
         method: impl Into<String>,
@@ -154,13 +154,13 @@ impl Error {
         }
     }
 
-    /// 创建缓存操作错误
+    /// Create cache operation error
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `operation` - 操作类型 ("get", "set", "delete", "clear")
-    /// * `key` - 相关的缓存键（可选）
-    /// * `message` - 错误消息
+    /// * `operation` - Operation type ("get", "set", "delete", "clear")
+    /// * `key` - Related cache key (optional)
+    /// * `message` - Error message
     #[must_use]
     pub fn cache(
         operation: impl Into<String>,
@@ -174,12 +174,12 @@ impl Error {
         }
     }
 
-    /// 创建 MCP 协议错误
+    /// Create MCP protocol error
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `context` - 错误发生的上下文
-    /// * `message` - 错误消息
+    /// * `context` - Context where error occurred
+    /// * `message` - Error message
     #[must_use]
     pub fn mcp(context: impl Into<String>, message: impl Into<String>) -> Self {
         Self::Mcp {
@@ -188,12 +188,12 @@ impl Error {
         }
     }
 
-    /// 创建初始化错误
+    /// Create initialization error
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `component` - 初始化失败的组件
-    /// * `message` - 错误消息
+    /// * `component` - Component that failed initialization
+    /// * `message` - Error message
     #[must_use]
     pub fn initialization(component: impl Into<String>, message: impl Into<String>) -> Self {
         Self::Initialization {
@@ -202,12 +202,12 @@ impl Error {
         }
     }
 
-    /// 创建配置错误
+    /// Create configuration error
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `field` - 配置字段名
-    /// * `message` - 错误消息
+    /// * `field` - Configuration field name
+    /// * `message` - Error message
     #[must_use]
     pub fn config(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self::Config {
@@ -216,13 +216,13 @@ impl Error {
         }
     }
 
-    /// 创建解析错误
+    /// Create parse error
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `input` - 解析的输入源
-    /// * `position` - 错误位置（可选）
-    /// * `message` - 错误消息
+    /// * `input` - Input source being parsed
+    /// * `position` - Error position (optional)
+    /// * `message` - Error message
     #[must_use]
     pub fn parse(
         input: impl Into<String>,
@@ -236,12 +236,12 @@ impl Error {
         }
     }
 
-    /// 创建认证错误
+    /// Create authentication error
     ///
-    /// # 参数
+    /// # Arguments
     ///
-    /// * `provider` - 认证提供者
-    /// * `message` - 错误消息
+    /// * `provider` - Authentication provider
+    /// * `message` - Error message
     #[must_use]
     pub fn auth(provider: impl Into<String>, message: impl Into<String>) -> Self {
         Self::Auth {

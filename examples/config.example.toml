@@ -1,118 +1,118 @@
-# Crates Docs MCP 服务器配置示例
+# Crates Docs MCP Server Configuration Example
 #
 # =============================================================================
-# 热重载支持说明
+# Hot Reload Support Notes
 # =============================================================================
 #
-# 标记说明：
-# - ✅ 支持热重载：配置更改后无需重启服务器，会自动生效
-# - ❌ 不支持热重载：配置更改后需要重启服务器才能生效
+# Marker explanation:
+# - ✅ Supports hot reload: configuration changes take effect automatically without server restart
+# - ❌ Does not support hot reload: configuration changes require server restart to take effect
 #
-# 支持热重载的配置：
-# - logging 部分：所有字段
-# - auth/oauth/api_key 部分：所有字段
-# - cache 部分：TTL 相关字段 (default_ttl, crate_docs_ttl_secs, item_docs_ttl_secs, search_results_ttl_secs)
-# - performance 部分：rate_limit_per_second, concurrent_request_limit, enable_metrics, enable_response_compression
+# Configuration that supports hot reload:
+# - logging section: all fields
+# - auth/oauth/api_key section: all fields
+# - cache section: TTL-related fields (default_ttl, crate_docs_ttl_secs, item_docs_ttl_secs, search_results_ttl_secs)
+# - performance section: rate_limit_per_second, concurrent_request_limit, enable_metrics, enable_response_compression
 #
-# 不支持热重载的配置：
-# - server 部分：所有字段（涉及监听套接字和传输层初始化）
-# - cache 部分：cache_type, memory_size, redis_url, key_prefix（缓存后端初始化参数）
-# - performance 部分：http_client_*, cache_max_size, cache_default_ttl_secs, metrics_port
+# Configuration that does not support hot reload:
+# - server section: all fields (involves listening socket and transport layer initialization)
+# - cache section: cache_type, memory_size, redis_url, key_prefix (cache backend initialization parameters)
+# - performance section: http_client_*, cache_max_size, cache_default_ttl_secs, metrics_port
 #
-# 修改配置文件后，系统会自动检测变更并应用支持热重载的配置项。
+# After modifying the configuration file, the system will automatically detect changes and apply hot-reloadable configuration items.
 
 # =============================================================================
-# [server] 服务器配置 ❌ 不支持热重载
+# [server] Server Configuration ❌ Does not support hot reload
 # =============================================================================
-# 警告：以下配置项更改后需要重启服务器才能生效
+# Warning: The following configuration changes require server restart to take effect
 #
 [server]
-# 服务器名称
+# Server name
 name = "crates-docs"
-# 服务器版本（默认使用 Cargo.toml 中的版本）
+# Server version (defaults to version in Cargo.toml)
 # version = "0.5.3"
-# 服务器描述
-description = "高性能 Rust crate 文档查询 MCP 服务器"
-# 监听主机
-# 容器部署时建议使用 0.0.0.0，对外暴露服务；本地仅自用可改回 127.0.0.1
+# Server description
+description = "High-performance Rust crate documentation query MCP server"
+# Listen host
+# For container deployment, use 0.0.0.0 to expose service externally; for local use only, change back to 127.0.0.1
 host = "0.0.0.0"
-# 监听端口
+# Listen port
 port = 8080
-# 传输模式: stdio, http, sse, hybrid
+# Transport mode: stdio, http, sse, hybrid
 transport_mode = "hybrid"
-# 启用 SSE 支持
+# Enable SSE support
 enable_sse = true
-# 启用 OAuth 认证
+# Enable OAuth authentication
 enable_oauth = false
-# 最大并发连接数
+# Maximum concurrent connections
 max_connections = 100
-# 请求超时时间（秒）
+# Request timeout (seconds)
 request_timeout_secs = 30
-# 响应超时时间（秒）
+# Response timeout (seconds)
 response_timeout_secs = 60
 
-# 安全配置
-# 允许的主机列表 (Host 请求头验证)
-# 容器/反向代理部署时请按需补充实际域名或服务名
+# Security configuration
+# Allowed hosts list (Host header validation)
+# For container/reverse proxy deployment, add actual domain names or service names as needed
 allowed_hosts = ["localhost", "127.0.0.1", "0.0.0.0"]
 
-# 允许的来源列表 (CORS)
-# 开发环境可使用通配符模式，生产环境请指定具体域名
-# 示例: allowed_origins = ["https://your-domain.com"]
-# 注意: 使用 "*" 会允许所有来源，存在安全风险
+# Allowed origins list (CORS)
+# Development environment can use wildcard patterns; production environment should specify exact domain names
+# Example: allowed_origins = ["https://your-domain.com"]
+# Note: Using "*" will allow all origins, which poses security risks
 allowed_origins = ["http://localhost:*"]
 
 # =============================================================================
-# [cache] 缓存配置 - 部分支持热重载
+# [cache] Cache Configuration - Partial hot reload support
 # =============================================================================
 #
-# ✅ 支持热重载的字段：
+# ✅ Hot reload supported fields:
 #    default_ttl, crate_docs_ttl_secs, item_docs_ttl_secs, search_results_ttl_secs
 #
-# ❌ 不支持热重载的字段（需要重启）：
+# ❌ Hot reload not supported fields (require restart):
 #    cache_type, memory_size, redis_url, key_prefix
 #
 [cache]
-# 缓存类型: memory, redis ❌ 不支持热重载
+# Cache type: memory, redis ❌ Does not support hot reload
 cache_type = "memory"
-# 内存缓存大小（条目数） ❌ 不支持热重载
+# Memory cache size (number of entries) ❌ Does not support hot reload
 memory_size = 1000
-# Redis 连接 URL（仅当 cache_type = "redis" 时使用） ❌ 不支持热重载
+# Redis connection URL (used only when cache_type = "redis") ❌ Does not support hot reload
 # redis_url = "redis://localhost:6379"
-# 默认缓存时间（秒） ✅ 支持热重载
+# Default cache TTL (seconds) ✅ Supports hot reload
 default_ttl = 3600
-# crate 文档缓存 TTL（秒），默认 1 小时 ✅ 支持热重载
+# Crate docs cache TTL (seconds), default 1 hour ✅ Supports hot reload
 crate_docs_ttl_secs = 3600
-# 项目文档缓存 TTL（秒），默认 30 分钟 ✅ 支持热重载
+# Item docs cache TTL (seconds), default 30 minutes ✅ Supports hot reload
 item_docs_ttl_secs = 1800
-# 搜索结果缓存 TTL（秒），默认 5 分钟 ✅ 支持热重载
+# Search results cache TTL (seconds), default 5 minutes ✅ Supports hot reload
 search_results_ttl_secs = 300
 
 # =============================================================================
-# [oauth] OAuth 配置 ✅ 完全支持热重载
+# [oauth] OAuth Configuration ✅ Fully supports hot reload
 # =============================================================================
 #
-# 所有字段都支持运行时热重载，修改后立即生效（无需重启）
+# All fields support runtime hot reload, take effect immediately after modification (no restart needed)
 #
 [oauth]
-# 是否启用 OAuth ✅ 支持热重载
+# Enable OAuth ✅ Supports hot reload
 enabled = false
-# OAuth 客户端 ID ✅ 支持热重载
+# OAuth client ID ✅ Supports hot reload
 # client_id = "your-client-id"
-# OAuth 客户端密钥 ✅ 支持热重载
+# OAuth client secret ✅ Supports hot reload
 # client_secret = "your-client-secret"
-# 重定向 URI ✅ 支持热重载
+# Redirect URI ✅ Supports hot reload
 # redirect_uri = "http://localhost:8080/oauth/callback"
-# 授权端点 ✅ 支持热重载
+# Authorization endpoint ✅ Supports hot reload
 # authorization_endpoint = "https://provider.com/oauth/authorize"
-# 令牌端点 ✅ 支持热重载
+# Token endpoint ✅ Supports hot reload
 # token_endpoint = "https://provider.com/oauth/token"
-# 授权范围 ✅ 支持热重载
+# Authorization scopes ✅ Supports hot reload
 scopes = ["openid", "profile", "email"]
-# OAuth 提供者: Custom, GitHub, Google, Keycloak ✅ 支持热重载
+# OAuth provider: Custom, GitHub, Google, Keycloak ✅ Supports hot reload
 provider = "Custom"
 
-# GitHub OAuth 示例配置
+# GitHub OAuth example configuration
 # [oauth]
 # enabled = true
 # client_id = "github-client-id"
@@ -123,7 +123,7 @@ provider = "Custom"
 # scopes = ["read:user", "user:email"]
 # provider = "GitHub"
 
-# Google OAuth 示例配置
+# Google OAuth example configuration
 # [oauth]
 # enabled = true
 # client_id = "google-client-id"
@@ -134,7 +134,7 @@ provider = "Custom"
 # scopes = ["openid", "https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"]
 # provider = "Google"
 
-# Keycloak OAuth 示例配置
+# Keycloak OAuth example configuration
 # [oauth]
 # enabled = true
 # client_id = "keycloak-client-id"
@@ -146,115 +146,116 @@ provider = "Custom"
 # provider = "Keycloak"
 
 # =============================================================================
-# [api_key] API Key 认证配置 ✅ 完全支持热重载
+# [api_key] API Key Authentication Configuration ✅ Fully supports hot reload
 # =============================================================================
 #
-# 注意：需要启用 api-key feature 才能使用此功能
-# 所有字段都支持运行时热重载，修改后立即生效（无需重启）
+# Note: Requires api-key feature to use this functionality
+# All fields support runtime hot reload, take effect immediately after modification (no restart needed)
 #
 # [api_key]
-# # 是否启用 API Key 认证 ✅ 支持热重载
+# # Enable API Key authentication ✅ Supports hot reload
 # enabled = true
-# # 有效的 API Key 哈希列表（Argon2 PHC 格式） ✅ 支持热重载
-# # 不要在配置文件中存储明文 key；请使用 `crates-docs generate-api-key`
-# # 生成一次性明文 key，并将输出的 hash 保存到这里
+# # List of valid API Key hashes (Argon2 PHC format) ✅ Supports hot reload
+# # Do not store plaintext keys in configuration file; use `crates-docs generate-api-key`
+# # to generate a one-time plaintext key, and save the output hash here
 # keys = ["$argon2id$v=19$m=47104,t=1,p=1$replace$with_generated_hash"]
-# # API Key 请求头名称 ✅ 支持热重载
+# # API Key header name ✅ Supports hot reload
 # header_name = "X-API-Key"
-# # API Key 查询参数名称（不推荐使用，安全性较低） ✅ 支持热重载
+# # API Key query parameter name (not recommended, lower security) ✅ Supports hot reload
 # query_param_name = "api_key"
-# # 是否允许通过查询参数传递 API Key（默认 false） ✅ 支持热重载
+# # Allow API Key via query parameter (default false) ✅ Supports hot reload
 # allow_query_param = false
-# # API Key 前缀（用于生成和校验结构化 key） ✅ 支持热重载
+# # API Key prefix (for generating and validating structured keys) ✅ Supports hot reload
 # key_prefix = "sk"
 
 # =============================================================================
-# [logging] 日志配置 ✅ 完全支持热重载
+# [logging] Logging Configuration ✅ Fully supports hot reload
 # =============================================================================
 #
-# 所有字段都支持运行时热重载，修改后立即生效（无需重启）
+# All fields support runtime hot reload, take effect immediately after modification (no restart needed)
 #
 [logging]
-# 日志级别: trace, debug, info, warn, error ✅ 支持热重载
+# Log level: trace, debug, info, warn, error ✅ Supports hot reload
 level = "info"
-# 日志文件路径（enable_file = true 时生效） ✅ 支持热重载
+# Log file path (effective when enable_file = true) ✅ Supports hot reload
 file_path = "./logs/crates-docs.log"
-# 是否启用控制台日志 ✅ 支持热重载
+# Enable console logging ✅ Supports hot reload
 enable_console = true
-# 是否启用文件日志（默认 false，仅控制台输出） ✅ 支持热重载
+# Enable file logging (default false, console output only) ✅ Supports hot reload
 enable_file = false
-# 日志文件最大大小（MB） ✅ 支持热重载
+# Maximum log file size (MB) ✅ Supports hot reload
 max_file_size_mb = 100
-# 保留的日志文件数量 ✅ 支持热重载
+# Number of log files to retain ✅ Supports hot reload
 max_files = 10
 
 # =============================================================================
-# [performance] 性能配置 - 部分支持热重载
+# [performance] Performance Configuration - Partial hot reload support
 # =============================================================================
 #
-# ✅ 支持热重载的字段：
+# ✅ Hot reload supported fields:
 #    rate_limit_per_second, concurrent_request_limit, enable_metrics, enable_response_compression
 #
-# ❌ 不支持热重载的字段（需要重启）：
+# ❌ Hot reload not supported fields (require restart):
 #    http_client_*, cache_max_size, cache_default_ttl_secs, metrics_port
 #
 [performance]
-# HTTP 客户端连接池大小 ❌ 不支持热重载
+# HTTP client connection pool size ❌ Does not support hot reload
 http_client_pool_size = 10
-# HTTP 客户端连接池空闲超时时间（秒） ❌ 不支持热重载
+# HTTP client pool idle timeout (seconds) ❌ Does not support hot reload
 http_client_pool_idle_timeout_secs = 90
-# HTTP 客户端连接超时时间（秒） ❌ 不支持热重载
+# HTTP client connection timeout (seconds) ❌ Does not support hot reload
 http_client_connect_timeout_secs = 10
-# HTTP 客户端请求超时时间（秒） ❌ 不支持热重载
+# HTTP client request timeout (seconds) ❌ Does not support hot reload
 http_client_timeout_secs = 30
-# HTTP 客户端读取超时时间（秒） ❌ 不支持热重载
+# HTTP client read timeout (seconds) ❌ Does not support hot reload
 http_client_read_timeout_secs = 30
-# HTTP 客户端最大重试次数 ❌ 不支持热重载
+# HTTP client max retry attempts ❌ Does not support hot reload
 http_client_max_retries = 3
-# HTTP 客户端重试初始延迟（毫秒） ❌ 不支持热重载
+# HTTP client retry initial delay (milliseconds) ❌ Does not support hot reload
 http_client_retry_initial_delay_ms = 100
-# HTTP 客户端重试最大延迟（毫秒） ❌ 不支持热重载
+# HTTP client retry max delay (milliseconds) ❌ Does not support hot reload
 http_client_retry_max_delay_ms = 10000
-# 缓存最大大小（条目数） ❌ 不支持热重载
+# Cache maximum size (number of entries) ❌ Does not support hot reload
 cache_max_size = 1000
-# 缓存默认 TTL（秒） ❌ 不支持热重载
+# Cache default TTL (seconds) ❌ Does not support hot reload
 cache_default_ttl_secs = 3600
-# 请求速率限制（每秒请求数） ✅ 支持热重载
+# Request rate limit (requests per second) ✅ Supports hot reload
 rate_limit_per_second = 100
-# 并发请求限制 ✅ 支持热重载
+# Concurrent request limit ✅ Supports hot reload
 concurrent_request_limit = 50
-# 启用响应压缩 ✅ 支持热重载
+# Enable response compression ✅ Supports hot reload
 enable_response_compression = true
-# 启用 Prometheus 指标收集 ✅ 支持热重载
+# Enable Prometheus metrics collection ✅ Supports hot reload
 enable_metrics = true
-# 指标服务端口号（0 表示使用服务器端口） ❌ 不支持热重载
+# Metrics server port (0 means use server port) ❌ Does not support hot reload
 metrics_port = 0
 
 # ============================================================================
-# 环境变量配置（适用于 Docker 部署）
+# Environment Variable Configuration (for Docker deployment)
 # ============================================================================
 #
-# 以下环境变量可以覆盖配置文件中的设置，优先级：环境变量 > CLI 配置文件 > 默认值
+# The following environment variables can override settings in the configuration file.
+# Priority: Environment variables > CLI configuration file > Default values
 #
-# API Key 认证环境变量：
-#   CRATES_DOCS_API_KEY_ENABLED=true                    # 启用 API Key 认证
-#   CRATES_DOCS_API_KEYS=$argon2id$...,$argon2id$...   # API Key 哈希列表（逗号分隔）
-#   CRATES_DOCS_API_KEY_HEADER=X-API-Key                # API Key 请求头名称
-#   CRATES_DOCS_API_KEY_QUERY_PARAM_NAME=api_key        # API Key 查询参数名称
-#   CRATES_DOCS_API_KEY_ALLOW_QUERY=false               # 是否允许查询参数传递
-#   CRATES_DOCS_API_KEY_PREFIX=sk                       # API Key 前缀
+# API Key authentication environment variables:
+#   CRATES_DOCS_API_KEY_ENABLED=true                    # Enable API Key authentication
+#   CRATES_DOCS_API_KEYS=$argon2id$...,$argon2id$...   # API Key hash list (comma-separated)
+#   CRATES_DOCS_API_KEY_HEADER=X-API-Key                # API Key header name
+#   CRATES_DOCS_API_KEY_QUERY_PARAM_NAME=api_key        # API Key query parameter name
+#   CRATES_DOCS_API_KEY_ALLOW_QUERY=false               # Allow query parameter passing
+#   CRATES_DOCS_API_KEY_PREFIX=sk                       # API Key prefix
 #
-# 先生成 key：
+# First generate key:
 #   crates-docs generate-api-key --prefix sk
 #
-# Docker 部署示例：
+# Docker deployment example:
 #   docker run -d \
 #     -p 8080:8080 \
 #     -e CRATES_DOCS_API_KEY_ENABLED=true \
 #     -e CRATES_DOCS_API_KEYS='$argon2id$...generated_hash...' \
 #     crates-docs:latest
 #
-# Docker Compose 示例：
+# Docker Compose example:
 #   services:
 #     crates-docs:
 #       image: crates-docs:latest
@@ -266,7 +267,7 @@ metrics_port = 0
 #         - CRATES_DOCS_HOST=0.0.0.0
 #         - CRATES_DOCS_PORT=8080
 #
-# CLI 参数示例：
+# CLI parameter example:
 #   crates-docs serve \
 #     --enable-api-key \
 #     --api-keys '$argon2id$...generated_hash...' \
