@@ -109,6 +109,26 @@ pub trait Cache: Send + Sync {
 /// - `crate_docs_ttl_secs`: crate 文档缓存 TTL（秒）
 /// - `item_docs_ttl_secs`: 项目文档缓存 TTL（秒）
 /// - `search_results_ttl_secs`: 搜索结果缓存 TTL（秒）
+///
+/// # 热重载支持
+///
+/// ## 支持热重载的字段 ✅
+///
+/// TTL 相关字段可以在运行时动态更新（影响新写入的缓存条目）：
+/// - `default_ttl`: 默认 TTL（秒）
+/// - `crate_docs_ttl_secs`: crate 文档缓存 TTL（秒）
+/// - `item_docs_ttl_secs`: 项目文档缓存 TTL（秒）
+/// - `search_results_ttl_secs`: 搜索结果缓存 TTL（秒）
+///
+/// ## 不支持热重载的字段 ❌
+///
+/// 以下字段需要重启服务器才能生效：
+/// - `cache_type`: 缓存类型（涉及缓存实例的创建）
+/// - `memory_size`: 内存缓存大小（初始化参数）
+/// - `redis_url`: Redis 连接 URL（连接池初始化）
+/// - `key_prefix`: 缓存键前缀（初始化参数）
+///
+/// 原因：这些配置涉及缓存后端（内存/R）的初始化和连接池创建。
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct CacheConfig {
     /// 缓存类型：`memory` 或 `redis`

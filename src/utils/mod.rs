@@ -4,9 +4,121 @@ use crate::error::{Error, Result};
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
+
+/// Global HTTP client singleton with connection pool reuse
+///
+/// This static instance ensures connection pooling is effective across
+/// all HTTP requests in the application. The client is lazily initialized
+/// on first access.
+static GLOBAL_HTTP_CLIENT: OnceLock<Arc<reqwest_middleware::ClientWithMiddleware>> =
+    OnceLock::new();
+
+/// Storage for initialization error (if any)
+/// Used to avoid retrying failed initialization
+static INIT_ERROR: Mutex<Option<String>> = Mutex::new(None);
+
+/// Initialize the global HTTP client singleton
+///
+/// # Arguments
+///
+/// * `config` - Performance configuration for connection pool settings
+///
+/// # Errors
+///
+/// Returns an error if HTTP client creation fails
+///
+/// # Note
+///
+/// This function is thread-safe and ensures only one thread performs the
+/// expensive client initialization (including TLS setup). Subsequent calls
+/// will return Ok(()) if initialization succeeded, or the original error
+/// if initialization previously failed.
+pub fn init_global_http_client(config: &crate::config::PerformanceConfig) -> Result<()> {
+    // Fast path: already initialized
+    if GLOBAL_HTTP_CLIENT.get().is_some() {
+        return Ok(());
+    }
+
+    // Check if previous initialization failed
+    {
+        let error_guard = INIT_ERROR.lock().map_err(|e| {
+            Error::initialization(
+                "global_http_client",
+                format!("Failed to lock init error mutex: {e}"),
+            )
+        })?;
+        if let Some(ref err_msg) = *error_guard {
+            return Err(Error::initialization(
+                "global_http_client",
+                format!("Previous initialization failed: {err_msg}"),
+            ));
+        }
+    }
+
+    // Slow path: try to initialize
+    let client_result = create_http_client_from_config(config).build();
+
+    match client_result {
+        Ok(client) => {
+            let client_arc = Arc::new(client);
+            // set() returns Err if already initialized, which is fine
+            let _ = GLOBAL_HTTP_CLIENT.set(client_arc);
+            Ok(())
+        }
+        Err(e) => {
+            let err_msg = format!("Failed to create global HTTP client: {e}");
+            if let Ok(mut error_guard) = INIT_ERROR.lock() {
+                *error_guard = Some(err_msg.clone());
+            }
+            Err(Error::initialization("global_http_client", err_msg))
+        }
+    }
+}
+
+/// Get the global HTTP client singleton
+///
+/// # Panics
+///
+/// Panics if the global HTTP client has not been initialized.
+/// Call `init_global_http_client()` before using this function.
+#[must_use]
+pub fn get_global_http_client() -> Arc<reqwest_middleware::ClientWithMiddleware> {
+    GLOBAL_HTTP_CLIENT
+        .get()
+        .cloned()
+        .expect("Global HTTP client not initialized. Call init_global_http_client() first.")
+}
+
+/// Get or initialize the global HTTP client with default config
+///
+/// This is a convenience function for use cases where the client
+/// might not be explicitly initialized. It uses default performance config.
+///
+/// # Errors
+///
+/// Returns an error if HTTP client creation fails (e.g., TLS initialization error).
+/// This function is thread-safe and ensures only one thread performs initialization.
+pub fn get_or_init_global_http_client() -> Result<Arc<reqwest_middleware::ClientWithMiddleware>> {
+    // Fast path: already initialized
+    if let Some(client) = GLOBAL_HTTP_CLIENT.get() {
+        return Ok(client.clone());
+    }
+
+    // Use init_global_http_client with default config for thread-safe initialization
+    let default_config = crate::config::PerformanceConfig::default();
+    init_global_http_client(&default_config)?;
+
+    // Now it should be initialized
+    GLOBAL_HTTP_CLIENT.get().cloned().ok_or_else(|| {
+        Error::initialization(
+            "global_http_client",
+            "HTTP client initialization failed unexpectedly".to_string(),
+        )
+    })
+}
 
 /// HTTP client builder with retry support
 ///

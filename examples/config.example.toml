@@ -1,5 +1,31 @@
 # Crates Docs MCP 服务器配置示例
+#
+# =============================================================================
+# 热重载支持说明
+# =============================================================================
+#
+# 标记说明：
+# - ✅ 支持热重载：配置更改后无需重启服务器，会自动生效
+# - ❌ 不支持热重载：配置更改后需要重启服务器才能生效
+#
+# 支持热重载的配置：
+# - logging 部分：所有字段
+# - auth/oauth/api_key 部分：所有字段
+# - cache 部分：TTL 相关字段 (default_ttl, crate_docs_ttl_secs, item_docs_ttl_secs, search_results_ttl_secs)
+# - performance 部分：rate_limit_per_second, concurrent_request_limit, enable_metrics, enable_response_compression
+#
+# 不支持热重载的配置：
+# - server 部分：所有字段（涉及监听套接字和传输层初始化）
+# - cache 部分：cache_type, memory_size, redis_url, key_prefix（缓存后端初始化参数）
+# - performance 部分：http_client_*, cache_max_size, cache_default_ttl_secs, metrics_port
+#
+# 修改配置文件后，系统会自动检测变更并应用支持热重载的配置项。
 
+# =============================================================================
+# [server] 服务器配置 ❌ 不支持热重载
+# =============================================================================
+# 警告：以下配置项更改后需要重启服务器才能生效
+#
 [server]
 # 服务器名称
 name = "crates-docs"
@@ -36,38 +62,54 @@ allowed_hosts = ["localhost", "127.0.0.1", "0.0.0.0"]
 # 注意: 使用 "*" 会允许所有来源，存在安全风险
 allowed_origins = ["http://localhost:*"]
 
+# =============================================================================
+# [cache] 缓存配置 - 部分支持热重载
+# =============================================================================
+#
+# ✅ 支持热重载的字段：
+#    default_ttl, crate_docs_ttl_secs, item_docs_ttl_secs, search_results_ttl_secs
+#
+# ❌ 不支持热重载的字段（需要重启）：
+#    cache_type, memory_size, redis_url, key_prefix
+#
 [cache]
-# 缓存类型: memory, redis
+# 缓存类型: memory, redis ❌ 不支持热重载
 cache_type = "memory"
-# 内存缓存大小（条目数）
+# 内存缓存大小（条目数） ❌ 不支持热重载
 memory_size = 1000
-# Redis 连接 URL（仅当 cache_type = "redis" 时使用）
+# Redis 连接 URL（仅当 cache_type = "redis" 时使用） ❌ 不支持热重载
 # redis_url = "redis://localhost:6379"
-# 默认缓存时间（秒）
+# 默认缓存时间（秒） ✅ 支持热重载
 default_ttl = 3600
-# crate 文档缓存 TTL（秒），默认 1 小时
+# crate 文档缓存 TTL（秒），默认 1 小时 ✅ 支持热重载
 crate_docs_ttl_secs = 3600
-# 项目文档缓存 TTL（秒），默认 30 分钟
+# 项目文档缓存 TTL（秒），默认 30 分钟 ✅ 支持热重载
 item_docs_ttl_secs = 1800
-# 搜索结果缓存 TTL（秒），默认 5 分钟
+# 搜索结果缓存 TTL（秒），默认 5 分钟 ✅ 支持热重载
 search_results_ttl_secs = 300
 
+# =============================================================================
+# [oauth] OAuth 配置 ✅ 完全支持热重载
+# =============================================================================
+#
+# 所有字段都支持运行时热重载，修改后立即生效（无需重启）
+#
 [oauth]
-# 是否启用 OAuth
+# 是否启用 OAuth ✅ 支持热重载
 enabled = false
-# OAuth 客户端 ID
+# OAuth 客户端 ID ✅ 支持热重载
 # client_id = "your-client-id"
-# OAuth 客户端密钥
+# OAuth 客户端密钥 ✅ 支持热重载
 # client_secret = "your-client-secret"
-# 重定向 URI
+# 重定向 URI ✅ 支持热重载
 # redirect_uri = "http://localhost:8080/oauth/callback"
-# 授权端点
+# 授权端点 ✅ 支持热重载
 # authorization_endpoint = "https://provider.com/oauth/authorize"
-# 令牌端点
+# 令牌端点 ✅ 支持热重载
 # token_endpoint = "https://provider.com/oauth/token"
-# 授权范围
+# 授权范围 ✅ 支持热重载
 scopes = ["openid", "profile", "email"]
-# OAuth 提供者: Custom, GitHub, Google, Keycloak
+# OAuth 提供者: Custom, GitHub, Google, Keycloak ✅ 支持热重载
 provider = "Custom"
 
 # GitHub OAuth 示例配置
@@ -103,68 +145,89 @@ provider = "Custom"
 # scopes = ["openid", "profile", "email"]
 # provider = "Keycloak"
 
-# API Key 认证配置
+# =============================================================================
+# [api_key] API Key 认证配置 ✅ 完全支持热重载
+# =============================================================================
+#
 # 注意：需要启用 api-key feature 才能使用此功能
+# 所有字段都支持运行时热重载，修改后立即生效（无需重启）
+#
 # [api_key]
-# # 是否启用 API Key 认证
+# # 是否启用 API Key 认证 ✅ 支持热重载
 # enabled = true
-# # 有效的 API Key 哈希列表（Argon2 PHC 格式）
+# # 有效的 API Key 哈希列表（Argon2 PHC 格式） ✅ 支持热重载
 # # 不要在配置文件中存储明文 key；请使用 `crates-docs generate-api-key`
 # # 生成一次性明文 key，并将输出的 hash 保存到这里
 # keys = ["$argon2id$v=19$m=47104,t=1,p=1$replace$with_generated_hash"]
-# # API Key 请求头名称
+# # API Key 请求头名称 ✅ 支持热重载
 # header_name = "X-API-Key"
-# # API Key 查询参数名称（不推荐使用，安全性较低）
+# # API Key 查询参数名称（不推荐使用，安全性较低） ✅ 支持热重载
 # query_param_name = "api_key"
-# # 是否允许通过查询参数传递 API Key（默认 false）
+# # 是否允许通过查询参数传递 API Key（默认 false） ✅ 支持热重载
 # allow_query_param = false
-# # API Key 前缀（用于生成和校验结构化 key）
+# # API Key 前缀（用于生成和校验结构化 key） ✅ 支持热重载
 # key_prefix = "sk"
 
+# =============================================================================
+# [logging] 日志配置 ✅ 完全支持热重载
+# =============================================================================
+#
+# 所有字段都支持运行时热重载，修改后立即生效（无需重启）
+#
 [logging]
-# 日志级别: trace, debug, info, warn, error
+# 日志级别: trace, debug, info, warn, error ✅ 支持热重载
 level = "info"
-# 日志文件路径（enable_file = true 时生效）
+# 日志文件路径（enable_file = true 时生效） ✅ 支持热重载
 file_path = "./logs/crates-docs.log"
-# 是否启用控制台日志
+# 是否启用控制台日志 ✅ 支持热重载
 enable_console = true
-# 是否启用文件日志（默认 false，仅控制台输出）
+# 是否启用文件日志（默认 false，仅控制台输出） ✅ 支持热重载
 enable_file = false
-# 日志文件最大大小（MB）
+# 日志文件最大大小（MB） ✅ 支持热重载
 max_file_size_mb = 100
-# 保留的日志文件数量
+# 保留的日志文件数量 ✅ 支持热重载
 max_files = 10
 
+# =============================================================================
+# [performance] 性能配置 - 部分支持热重载
+# =============================================================================
+#
+# ✅ 支持热重载的字段：
+#    rate_limit_per_second, concurrent_request_limit, enable_metrics, enable_response_compression
+#
+# ❌ 不支持热重载的字段（需要重启）：
+#    http_client_*, cache_max_size, cache_default_ttl_secs, metrics_port
+#
 [performance]
-# HTTP 客户端连接池大小
+# HTTP 客户端连接池大小 ❌ 不支持热重载
 http_client_pool_size = 10
-# HTTP 客户端连接池空闲超时时间（秒）
+# HTTP 客户端连接池空闲超时时间（秒） ❌ 不支持热重载
 http_client_pool_idle_timeout_secs = 90
-# HTTP 客户端连接超时时间（秒）
+# HTTP 客户端连接超时时间（秒） ❌ 不支持热重载
 http_client_connect_timeout_secs = 10
-# HTTP 客户端请求超时时间（秒）
+# HTTP 客户端请求超时时间（秒） ❌ 不支持热重载
 http_client_timeout_secs = 30
-# HTTP 客户端读取超时时间（秒）
+# HTTP 客户端读取超时时间（秒） ❌ 不支持热重载
 http_client_read_timeout_secs = 30
-# HTTP 客户端最大重试次数
+# HTTP 客户端最大重试次数 ❌ 不支持热重载
 http_client_max_retries = 3
-# HTTP 客户端重试初始延迟（毫秒）
+# HTTP 客户端重试初始延迟（毫秒） ❌ 不支持热重载
 http_client_retry_initial_delay_ms = 100
-# HTTP 客户端重试最大延迟（毫秒）
+# HTTP 客户端重试最大延迟（毫秒） ❌ 不支持热重载
 http_client_retry_max_delay_ms = 10000
-# 缓存最大大小（条目数）
+# 缓存最大大小（条目数） ❌ 不支持热重载
 cache_max_size = 1000
-# 缓存默认 TTL（秒）
+# 缓存默认 TTL（秒） ❌ 不支持热重载
 cache_default_ttl_secs = 3600
-# 请求速率限制（每秒请求数）
+# 请求速率限制（每秒请求数） ✅ 支持热重载
 rate_limit_per_second = 100
-# 并发请求限制
+# 并发请求限制 ✅ 支持热重载
 concurrent_request_limit = 50
-# 启用响应压缩
+# 启用响应压缩 ✅ 支持热重载
 enable_response_compression = true
-# 启用 Prometheus 指标收集
+# 启用 Prometheus 指标收集 ✅ 支持热重载
 enable_metrics = true
-# 指标服务端口号（0 表示使用服务器端口）
+# 指标服务端口号（0 表示使用服务器端口） ❌ 不支持热重载
 metrics_port = 0
 
 # ============================================================================

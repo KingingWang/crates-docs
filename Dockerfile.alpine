@@ -1,0 +1,74 @@
+# ============================================================================
+# Dockerfile.alpine - 使用 Alpine 作为运行时 (兼容性最好)
+# 适用于: 需要 shell 调试、内网环境无法访问 gcr.io
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 阶段 1: Planner
+# ----------------------------------------------------------------------------
+FROM rust:1.81-alpine AS planner
+RUN apk add --no-cache musl-dev
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+COPY Cargo.toml Cargo.lock ./
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ----------------------------------------------------------------------------
+# 阶段 2: Builder
+# ----------------------------------------------------------------------------
+FROM rust:1.81-alpine AS builder
+RUN apk add --no-cache \
+    musl-dev \
+    openssl-dev \
+    openssl-libs-static \
+    pkgconfig \
+    git
+
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+COPY --from=planner /app/recipe.json recipe.json
+ENV OPENSSL_STATIC=1
+ENV RUSTFLAGS="-C target-feature=+crt-static"
+RUN cargo chef cook --release --recipe-path recipe.json
+
+COPY build.rs ./
+COPY src ./src
+RUN cargo build --release --bin crates-docs
+
+# ----------------------------------------------------------------------------
+# 阶段 3: Runtime - Alpine (带 shell，方便调试)
+# ----------------------------------------------------------------------------
+FROM alpine:3.19
+
+# 安装 CA 证书 (HTTPS 必需)
+RUN apk add --no-cache ca-certificates
+
+# 创建非 root 用户
+RUN adduser -D -H -u 1000 -s /bin/sh appuser
+
+WORKDIR /app
+
+# 复制二进制
+COPY --from=builder /app/target/release/crates-docs /app/crates-docs
+
+# 复制配置
+COPY examples/config.example.toml /app/config.toml
+
+# 创建必要的目录
+RUN mkdir -p /app/logs /app/data && \
+    chown -R appuser:appuser /app
+
+# 暴露端口
+EXPOSE 8080
+
+# 环境变量
+ENV RUST_LOG=info
+ENV CRATES_DOCS_HOST=0.0.0.0
+ENV CRATES_DOCS_PORT=8080
+ENV CRATES_DOCS_TRANSPORT_MODE=hybrid
+
+# 切换到非 root 用户
+USER appuser
+
+# 启动命令
+CMD ["/app/crates-docs", "serve", "--config", "/app/config.toml"]
