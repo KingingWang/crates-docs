@@ -37,11 +37,11 @@ use std::sync::Arc;
 ///
 /// # 字段
 ///
-/// - `client`: 带重试中间件的 HTTP 客户端
+/// - `client`: 带重试中间件的 HTTP 客户端（共享引用以实现连接池复用）
 /// - `cache`: 通用缓存实例
 /// - `doc_cache`: 文档专用缓存
 pub struct DocService {
-    client: reqwest_middleware::ClientWithMiddleware,
+    client: Arc<reqwest_middleware::ClientWithMiddleware>,
     cache: Arc<dyn Cache>,
     doc_cache: cache::DocCache,
 }
@@ -67,6 +67,12 @@ impl DocService {
     /// let cache = Arc::new(MemoryCache::new(1000));
     /// let service = DocService::new(cache).expect("Failed to create DocService");
     /// ```
+    ///
+    /// # Note
+    ///
+    /// This method uses the global HTTP client singleton for connection pool reuse.
+    /// Make sure to call `init_global_http_client()` during server initialization
+    /// for optimal performance.
     pub fn new(cache: Arc<dyn Cache>) -> crate::error::Result<Self> {
         Self::with_config(cache, &CacheConfig::default())
     }
@@ -81,22 +87,19 @@ impl DocService {
     /// # 错误
     ///
     /// 如果 HTTP 客户端创建失败，返回错误
+    ///
+    /// # Note
+    ///
+    /// This method uses the global HTTP client singleton for connection pool reuse.
+    /// If the global client is not initialized, it will be initialized with default config.
     pub fn with_config(
         cache: Arc<dyn Cache>,
         cache_config: &CacheConfig,
     ) -> crate::error::Result<Self> {
         let ttl = cache::DocCacheTtl::from_cache_config(cache_config);
         let doc_cache = cache::DocCache::with_ttl(cache.clone(), ttl);
-        // Use default performance config for backward compatibility
-        let perf_config = PerformanceConfig::default();
-        let client = crate::utils::create_http_client_from_config(&perf_config)
-            .build()
-            .map_err(|e| {
-                crate::error::Error::initialization(
-                    "http_client",
-                    format!("Failed to create HTTP client with retry: {e}"),
-                )
-            })?;
+        // Use global HTTP client singleton for connection pool reuse
+        let client = crate::utils::get_or_init_global_http_client()?;
         Ok(Self {
             client,
             cache,
@@ -110,26 +113,26 @@ impl DocService {
     ///
     /// * `cache` - 缓存实例
     /// * `cache_config` - 缓存配置
-    /// * `perf_config` - 性能配置
+    /// * `perf_config` - 性能配置（仅用于初始化全局 HTTP 客户端，如果尚未初始化）
     ///
     /// # 错误
     ///
     /// 如果 HTTP 客户端创建失败，返回错误
+    ///
+    /// # Note
+    ///
+    /// This method uses the global HTTP client singleton for connection pool reuse.
+    /// The `perf_config` is used only if the global client hasn't been initialized yet.
+    /// For consistent configuration, call `init_global_http_client()` during server startup.
     pub fn with_full_config(
         cache: Arc<dyn Cache>,
         cache_config: &CacheConfig,
-        perf_config: &PerformanceConfig,
+        _perf_config: &PerformanceConfig,
     ) -> crate::error::Result<Self> {
         let ttl = cache::DocCacheTtl::from_cache_config(cache_config);
         let doc_cache = cache::DocCache::with_ttl(cache.clone(), ttl);
-        let client = crate::utils::create_http_client_from_config(perf_config)
-            .build()
-            .map_err(|e| {
-                crate::error::Error::initialization(
-                    "http_client",
-                    format!("Failed to create HTTP client with retry: {e}"),
-                )
-            })?;
+        // Use global HTTP client singleton for connection pool reuse
+        let client = crate::utils::get_or_init_global_http_client()?;
         Ok(Self {
             client,
             cache,

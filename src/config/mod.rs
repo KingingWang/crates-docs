@@ -46,6 +46,19 @@ use std::path::Path;
 /// - `auth`: 认证配置（OAuth 和 API Key）
 /// - `logging`: 日志配置
 /// - `performance`: 性能配置
+///
+/// # 热重载支持
+///
+/// 以下配置项支持热重载（运行时无需重启）：
+/// - `logging` 部分：所有字段
+/// - `auth` 部分：所有字段（包括 API Key 和 OAuth）
+/// - `cache` 部分：TTL 相关字段（`default_ttl`, `crate_docs_ttl_secs`, `item_docs_ttl_secs`, `search_results_ttl_secs`）
+/// - `performance` 部分：`rate_limit_per_second`, `concurrent_request_limit`, `enable_metrics`, `enable_response_compression`
+///
+/// 以下配置项**不支持**热重载（需要重启服务器）：
+/// - `server` 部分：所有字段（host, port, `transport_mode`, `max_connections` 等）
+/// - `cache` 部分：`cache_type`, `memory_size`, `redis_url`（缓存初始化参数）
+/// - `performance` 部分：`http_client_*`, `cache_max_size`, `cache_default_ttl_secs`, `metrics_port`
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct AppConfig {
     /// 服务器配置
@@ -69,7 +82,14 @@ pub struct AppConfig {
     pub performance: PerformanceConfig,
 }
 
-/// Server configuration
+/// 服务器配置
+///
+/// # 热重载支持
+///
+/// ⚠️ **不支持热重载** - 服务器配置项改变后需要重启服务器才能生效。
+///
+/// 原因：这些配置涉及服务器监听套接字、传输层初始化等核心参数，
+/// 运行时更改可能导致连接中断或状态不一致。
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
     /// Server name
@@ -144,7 +164,21 @@ fn default_icons() -> Vec<Icon> {
     ]
 }
 
-/// Logging configuration
+/// 日志配置
+///
+/// # 热重载支持
+///
+/// ✅ **支持热重载** - 所有日志配置项都可以在运行时动态更新。
+///
+/// 支持热重载的字段：
+/// - `level`: 日志级别（trace/debug/info/warn/error）
+/// - `file_path`: 日志文件路径
+/// - `enable_console`: 控制台日志开关
+/// - `enable_file`: 文件日志开关
+/// - `max_file_size_mb`: 日志文件最大大小
+/// - `max_files`: 保留的日志文件数量
+///
+/// 注意：文件日志路径更改后，新日志会写入新文件，但不会自动关闭旧文件句柄。
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LoggingConfig {
     /// Log level
@@ -166,7 +200,27 @@ pub struct LoggingConfig {
     pub max_files: usize,
 }
 
-/// Performance configuration
+/// 性能配置
+///
+/// # 热重载支持
+///
+/// ## 支持热重载的字段 ✅
+///
+/// 以下字段可以在运行时动态更新：
+/// - `rate_limit_per_second`: 请求速率限制（每秒请求数）
+/// - `concurrent_request_limit`: 并发请求限制
+/// - `enable_metrics`: Prometheus 指标收集开关
+/// - `enable_response_compression`: 响应压缩开关
+///
+/// ## 不支持热重载的字段 ❌
+///
+/// 以下字段需要重启服务器才能生效：
+/// - `http_client_*`: HTTP 客户端配置（连接池大小、超时等）
+/// - `cache_max_size`: 缓存最大大小
+/// - `cache_default_ttl_secs`: 缓存默认 TTL
+/// - `metrics_port`: 指标服务端口
+///
+/// 原因：这些配置涉及底层连接池、缓存实例的初始化参数。
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PerformanceConfig {
     /// HTTP client connection pool size

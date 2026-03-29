@@ -94,6 +94,11 @@ impl CratesDocsServer {
     ///
     /// 如果文档服务创建失败，返回错误
     fn from_parts(config: AppConfig, cache: Arc<dyn Cache>) -> crate::error::Result<Self> {
+        // Initialize global HTTP client with performance config for connection pool reuse
+        // This ensures all HTTP requests share the same connection pool
+        // Note: init_global_http_client will fail if already initialized, which is fine
+        let _ = crate::utils::init_global_http_client(&config.performance);
+
         // Create document service with cache configuration
         let doc_service = Arc::new(crate::tools::docs::DocService::with_config(
             cache.clone(),

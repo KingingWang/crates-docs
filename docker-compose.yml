@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   crates-docs:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: crates-docs
     ports:
       - "8080:8080"
@@ -18,6 +20,12 @@ services:
     restart: unless-stopped
     networks:
       - crates-docs-network
+    healthcheck:
+      test: ["CMD", "/app/crates-docs", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
 
   # Redis 服务（可选，用于 Redis 缓存）
   # 如需使用 Redis 缓存，请：

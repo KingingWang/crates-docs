@@ -1,0 +1,66 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Build artifacts
+target/
+Cargo.lock.orig
+
+# Documentation (keep examples/ for config)
+docs/
+*.md
+!README.md
+
+# Tests (不需要在 Docker 中运行测试)
+tests/
+benches/
+
+# Logs
+logs/
+*.log
+
+# Data directories
+data/
+*.db
+*.sqlite
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files themselves (避免递归复制)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Environment files (安全考虑)
+.env
+.env.*
+!.env.example
+
+# Certificates (安全考虑)
+*.pem
+*.key
+*.crt
+certs/
+
+# Node modules (如果前端混合项目)
+node_modules/

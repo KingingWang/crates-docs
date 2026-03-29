@@ -80,11 +80,23 @@ impl HealthCheckToolImpl {
         healthy_msg: &'static str,
     ) -> HealthCheck {
         let start = Instant::now();
-        let client = reqwest::Client::new();
+        // Use global HTTP client singleton for connection pool reuse
+        let client = match crate::utils::get_or_init_global_http_client() {
+            Ok(client) => client,
+            Err(e) => {
+                return HealthCheck {
+                    name: name.to_string(),
+                    status: "unhealthy".to_string(),
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    message: None,
+                    error: Some(format!("Failed to initialize HTTP client: {e}")),
+                };
+            }
+        };
 
         match client
             .get(url)
-            .header("User-Agent", format!("CratesDocsMCP/{}", crate::VERSION))
+            .header("User-Agent", format!("CratesDocsMCP/ {}", crate::VERSION))
             .timeout(Duration::from_secs(5))
             .send()
             .await

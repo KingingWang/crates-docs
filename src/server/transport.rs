@@ -94,6 +94,74 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
     Ok(())
 }
 
+/// Internal helper to run a Hyper-based MCP server with the given configuration.
+///
+/// This function consolidates the common logic for HTTP, SSE, and Hybrid servers,
+/// which only differ in their SSE support and log messages.
+///
+/// # Arguments
+///
+/// * `server` - `CratesDocsServer` 实例
+/// * `protocol_name` - Protocol name for logging (e.g., "HTTP", "SSE", "Hybrid")
+/// * `sse_support` - Whether SSE support is enabled
+async fn run_hyper_server(
+    server: &CratesDocsServer,
+    protocol_name: &str,
+    sse_support: bool,
+) -> Result<()> {
+    let config = server.config();
+    let server_info = server.server_info();
+    let handler = CratesDocsHandler::new(Arc::new(server.clone()));
+
+    tracing::info!(
+        "Starting {} MCP server on {}:{}...",
+        protocol_name,
+        config.server.host,
+        config.server.port
+    );
+
+    // Create Hyper server options with security settings from config
+    let options = HyperServerOptions {
+        host: config.server.host.clone(),
+        port: config.server.port,
+        transport_options: Arc::new(TransportOptions::default()),
+        sse_support,
+        event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
+        task_store: None,
+        client_task_store: None,
+        allowed_hosts: Some(config.server.allowed_hosts.clone()),
+        allowed_origins: Some(config.server.allowed_origins.clone()),
+        health_endpoint: Some("/health".to_string()),
+        ..Default::default()
+    };
+
+    // Create HTTP/SSE/Hybrid server
+    let mcp_server =
+        hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
+
+    // Build the started message based on the protocol
+    let started_msg = if sse_support && protocol_name != "SSE" {
+        // Hybrid mode
+        format!(
+            "{} MCP server started, listening on {}:{} (HTTP + SSE)",
+            protocol_name, config.server.host, config.server.port
+        )
+    } else {
+        format!(
+            "{} MCP server started, listening on {}:{}",
+            protocol_name, config.server.host, config.server.port
+        )
+    };
+    tracing::info!("{}", started_msg);
+
+    mcp_server
+        .start()
+        .await
+        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
+
+    Ok(())
+}
+
 /// 运行 HTTP 服务器（Streamable HTTP）
 ///
 /// 启动支持 Streamable HTTP 协议的 MCP 服务器。
@@ -121,46 +189,7 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
 /// }
 /// ```
 pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
-    let config = server.config();
-    tracing::info!(
-        "Starting HTTP MCP server on {}:{}...",
-        config.server.host,
-        config.server.port
-    );
-
-    let server_info = server.server_info();
-    let handler = CratesDocsHandler::new(Arc::new(server.clone()));
-
-    // Create Hyper server options with security settings from config
-    let options = HyperServerOptions {
-        host: config.server.host.clone(),
-        port: config.server.port,
-        transport_options: Arc::new(TransportOptions::default()),
-        sse_support: false, // Pure HTTP mode
-        event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
-        task_store: None,
-        client_task_store: None,
-        allowed_hosts: Some(config.server.allowed_hosts.clone()),
-        allowed_origins: Some(config.server.allowed_origins.clone()),
-        health_endpoint: Some("/health".to_string()),
-        ..Default::default()
-    };
-
-    // Create HTTP server
-    let mcp_server =
-        hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
-
-    tracing::info!(
-        "HTTP MCP server started, listening on {}:{}",
-        config.server.host,
-        config.server.port
-    );
-    mcp_server
-        .start()
-        .await
-        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
-
-    Ok(())
+    run_hyper_server(server, "HTTP", false).await
 }
 
 /// 运行 SSE 服务器（Server-Sent Events）
@@ -190,46 +219,7 @@ pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
 /// }
 /// ```
 pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
-    let config = server.config();
-    tracing::info!(
-        "Starting SSE MCP server on {}:{}...",
-        config.server.host,
-        config.server.port
-    );
-
-    let server_info = server.server_info();
-    let handler = CratesDocsHandler::new(Arc::new(server.clone()));
-
-    // Create Hyper server options with SSE support and security settings from config
-    let options = HyperServerOptions {
-        host: config.server.host.clone(),
-        port: config.server.port,
-        transport_options: Arc::new(TransportOptions::default()),
-        sse_support: true, // Enable SSE support
-        event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
-        task_store: None,
-        client_task_store: None,
-        allowed_hosts: Some(config.server.allowed_hosts.clone()),
-        allowed_origins: Some(config.server.allowed_origins.clone()),
-        health_endpoint: Some("/health".to_string()),
-        ..Default::default()
-    };
-
-    // Create SSE server
-    let mcp_server =
-        hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
-
-    tracing::info!(
-        "SSE MCP server started, listening on {}:{}",
-        config.server.host,
-        config.server.port
-    );
-    mcp_server
-        .start()
-        .await
-        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
-
-    Ok(())
+    run_hyper_server(server, "SSE", true).await
 }
 
 /// 运行混合服务器（同时支持 HTTP 和 SSE）
@@ -259,46 +249,7 @@ pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
 /// }
 /// ```
 pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
-    let config = server.config();
-    tracing::info!(
-        "Starting hybrid MCP server on {}:{}...",
-        config.server.host,
-        config.server.port
-    );
-
-    let server_info = server.server_info();
-    let handler = CratesDocsHandler::new(Arc::new(server.clone()));
-
-    // Create Hyper server options with SSE support and security settings from config
-    let options = HyperServerOptions {
-        host: config.server.host.clone(),
-        port: config.server.port,
-        transport_options: Arc::new(TransportOptions::default()),
-        sse_support: true, // Enable SSE support
-        event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
-        task_store: None,
-        client_task_store: None,
-        allowed_hosts: Some(config.server.allowed_hosts.clone()),
-        allowed_origins: Some(config.server.allowed_origins.clone()),
-        health_endpoint: Some("/health".to_string()),
-        ..Default::default()
-    };
-
-    // Create hybrid server (HTTP + SSE)
-    let mcp_server =
-        hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
-
-    tracing::info!(
-        "Hybrid MCP server started, listening on {}:{} (HTTP + SSE)",
-        config.server.host,
-        config.server.port
-    );
-    mcp_server
-        .start()
-        .await
-        .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
-
-    Ok(())
+    run_hyper_server(server, "Hybrid", true).await
 }
 
 /// 传输模式

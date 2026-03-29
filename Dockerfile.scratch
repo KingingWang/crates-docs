@@ -1,0 +1,76 @@
+# ============================================================================
+# Dockerfile.scratch - 使用 scratch 基础镜像 (终极最小化)
+# 警告: scratch 镜像没有 shell、没有 CA 证书、没有任何工具
+# 仅适用于完全静态链接的二进制
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 阶段 1: Planner
+# ----------------------------------------------------------------------------
+FROM rust:1.81-alpine AS planner
+RUN apk add --no-cache musl-dev
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+COPY Cargo.toml Cargo.lock ./
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ----------------------------------------------------------------------------
+# 阶段 2: Builder (带 CA 证书)
+# ----------------------------------------------------------------------------
+FROM rust:1.81-alpine AS builder
+RUN apk add --no-cache \
+    musl-dev \
+    openssl-dev \
+    openssl-libs-static \
+    pkgconfig \
+    git \
+    ca-certificates
+
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+COPY --from=planner /app/recipe.json recipe.json
+ENV OPENSSL_STATIC=1
+ENV RUSTFLAGS="-C target-feature=+crt-static"
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# 复制并构建
+COPY build.rs ./
+COPY src ./src
+RUN cargo build --release --bin crates-docs
+
+# 复制 CA 证书供 scratch 使用
+RUN cp /etc/ssl/certs/ca-certificates.crt /app/
+
+# 验证静态链接
+RUN file /app/target/release/crates-docs && \
+    ldd /app/target/release/crates-docs 2>/dev/null || echo "✓ Binary is statically linked"
+
+# 剥离调试符号 (进一步减小体积)
+RUN strip /app/target/release/crates-docs
+
+# ----------------------------------------------------------------------------
+# 阶段 3: Runtime - scratch (空镜像)
+# ----------------------------------------------------------------------------
+FROM scratch
+
+# 必须复制 CA 证书 (HTTPS 请求需要)
+COPY --from=builder /app/ca-certificates.crt /etc/ssl/certs/
+
+# 复制二进制
+COPY --from=builder /app/target/release/crates-docs /crates-docs
+
+# 复制配置 (从构建上下文)
+COPY examples/config.example.toml /config.toml
+
+# 暴露端口
+EXPOSE 8080
+
+# 环境变量
+ENV RUST_LOG=info
+ENV CRATES_DOCS_HOST=0.0.0.0
+ENV CRATES_DOCS_PORT=8080
+ENV CRATES_DOCS_TRANSPORT_MODE=hybrid
+
+# 入口点 (scratch 只支持 ENTRYPOINT)
+ENTRYPOINT ["/crates-docs"]
+CMD ["serve", "--config", "/config.toml"]
