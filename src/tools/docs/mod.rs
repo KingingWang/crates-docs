@@ -113,7 +113,7 @@ impl DocService {
     ///
     /// * `cache` - cache instance
     /// * `cache_config` - cache configuration
-    /// * `perf_config` - performance configuration（used only for initializing global HTTP client if not yet initialized）
+    /// * `perf_config` - performance configuration(used only for initializing global HTTP client if not yet initialized)
     ///
     /// # Errors
     ///

@@ -4,7 +4,7 @@
 //!
 //! # Features
 //!
-//! - **Memory cache**: High-performance memory cache based on `moka`，supporting `TinyLFU` eviction strategy
+//! - **Memory cache**: High-performance memory cache based on `moka`, supporting `TinyLFU` eviction strategy
 //! - **Redis cache**: Supports distributed deployment (requires `cache-redis` feature)
 //!
 //! # Examples
@@ -30,8 +30,8 @@ use std::time::Duration;
 ///
 /// # Implementations
 ///
-/// - `memory::MemoryCache`: Memory cacheImplementations
-/// - `redis::RedisCache`: Redis cache implementation（requires `cache-redis` feature）
+/// - `memory::MemoryCache`: Memory cache implementation
+/// - `redis::RedisCache`: Redis cache implementation (requires `cache-redis` feature)
 #[async_trait::async_trait]
 pub trait Cache: Send + Sync {
     /// Get cache value
@@ -42,7 +42,7 @@ pub trait Cache: Send + Sync {
     ///
     /// # Returns
     ///
-    /// If key exists and not expired，returns cache value；otherwise returns `None`
+    /// If key exists and not expired, returns cache value; otherwise returns `None`
     async fn get(&self, key: &str) -> Option<String>;
 
     /// Set cache value
@@ -104,7 +104,7 @@ pub trait Cache: Send + Sync {
 /// - `cache_type`: Cache type, `"memory"` or `"redis"`
 /// - `memory_size`: Memory cache size(number of entries)
 /// - `redis_url`: Redis connection URL
-/// - `key_prefix`: Key prefix（used to isolate caches of different services）
+/// - `key_prefix`: Key prefix (used to isolate caches of different services)
 /// - `default_ttl`: Default TTL (seconds)
 /// - `crate_docs_ttl_secs`: Crate document cache TTL (seconds)
 /// - `item_docs_ttl_secs`: Item document cache TTL (seconds)
@@ -114,7 +114,7 @@ pub trait Cache: Send + Sync {
 ///
 /// ## Hot reload supported fields ✅
 ///
-/// TTL-related fieldscan be dynamically updated at runtime（affecting newly written cache entries）：
+/// TTL-related fields can be dynamically updated at runtime (affecting newly written cache entries):
 /// - `default_ttl`: Default TTL (seconds)
 /// - `crate_docs_ttl_secs`: Crate document cache TTL (seconds)
 /// - `item_docs_ttl_secs`: Item document cache TTL (seconds)
@@ -122,7 +122,7 @@ pub trait Cache: Send + Sync {
 ///
 /// ## Hot reload NOT supported fields ❌
 ///
-/// The following fields require server restart to take effect:：
+/// The following fields require server restart to take effect:
 /// - `cache_type`: Cache type (involves cache instance creation)
 /// - `memory_size`: Memory cache size(initialization parameter)
 /// - `redis_url`: Redis connection URL(connection pool initialization)
@@ -140,7 +140,7 @@ pub struct CacheConfig {
     /// Redis connection URL
     pub redis_url: Option<String>,
 
-    /// Redis cache key prefix（used to isolate caches of different services）
+    /// Redis cache key prefix (used to isolate caches of different services)
     #[serde(default = "default_key_prefix")]
     pub key_prefix: String,
 
@@ -260,7 +260,7 @@ pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error
 
 /// Async create cache instance
 ///
-/// Supports async initialization for Redis cache。
+/// Supports async initialization for Redis cache.
 ///
 /// # Arguments
 ///

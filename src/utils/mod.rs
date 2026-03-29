@@ -418,10 +418,10 @@ pub mod string {
     /// assert_eq!(truncate_with_ellipsis("hello world", 8), "hello...");
     /// assert_eq!(truncate_with_ellipsis("short", 10), "short");
     /// // UTF-8 safe: works with multi-byte characters
-    /// assert_eq!(truncate_with_ellipsis("hello world", 3), "...");
-    /// assert_eq!(truncate_with_ellipsis("hello world", 4), "hello world"); // 4 chars <= max_len, no truncation
-    /// assert_eq!(truncate_with_ellipsis("hello world", 5), "hello world"); // 4 chars <= max_len, no truncation
-    /// assert_eq!(truncate_with_ellipsis("hello world test", 4), "h...");   // 4 chars > max_len-3, truncate
+    /// assert_eq!(truncate_with_ellipsis("你好世界", 3), "...");
+    /// assert_eq!(truncate_with_ellipsis("你好世界", 4), "你好世界"); // 4 chars <= max_len, no truncation
+    /// assert_eq!(truncate_with_ellipsis("你好世界", 5), "你好世界"); // 4 chars <= max_len, no truncation
+    /// assert_eq!(truncate_with_ellipsis("你好世界你好", 4), "你...");   // 4 chars > max_len-3, truncate
     /// ```
     #[must_use]
     pub fn truncate_with_ellipsis(s: &str, max_len: usize) -> String {

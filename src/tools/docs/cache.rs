@@ -1,6 +1,6 @@
 //! Document cache module
 //!
-//! Provides document-specific cache service，Supports independent TTL configuration for crate docs, search results, and item docs.
+//! Provides document-specific cache service,Supports independent TTL configuration for crate docs, search results, and item docs.
 //!
 //! # Cache key format
 //!
@@ -32,7 +32,7 @@ use std::time::Duration;
 /// - `crate_docs_secs`: Crate document cache duration (seconds)
 /// - `search_results_secs`: search results cache duration (seconds)
 /// - `item_docs_secs`: item docs cache duration (seconds)
-/// - `jitter_ratio`: TTL jitter ratio（0.0-1.0），used to prevent cache stampede
+/// - `jitter_ratio`: TTL jitter ratio(0.0-1.0),used to prevent cache stampede
 #[derive(Debug, Clone, Copy)]
 pub struct DocCacheTtl {
     /// Crate document TTL (seconds)
@@ -44,7 +44,7 @@ pub struct DocCacheTtl {
     /// TTL jitter ratio (0.0-1.0), default 0.1 (10%)
     ///
     /// Actual TTL = `base_ttl * (1 + random(-jitter_ratio, jitter_ratio))`
-    /// for example：`base_ttl=3600`, `jitter_ratio=0.1` => Actual TTL range `[3240, 3960]`
+    /// for example:`base_ttl=3600`, `jitter_ratio=0.1` => Actual TTL range `[3240, 3960]`
     pub jitter_ratio: f64,
 }
 
@@ -114,7 +114,7 @@ impl DocCacheTtl {
 
 /// Document cache service
 ///
-/// provides document-specific cache operations，supports crate docs, search results, and item docs。
+/// provides document-specific cache operations,supports crate docs, search results, and item docs.
 ///
 /// # Fields
 ///
@@ -224,7 +224,7 @@ impl DocCache {
     ///
     /// # Returns
     ///
-    /// Returns search results if cache hit；otherwise returns `None`
+    /// Returns search results if cache hit;otherwise returns `None`
     pub async fn get_search_results(&self, query: &str, limit: u32) -> Option<String> {
         let key = Self::search_cache_key(query, limit);
         self.cache.get(&key).await
@@ -262,7 +262,7 @@ impl DocCache {
     ///
     /// # Returns
     ///
-    /// Returns item docs if cache hit；otherwise returns `None`
+    /// Returns item docs if cache hit;otherwise returns `None`
     pub async fn get_item_docs(
         &self,
         crate_name: &str,
