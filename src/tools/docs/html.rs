@@ -20,29 +20,33 @@ const NAV_TAGS: &[&str] = &["nav", "header", "footer", "aside"];
 const UI_TAGS: &[&str] = &["button", "summary"];
 
 /// Regex patterns for self-closing/void tags to remove
-static LINK_TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<link[^>]*>").unwrap());
+static LINK_TAG_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"<link[^>]*>").expect("hardcoded valid regex pattern"));
 
-static META_TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<meta[^>]*>").unwrap());
+static META_TAG_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"<meta[^>]*>").expect("hardcoded valid regex pattern"));
 
 /// Regex to remove "Copy item path" and similar UI text
-static COPY_PATH_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Copy item path").unwrap());
+static COPY_PATH_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"Copy item path").expect("hardcoded valid regex pattern"));
 
 /// Regex to remove anchor links like [§](#xxx)
 static ANCHOR_LINK_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").unwrap());
+    LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").expect("hardcoded valid regex pattern"));
 
 /// Regex to remove relative source links like [Source](../src/...)
 static SOURCE_LINK_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\[Source\]\([^)]*\)").unwrap());
+    LazyLock::new(|| Regex::new(r"\[Source\]\([^)]*\)").expect("hardcoded valid regex pattern"));
 
 /// Regex to remove relative documentation links like [de](de/index.html) or [forward\_to\_deserialize\_any](macro.xxx.html)
 /// Matches: [text](relative_path.html) where `relative_path` starts with letter and ends with .html
-static RELATIVE_LINK_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\[[^\]]*\]\([a-zA-Z][^)]*\.html\)").unwrap());
+static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\[[^\]]*\]\([a-zA-Z][^)]*\.html\)").expect("hardcoded valid regex pattern")
+});
 
 /// Regex to clean up section markers like [§](#xxx) that may remain in headings
 static SECTION_MARKER_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").unwrap());
+    LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").expect("hardcoded valid regex pattern"));
 
 /// Clean HTML by removing unwanted tags and their content
 ///

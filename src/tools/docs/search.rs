@@ -214,6 +214,7 @@ fn format_search_results(crates: &[CrateInfo], format: &str) -> String {
 }
 
 fn format_markdown_results(crates: &[CrateInfo]) -> String {
+    // SAFETY: writeln! to String never fails (writes to memory buffer). unwrap() is safe here.
     use std::fmt::Write;
     let estimated_size = crates.len() * 200 + 20;
     let mut output = String::with_capacity(estimated_size);
@@ -248,6 +249,7 @@ fn format_markdown_results(crates: &[CrateInfo]) -> String {
 }
 
 fn format_text_results(crates: &[CrateInfo]) -> String {
+    // SAFETY: writeln! to String never fails (writes to memory buffer). unwrap() is safe here.
     use std::fmt::Write;
     let estimated_size = crates.len() * 100;
     let mut output = String::with_capacity(estimated_size);

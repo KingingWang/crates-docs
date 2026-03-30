@@ -69,35 +69,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Server name
 pub const NAME: &str = "crates-docs";
 
-/// Initialize the logging system (simple version using boolean parameter)
-///
-/// # Errors
-/// Returns an error if logging system initialization fails
-#[deprecated(note = "Please use init_logging_with_config instead")]
-pub fn init_logging(debug: bool) -> Result<()> {
-    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-
-    let filter = if debug {
-        EnvFilter::new("debug")
-    } else {
-        EnvFilter::new("info")
-    };
-
-    let fmt_layer = fmt::layer()
-        .with_target(true)
-        .with_thread_ids(true)
-        .with_thread_names(true)
-        .compact();
-
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(fmt_layer)
-        .try_init()
-        .map_err(|e| error::Error::initialization("logging", e.to_string()))?;
-
-    Ok(())
-}
-
 /// Initialize logging system with configuration
 ///
 /// # Errors

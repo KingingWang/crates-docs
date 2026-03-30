@@ -236,6 +236,7 @@ impl Tool for HealthCheckToolImpl {
         let health_status = self.perform_checks(&check_type, verbose).await;
 
         let content = if verbose {
+            // SAFETY: write! to String never fails (writes to memory buffer). unwrap() is safe here.
             serde_json::to_string_pretty(&health_status).map_err(|e| {
                 rust_mcp_sdk::schema::CallToolError::from_message(format!(
                     "JSON serialization failed: {e}"
