@@ -20,6 +20,8 @@
 //! ```
 
 use crate::cache::Cache;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -124,6 +126,26 @@ impl DocCacheTtl {
 pub struct DocCache {
     cache: Arc<dyn Cache>,
     ttl: DocCacheTtl,
+}
+
+fn normalize_version(version: Option<&str>) -> Option<String> {
+    version.map(|v| v.trim().to_lowercase())
+}
+
+fn is_valid_crate_name_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b'-'
+}
+
+fn is_valid_item_path_char(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b':'
+}
+
+fn is_valid_crate_name(name: &str) -> bool {
+    !name.is_empty() && name.bytes().all(is_valid_crate_name_char)
+}
+
+fn is_valid_item_path(path: &str) -> bool {
+    !path.is_empty() && path.bytes().all(is_valid_item_path_char)
 }
 
 impl DocCache {
@@ -306,26 +328,72 @@ impl DocCache {
         self.cache.clear().await
     }
 
-    /// Build crate cache key
+    /// Build crate cache key with normalization
+    ///
+    /// # Normalization rules
+    ///
+    /// - `crate_name`: lowercase
+    /// - `version`: lowercase, trimmed
+    /// - Invalid characters in `crate_name` (non-alphanumeric, non-underscore, non-hyphen)
+    ///   will result in a hashed key to prevent injection
     fn crate_cache_key(crate_name: &str, version: Option<&str>) -> String {
-        if let Some(ver) = version {
-            format!("crate:{crate_name}:{ver}")
-        } else {
-            format!("crate:{crate_name}")
+        let normalized_name = crate_name.to_lowercase();
+
+        if !is_valid_crate_name(&normalized_name) {
+            let mut hasher = DefaultHasher::new();
+            normalized_name.hash(&mut hasher);
+            let hash = hasher.finish();
+            return match normalize_version(version) {
+                Some(normalized_ver) => format!("crate:hash:{hash}:{normalized_ver}"),
+                None => format!("crate:hash:{hash}"),
+            };
+        }
+
+        match normalize_version(version) {
+            Some(normalized_ver) => format!("crate:{normalized_name}:{normalized_ver}"),
+            None => format!("crate:{normalized_name}"),
         }
     }
 
-    /// Build search cache key
+    /// Build search cache key with normalization
+    ///
+    /// # Normalization rules
+    ///
+    /// - query: lowercase, trimmed (search is case-insensitive)
     fn search_cache_key(query: &str, limit: u32) -> String {
-        format!("search:{query}:{limit}")
+        let normalized_query = query.trim().to_lowercase();
+        format!("search:{normalized_query}:{limit}")
     }
 
-    /// Build item cache key
+    /// Build item cache key with normalization
+    ///
+    /// # Normalization rules
+    ///
+    /// - `crate_name`: lowercase
+    /// - `item_path`: trimmed but case-sensitive (Rust paths are case-sensitive)
+    /// - `version`: lowercase, trimmed
     fn item_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
-        if let Some(ver) = version {
-            format!("item:{crate_name}:{ver}:{item_path}")
-        } else {
-            format!("item:{crate_name}:{item_path}")
+        let normalized_name = crate_name.to_lowercase();
+        let normalized_path = item_path.trim();
+
+        if !is_valid_crate_name(&normalized_name) || !is_valid_item_path(normalized_path) {
+            let mut hasher = DefaultHasher::new();
+            normalized_name.hash(&mut hasher);
+            normalized_path.hash(&mut hasher);
+            let hash = hasher.finish();
+            return match normalize_version(version) {
+                Some(normalized_ver) => {
+                    format!("item:{normalized_name}:{normalized_ver}:hash:{hash}")
+                }
+                None => format!("item:{normalized_name}:hash:{hash}"),
+            };
+        }
+
+        match normalize_version(version) {
+            Some(normalized_ver) => {
+                format!("item:{normalized_name}:{normalized_ver}:{normalized_path}")
+            }
+            None => format!("item:{normalized_name}:{normalized_path}"),
         }
     }
 }
@@ -409,6 +477,112 @@ mod tests {
     }
 
     #[test]
+    fn test_cache_key_normalization_case_insensitivity() {
+        assert_eq!(
+            DocCache::crate_cache_key("Serde", None),
+            DocCache::crate_cache_key("serde", None)
+        );
+        assert_eq!(
+            DocCache::crate_cache_key("SERDE", None),
+            DocCache::crate_cache_key("serde", None)
+        );
+
+        assert_eq!(
+            DocCache::crate_cache_key("Tokio", Some("1.0")),
+            DocCache::crate_cache_key("tokio", Some("1.0"))
+        );
+        assert_eq!(
+            DocCache::crate_cache_key("tokio", Some("1.0")),
+            DocCache::crate_cache_key("tokio", Some("1.0"))
+        );
+
+        assert_eq!(
+            DocCache::search_cache_key("Web Framework", 10),
+            DocCache::search_cache_key("web framework", 10)
+        );
+        assert_eq!(
+            DocCache::search_cache_key("ASYNC", 20),
+            DocCache::search_cache_key("async", 20)
+        );
+
+        assert_eq!(
+            DocCache::item_cache_key("Serde", "Serialize", None),
+            DocCache::item_cache_key("serde", "Serialize", None)
+        );
+        assert_eq!(
+            DocCache::item_cache_key("TOKIO", "runtime::Runtime", Some("1.0")),
+            DocCache::item_cache_key("tokio", "runtime::Runtime", Some("1.0"))
+        );
+    }
+
+    #[test]
+    fn test_cache_key_normalization_whitespace() {
+        assert_eq!(
+            DocCache::crate_cache_key("serde", Some(" 1.0 ")),
+            "crate:serde:1.0"
+        );
+
+        assert_eq!(
+            DocCache::search_cache_key("  web framework  ", 10),
+            "search:web framework:10"
+        );
+
+        assert_eq!(
+            DocCache::item_cache_key("serde", "  Serialize  ", None),
+            "item:serde:Serialize"
+        );
+    }
+
+    #[test]
+    fn test_cache_key_normalization_version_case() {
+        assert_eq!(
+            DocCache::crate_cache_key("serde", Some("1.0-RC1")),
+            "crate:serde:1.0-rc1"
+        );
+        assert_eq!(
+            DocCache::item_cache_key("serde", "Serialize", Some("V1.0")),
+            "item:serde:v1.0:Serialize"
+        );
+    }
+
+    #[test]
+    fn test_cache_key_injection_prevention() {
+        let malicious_key = DocCache::crate_cache_key("serde:malicious", None);
+        assert!(malicious_key.starts_with("crate:hash:"));
+        assert!(!malicious_key.contains("serde:malicious"));
+
+        let malicious_key_with_version = DocCache::crate_cache_key("crate:evil", Some("1.0"));
+        assert!(malicious_key_with_version.starts_with("crate:hash:"));
+        assert!(!malicious_key_with_version.contains("crate:evil"));
+
+        let valid_key = DocCache::crate_cache_key("serde-json", None);
+        assert_eq!(valid_key, "crate:serde-json");
+
+        let valid_key_underscore = DocCache::crate_cache_key("my_crate", None);
+        assert_eq!(valid_key_underscore, "crate:my_crate");
+
+        let valid_key_alphanumeric = DocCache::crate_cache_key("crate123", None);
+        assert_eq!(valid_key_alphanumeric, "crate:crate123");
+    }
+
+    #[test]
+    fn test_item_path_case_sensitivity() {
+        assert_ne!(
+            DocCache::item_cache_key("serde", "Serialize", None),
+            DocCache::item_cache_key("serde", "serialize", None)
+        );
+
+        assert_eq!(
+            DocCache::item_cache_key("serde", "Serialize", None),
+            "item:serde:Serialize"
+        );
+        assert_eq!(
+            DocCache::item_cache_key("serde", "serialize", None),
+            "item:serde:serialize"
+        );
+    }
+
+    #[test]
     fn test_doc_cache_ttl_default() {
         let ttl = DocCacheTtl::default();
         assert_eq!(ttl.crate_docs_secs, 3600);
@@ -432,5 +606,63 @@ mod tests {
         assert_eq!(ttl.crate_docs_secs, 7200);
         assert_eq!(ttl.item_docs_secs, 3600);
         assert_eq!(ttl.search_results_secs, 600);
+    }
+
+    #[test]
+    fn test_cache_key_edge_cases() {
+        let empty_key = DocCache::crate_cache_key("", None);
+        assert!(empty_key.starts_with("crate:hash:"));
+
+        let empty_with_version = DocCache::crate_cache_key("", Some("1.0"));
+        assert!(empty_with_version.starts_with("crate:hash:"));
+        assert!(empty_with_version.contains("1.0"));
+
+        let whitespace_key = DocCache::crate_cache_key("   ", None);
+        assert!(whitespace_key.starts_with("crate:hash:"));
+        assert!(!whitespace_key.contains("   "));
+
+        assert_eq!(DocCache::crate_cache_key("serde", Some("")), "crate:serde:");
+        assert_eq!(
+            DocCache::crate_cache_key("serde", Some("   ")),
+            "crate:serde:"
+        );
+
+        let unicode_key = DocCache::crate_cache_key("serde测试", None);
+        assert!(unicode_key.starts_with("crate:hash:"));
+        assert!(!unicode_key.contains("测试"));
+
+        let unicode_version = DocCache::crate_cache_key("serde", Some("测试版本"));
+        assert!(unicode_version.contains("serde"));
+        assert!(unicode_version.contains(":测试版本"));
+
+        let malicious_item_path = DocCache::item_cache_key("serde", "Serialize\nmalicious", None);
+        assert!(malicious_item_path.contains("hash:"));
+        assert!(!malicious_item_path.contains('\n'));
+
+        let malicious_item_colon =
+            DocCache::item_cache_key("serde", "Serialize:extra:colons", None);
+        assert_eq!(malicious_item_colon, "item:serde:Serialize:extra:colons");
+
+        let valid_item_path = DocCache::item_cache_key("serde", "serde::Serialize", None);
+        assert_eq!(valid_item_path, "item:serde:serde::Serialize");
+
+        let item_with_unicode = DocCache::item_cache_key("serde", "Serialize测试", None);
+        assert!(item_with_unicode.contains("hash:"));
+        assert!(!item_with_unicode.contains("测试"));
+
+        let empty_item_key = DocCache::item_cache_key("serde", "", None);
+        assert!(empty_item_key.contains("hash:"));
+
+        let empty_item_crate = DocCache::item_cache_key("", "Serialize", None);
+        assert!(empty_item_crate.contains("hash:"));
+
+        let long_name = "x".repeat(1000);
+        let long_key = DocCache::crate_cache_key(&long_name, None);
+        assert!(long_key.starts_with("crate:"));
+        assert_eq!(long_key.len(), 1000 + 6);
+
+        let long_item_path = "module::".repeat(100);
+        let long_item_key = DocCache::item_cache_key("serde", &long_item_path, None);
+        assert!(long_item_key.starts_with("item:serde:"));
     }
 }
