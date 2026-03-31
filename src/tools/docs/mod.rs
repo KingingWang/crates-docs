@@ -32,6 +32,40 @@ use crate::config::PerformanceConfig;
 use rust_mcp_sdk::schema::CallToolError;
 use std::sync::Arc;
 
+#[cfg(not(test))]
+const DOCS_RS_BASE_URL: &str = "https://docs.rs";
+
+#[cfg(not(test))]
+const CRATES_IO_BASE_URL: &str = "https://crates.io";
+
+#[must_use]
+#[cfg(test)]
+/// Get the docs.rs base URL (configurable via environment variable for testing)
+pub fn docs_rs_base_url() -> String {
+    std::env::var("CRATES_DOCS_DOCS_RS_URL").unwrap_or_else(|_| "https://docs.rs".to_string())
+}
+
+#[must_use]
+#[cfg(not(test))]
+/// Get the docs.rs base URL
+pub fn docs_rs_base_url() -> String {
+    DOCS_RS_BASE_URL.to_string()
+}
+
+#[must_use]
+#[cfg(test)]
+/// Get the crates.io base URL (configurable via environment variable for testing)
+pub fn crates_io_base_url() -> String {
+    std::env::var("CRATES_DOCS_CRATES_IO_URL").unwrap_or_else(|_| "https://crates.io".to_string())
+}
+
+#[must_use]
+#[cfg(not(test))]
+/// Get the crates.io base URL
+pub fn crates_io_base_url() -> String {
+    CRATES_IO_BASE_URL.to_string()
+}
+
 /// Document service
 ///
 /// Provides centralized management of HTTP client (with auto-retry), cache, and document cache.

@@ -6,7 +6,7 @@ use super::config::{ApiKeyConfig, AuthConfig, OAuthConfig};
 use super::types::GeneratedApiKey;
 
 /// Authentication manager
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AuthManager {
     config: OAuthConfig,
     #[cfg(feature = "api-key")]
