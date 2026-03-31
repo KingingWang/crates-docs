@@ -68,6 +68,9 @@ const VALID_SEARCH_SORTS: &[&str] = &[
     "new",
 ];
 
+/// Default output format for search results
+const DEFAULT_FORMAT: &str = "markdown";
+
 pub struct SearchCratesToolImpl {
     service: Arc<super::DocService>,
 }
@@ -294,8 +297,8 @@ impl Tool for SearchCratesToolImpl {
         let sort = normalize_search_sort(params.sort.as_deref())?;
         let crates = self.search_crates(&params.query, limit, &sort).await?;
 
-        let format = params.format.unwrap_or_else(|| "markdown".to_string());
-        let content = format_search_results(&crates, &format);
+        let format = params.format.as_deref().unwrap_or(DEFAULT_FORMAT);
+        let content = format_search_results(&crates, format);
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
             content.into(),
