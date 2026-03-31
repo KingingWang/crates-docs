@@ -9,6 +9,8 @@ use rust_mcp_sdk::schema::CallToolError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+const TOOL_NAME: &str = "lookup_crate";
+
 /// Lookup crate documentation tool
 #[rust_mcp_sdk::macros::mcp_tool(
     name = "lookup_crate",
@@ -70,38 +72,6 @@ impl LookupCrateToolImpl {
         }
     }
 
-    /// Fetch HTML from docs.rs
-    async fn fetch_html(&self, url: &str) -> std::result::Result<String, CallToolError> {
-        let response = self
-            .service
-            .client()
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
-
-        let status = response.status();
-        if !status.is_success() {
-            let error_body = response.text().await.map_err(|e| {
-                CallToolError::from_message(format!("Failed to read error response: {e}"))
-            })?;
-            return Err(CallToolError::from_message(format!(
-                "Failed to get documentation: HTTP {} - {}",
-                status,
-                if error_body.is_empty() {
-                    "No error details".to_string()
-                } else {
-                    error_body
-                }
-            )));
-        }
-
-        response
-            .text()
-            .await
-            .map_err(|e| CallToolError::from_message(format!("Failed to read response: {e}")))
-    }
-
     /// Get crate documentation (markdown format)
     async fn fetch_crate_docs(
         &self,
@@ -120,7 +90,7 @@ impl LookupCrateToolImpl {
 
         // Fetch from docs.rs
         let url = Self::build_url(crate_name, version);
-        let html = self.fetch_html(&url).await?;
+        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
 
         // Extract documentation
         let docs = html::extract_documentation(&html);
@@ -130,7 +100,9 @@ impl LookupCrateToolImpl {
             .doc_cache()
             .set_crate_docs(crate_name, version, docs.clone())
             .await
-            .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
+            .map_err(|e| {
+                CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
+            })?;
 
         Ok(docs)
     }
@@ -142,7 +114,7 @@ impl LookupCrateToolImpl {
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
         let url = Self::build_url(crate_name, version);
-        let html = self.fetch_html(&url).await?;
+        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
         Ok(html::html_to_text(&html))
     }
 
@@ -153,7 +125,7 @@ impl LookupCrateToolImpl {
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
         let url = Self::build_url(crate_name, version);
-        self.fetch_html(&url).await
+        self.service.fetch_html(&url, Some(TOOL_NAME)).await
     }
 }
 

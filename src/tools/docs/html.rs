@@ -174,57 +174,6 @@ fn extract_text_excluding_skip_tags(
     }
 }
 
-#[inline]
-#[allow(dead_code)]
-fn is_block_element(tag: &str) -> bool {
-    const BLOCK_ELEMENTS: &[&str] = &[
-        "address",
-        "article",
-        "aside",
-        "blockquote",
-        "body",
-        "canvas",
-        "dd",
-        "div",
-        "dl",
-        "dt",
-        "fieldset",
-        "figcaption",
-        "figure",
-        "footer",
-        "form",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "head",
-        "header",
-        "hgroup",
-        "hr",
-        "html",
-        "li",
-        "main",
-        "nav",
-        "noscript",
-        "ol",
-        "p",
-        "pre",
-        "section",
-        "table",
-        "tbody",
-        "td",
-        "tfoot",
-        "th",
-        "thead",
-        "tr",
-        "ul",
-        "video",
-    ];
-    BLOCK_ELEMENTS.contains(&tag)
-}
-
 /// Extract documentation from HTML by cleaning and converting to Markdown
 ///
 /// For docs.rs pages, extracts only the main content area to avoid
@@ -340,7 +289,9 @@ mod tests {
 
     #[test]
     fn test_clean_whitespace() {
-        assert_eq!(clean_whitespace("  hello   world  "), "hello world");
+        assert_eq!(clean_whitespace(" hello world "), "hello world");
+        // Multi-space boundary test
+        assert_eq!(clean_whitespace("  hello    world  "), "hello world");
         assert_eq!(clean_whitespace("\t\nhello\n\tworld\t\n"), "hello world");
     }
 

@@ -495,11 +495,11 @@ impl AppConfig {
         }
 
         if let Ok(enable_console) = std::env::var("CRATES_DOCS_ENABLE_CONSOLE") {
-            config.logging.enable_console = enable_console.parse().unwrap_or(true);
+            config.logging.enable_console = enable_console.parse().unwrap_or(false);
         }
 
         if let Ok(enable_file) = std::env::var("CRATES_DOCS_ENABLE_FILE") {
-            config.logging.enable_file = enable_file.parse().unwrap_or(true);
+            config.logging.enable_file = enable_file.parse().unwrap_or(false);
         }
 
         #[cfg(feature = "api-key")]

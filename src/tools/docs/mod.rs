@@ -29,6 +29,7 @@ pub mod search;
 
 use crate::cache::{Cache, CacheConfig};
 use crate::config::PerformanceConfig;
+use rust_mcp_sdk::schema::CallToolError;
 use std::sync::Arc;
 
 /// Document service
@@ -157,6 +158,56 @@ impl DocService {
     pub fn doc_cache(&self) -> &cache::DocCache {
         &self.doc_cache
     }
+
+    /// Fetch HTML content from a URL
+    ///
+    /// This is a shared utility method used by multiple tools to fetch HTML
+    /// from docs.rs and crates.io.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The URL to fetch
+    /// * `tool_name` - Optional tool name for better error messages (e.g., "`lookup_crate`", "`lookup_item`")
+    ///
+    /// # Errors
+    ///
+    /// Returns a `CallToolError` if:
+    /// - The HTTP request fails
+    /// - The response status is not successful
+    /// - Reading the response body fails
+    pub async fn fetch_html(
+        &self,
+        url: &str,
+        tool_name: Option<&str>,
+    ) -> Result<String, CallToolError> {
+        let response = self.client.get(url).send().await.map_err(|e| {
+            let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+            CallToolError::from_message(format!("{prefix}HTTP request failed: {e}"))
+        })?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let error_body = response.text().await.map_err(|e| {
+                let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+                CallToolError::from_message(format!("{prefix}Failed to read error response: {e}"))
+            })?;
+            let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+            return Err(CallToolError::from_message(format!(
+                "{prefix}Failed to get documentation: HTTP {} - {}",
+                status,
+                if error_body.is_empty() {
+                    "No error details"
+                } else {
+                    &error_body
+                }
+            )));
+        }
+
+        response.text().await.map_err(|e| {
+            let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+            CallToolError::from_message(format!("{prefix}Failed to read response: {e}"))
+        })
+    }
 }
 
 impl Default for DocService {
@@ -173,3 +224,24 @@ pub use search::SearchCratesTool;
 
 /// Re-export cache types
 pub use cache::DocCacheTtl;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_doc_service_default() {
+        let service = DocService::default();
+        let _ = service.client();
+        // HTTP client is always available after service creation
+    }
+
+    #[test]
+    fn test_doc_service_accessors() {
+        let service = DocService::default();
+        let _ = service.client();
+        let _ = service.client();
+        let _ = service.cache();
+        let _ = service.doc_cache();
+    }
+}
