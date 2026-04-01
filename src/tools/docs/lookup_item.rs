@@ -209,8 +209,10 @@ impl Default for LookupItemToolImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_build_search_url_without_version() {
         std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupItemToolImpl::build_search_url("serde", "Serialize", None);
@@ -219,6 +221,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_build_search_url_with_version() {
         std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupItemToolImpl::build_search_url("serde", "Serialize", Some("1.0.0"));
@@ -227,6 +230,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_build_search_url_encodes_special_chars() {
         std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupItemToolImpl::build_search_url("std", "collections::HashMap", None);
