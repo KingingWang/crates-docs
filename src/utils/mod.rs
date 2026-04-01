@@ -4,7 +4,7 @@ use crate::error::{Error, Result};
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
 
@@ -18,7 +18,7 @@ static GLOBAL_HTTP_CLIENT: OnceLock<Arc<reqwest_middleware::ClientWithMiddleware
 
 /// Storage for initialization error (if any)
 /// Used to avoid retrying failed initialization
-static INIT_ERROR: Mutex<Option<String>> = Mutex::new(None);
+static INIT_ERROR: OnceLock<String> = OnceLock::new();
 
 /// Initialize the global HTTP client singleton
 ///
@@ -43,19 +43,11 @@ pub fn init_global_http_client(config: &crate::config::PerformanceConfig) -> Res
     }
 
     // Check if previous initialization failed
-    {
-        let error_guard = INIT_ERROR.lock().map_err(|e| {
-            Error::initialization(
-                "global_http_client",
-                format!("Failed to lock init error mutex: {e}"),
-            )
-        })?;
-        if let Some(ref err_msg) = *error_guard {
-            return Err(Error::initialization(
-                "global_http_client",
-                format!("Previous initialization failed: {err_msg}"),
-            ));
-        }
+    if let Some(err_msg) = INIT_ERROR.get() {
+        return Err(Error::initialization(
+            "global_http_client",
+            format!("Previous initialization failed: {err_msg}"),
+        ));
     }
 
     // Slow path: try to initialize
@@ -70,9 +62,7 @@ pub fn init_global_http_client(config: &crate::config::PerformanceConfig) -> Res
         }
         Err(e) => {
             let err_msg = format!("Failed to create global HTTP client: {e}");
-            if let Ok(mut error_guard) = INIT_ERROR.lock() {
-                *error_guard = Some(err_msg.clone());
-            }
+            let _ = INIT_ERROR.set(err_msg.clone());
             Err(Error::initialization("global_http_client", err_msg))
         }
     }

@@ -44,10 +44,6 @@ static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\[[^\]]*\]\([a-zA-Z][^)]*\.html\)").expect("hardcoded valid regex pattern")
 });
 
-/// Regex to clean up section markers like [§](#xxx) that may remain in headings
-static SECTION_MARKER_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").expect("hardcoded valid regex pattern"));
-
 /// Clean HTML by removing unwanted tags and their content
 ///
 /// Uses the `scraper` crate for robust HTML5 parsing, which handles
@@ -123,9 +119,6 @@ fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     result = SOURCE_LINK_REGEX.replace_all(&result, "").to_string();
     result = RELATIVE_LINK_REGEX.replace_all(&result, "").to_string();
 
-    // Clean up any remaining section markers
-    result = SECTION_MARKER_REGEX.replace_all(&result, "").to_string();
-
     result
 }
 
@@ -194,7 +187,7 @@ pub fn extract_documentation(html: &str) -> String {
 fn clean_markdown(markdown: &str) -> String {
     let result = SOURCE_LINK_REGEX.replace_all(markdown, Cow::Borrowed(""));
     let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
-    let result = SECTION_MARKER_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = result.replace("\n\n\n", "\n\n");
     result.trim().to_string()
 }
