@@ -759,3 +759,316 @@ fn test_cli_parse_test_command_with_sort() {
         _ => panic!("Expected Test command"),
     }
 }
+
+// ============================================================================
+// commands.rs tests - ListApiKeys and RevokeApiKey
+// ============================================================================
+
+/// Test Cli struct parsing - ListApiKeys command
+#[test]
+fn test_cli_parse_list_api_keys_command() {
+    let cli = crates_docs::cli::Cli::try_parse_from([
+        "crates-docs",
+        "list-api-keys",
+        "--config",
+        "/custom/config.toml",
+    ]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::ListApiKeys { config } => {
+            assert_eq!(config, PathBuf::from("/custom/config.toml"));
+        }
+        _ => panic!("Expected ListApiKeys command"),
+    }
+}
+
+/// Test Cli struct parsing - ListApiKeys command defaults
+#[test]
+fn test_cli_parse_list_api_keys_command_defaults() {
+    let cli = crates_docs::cli::Cli::try_parse_from(["crates-docs", "list-api-keys"]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::ListApiKeys { config } => {
+            assert_eq!(config, PathBuf::from("config.toml"));
+        }
+        _ => panic!("Expected ListApiKeys command"),
+    }
+}
+
+/// Test Cli struct parsing - RevokeApiKey command
+#[test]
+fn test_cli_parse_revoke_api_key_command() {
+    let cli = crates_docs::cli::Cli::try_parse_from([
+        "crates-docs",
+        "revoke-api-key",
+        "--config",
+        "/custom/config.toml",
+        "--key",
+        "test-key-hash",
+    ]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::RevokeApiKey { config, key } => {
+            assert_eq!(config, PathBuf::from("/custom/config.toml"));
+            assert_eq!(key, "test-key-hash");
+        }
+        _ => panic!("Expected RevokeApiKey command"),
+    }
+}
+
+/// Test Cli struct parsing - RevokeApiKey command defaults
+#[test]
+fn test_cli_parse_revoke_api_key_command_defaults() {
+    let cli = crates_docs::cli::Cli::try_parse_from([
+        "crates-docs",
+        "revoke-api-key",
+        "--key",
+        "test-key",
+    ]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::RevokeApiKey { config, key } => {
+            assert_eq!(config, PathBuf::from("config.toml"));
+            assert_eq!(key, "test-key");
+        }
+        _ => panic!("Expected RevokeApiKey command"),
+    }
+}
+
+// ============================================================================
+// list_api_keys_cmd tests
+// ============================================================================
+
+/// Test list_api_keys command - config file not found
+#[test]
+fn test_run_list_api_keys_command_file_not_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("nonexistent.toml");
+
+    let result = crates_docs::cli::run_list_api_keys_command(&config_path);
+
+    assert!(result.is_ok());
+}
+
+/// Test list_api_keys command - API key authentication disabled
+#[test]
+fn test_run_list_api_keys_command_disabled() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    let config = crates_docs::config::AppConfig::default();
+    config.save_to_file(&config_path).unwrap();
+
+    let result = crates_docs::cli::run_list_api_keys_command(&config_path);
+
+    assert!(result.is_ok());
+}
+
+/// Test list_api_keys command - API key authentication enabled with keys
+#[test]
+fn test_run_list_api_keys_command_enabled_with_keys() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    let mut config = crates_docs::config::AppConfig::default();
+    config.auth.api_key.enabled = true;
+    config.auth.api_key.keys = vec![
+        "$argon2id$v=19$m=47104,t=1,p=1$c2FsdA$hash1".to_string(),
+        "$argon2id$v=19$m=47104,t=1,p=1$c2FsdA$hash2".to_string(),
+    ];
+    config.save_to_file(&config_path).unwrap();
+
+    let result = crates_docs::cli::run_list_api_keys_command(&config_path);
+
+    assert!(result.is_ok());
+}
+
+/// Test list_api_keys command - API key authentication enabled with no keys
+#[test]
+fn test_run_list_api_keys_command_enabled_no_keys() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    let mut config = crates_docs::config::AppConfig::default();
+    config.auth.api_key.enabled = true;
+    config.auth.api_key.keys = vec![];
+    config.save_to_file(&config_path).unwrap();
+
+    let result = crates_docs::cli::run_list_api_keys_command(&config_path);
+
+    assert!(result.is_ok());
+}
+
+/// Test list_api_keys command - invalid config file
+#[test]
+fn test_run_list_api_keys_command_invalid_config() {
+    let dir = tempfile::tempdir().unwrap();
+    let config_path = dir.path().join("config.toml");
+
+    std::fs::write(&config_path, "invalid toml content").unwrap();
+
+    let result = crates_docs::cli::run_list_api_keys_command(&config_path);
+
+    assert!(result.is_err());
+}
+
+// ============================================================================
+// api_key_cmd tests
+// ============================================================================
+
+/// Test generate_api_key command - feature enabled
+#[cfg(feature = "api-key")]
+#[test]
+fn test_run_generate_api_key_command_success() {
+    let result = crates_docs::cli::run_generate_api_key_command("sk");
+    assert!(result.is_ok());
+}
+
+/// Test generate_api_key command - feature enabled with custom prefix
+#[cfg(feature = "api-key")]
+#[test]
+fn test_run_generate_api_key_command_custom_prefix() {
+    let result = crates_docs::cli::run_generate_api_key_command("custom");
+    assert!(result.is_ok());
+}
+
+/// Test generate_api_key command - feature disabled
+#[cfg(not(feature = "api-key"))]
+#[test]
+fn test_run_generate_api_key_command_feature_disabled() {
+    let result = crates_docs::cli::run_generate_api_key_command("sk");
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("not enabled"));
+}
+
+// ============================================================================
+// serve_cmd tests (via command parsing)
+// ============================================================================
+
+/// Test Cli struct parsing - Serve command with all API key parameters
+#[test]
+fn test_cli_parse_serve_command_with_api_key_params() {
+    let cli = crates_docs::cli::Cli::try_parse_from([
+        "crates-docs",
+        "serve",
+        "--enable-api-key",
+        "true",
+        "--api-keys",
+        "key1,key2,key3",
+        "--api-key-header",
+        "Authorization",
+        "--api-key-query-param",
+        "true",
+    ]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::Serve {
+            enable_api_key,
+            api_keys,
+            api_key_header,
+            api_key_query_param,
+            ..
+        } => {
+            assert_eq!(enable_api_key, Some(true));
+            assert_eq!(api_keys, Some("key1,key2,key3".to_string()));
+            assert_eq!(api_key_header, Some("Authorization".to_string()));
+            assert_eq!(api_key_query_param, Some(true));
+        }
+        _ => panic!("Expected Serve command"),
+    }
+}
+
+/// Test Cli struct parsing - Serve command with all parameters
+#[test]
+fn test_cli_parse_serve_command_all_params() {
+    let cli = crates_docs::cli::Cli::try_parse_from([
+        "crates-docs",
+        "serve",
+        "--mode",
+        "stdio",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9000",
+        "--enable-oauth",
+        "true",
+        "--oauth-client-id",
+        "client123",
+        "--oauth-client-secret",
+        "secret456",
+        "--oauth-redirect-uri",
+        "http://localhost/callback",
+        "--enable-api-key",
+        "true",
+        "--api-keys",
+        "test-key",
+    ]);
+
+    assert!(cli.is_ok());
+    let cli = cli.unwrap();
+    match cli.command {
+        crates_docs::cli::Commands::Serve {
+            mode,
+            host,
+            port,
+            enable_oauth,
+            oauth_client_id,
+            oauth_client_secret,
+            oauth_redirect_uri,
+            enable_api_key,
+            api_keys,
+            ..
+        } => {
+            assert_eq!(mode, Some("stdio".to_string()));
+            assert_eq!(host, Some("0.0.0.0".to_string()));
+            assert_eq!(port, Some(9000));
+            assert_eq!(enable_oauth, Some(true));
+            assert_eq!(oauth_client_id, Some("client123".to_string()));
+            assert_eq!(oauth_client_secret, Some("secret456".to_string()));
+            assert_eq!(
+                oauth_redirect_uri,
+                Some("http://localhost/callback".to_string())
+            );
+            assert_eq!(enable_api_key, Some(true));
+            assert_eq!(api_keys, Some("test-key".to_string()));
+        }
+        _ => panic!("Expected Serve command"),
+    }
+}
+
+/// Test Cli struct parsing - Serve command with mode variants
+#[test]
+fn test_cli_parse_serve_command_mode_variants() {
+    let modes = ["stdio", "http", "sse", "hybrid"];
+
+    for mode in modes {
+        let cli = crates_docs::cli::Cli::try_parse_from([
+            "crates-docs",
+            "serve",
+            "--mode",
+            mode,
+            "--port",
+            "8080",
+        ]);
+
+        assert!(cli.is_ok(), "Failed for mode: {}", mode);
+        let cli = cli.unwrap();
+        match cli.command {
+            crates_docs::cli::Commands::Serve { mode: m, .. } => {
+                assert_eq!(m, Some(mode.to_string()));
+            }
+            _ => panic!("Expected Serve command"),
+        }
+    }
+}

@@ -32,6 +32,40 @@ use crate::config::PerformanceConfig;
 use rust_mcp_sdk::schema::CallToolError;
 use std::sync::Arc;
 
+#[cfg(not(test))]
+const DOCS_RS_BASE_URL: &str = "https://docs.rs";
+
+#[cfg(not(test))]
+const CRATES_IO_BASE_URL: &str = "https://crates.io";
+
+#[must_use]
+#[cfg(test)]
+/// Get the docs.rs base URL (configurable via environment variable for testing)
+pub fn docs_rs_base_url() -> String {
+    std::env::var("CRATES_DOCS_DOCS_RS_URL").unwrap_or_else(|_| "https://docs.rs".to_string())
+}
+
+#[must_use]
+#[cfg(not(test))]
+/// Get the docs.rs base URL
+pub fn docs_rs_base_url() -> String {
+    DOCS_RS_BASE_URL.to_string()
+}
+
+#[must_use]
+#[cfg(test)]
+/// Get the crates.io base URL (configurable via environment variable for testing)
+pub fn crates_io_base_url() -> String {
+    std::env::var("CRATES_DOCS_CRATES_IO_URL").unwrap_or_else(|_| "https://crates.io".to_string())
+}
+
+#[must_use]
+#[cfg(not(test))]
+/// Get the crates.io base URL
+pub fn crates_io_base_url() -> String {
+    CRATES_IO_BASE_URL.to_string()
+}
+
 /// Document service
 ///
 /// Provides centralized management of HTTP client (with auto-retry), cache, and document cache.
@@ -207,6 +241,22 @@ impl DocService {
             let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
             CallToolError::from_message(format!("{prefix}Failed to read response: {e}"))
         })
+    }
+
+    /// Create new document service with custom HTTP client (for testing)
+    #[must_use]
+    pub fn with_custom_client(
+        cache: Arc<dyn Cache>,
+        cache_config: &CacheConfig,
+        client: Arc<reqwest_middleware::ClientWithMiddleware>,
+    ) -> Self {
+        let ttl = cache::DocCacheTtl::from_cache_config(cache_config);
+        let doc_cache = cache::DocCache::with_ttl(cache.clone(), ttl);
+        Self {
+            client,
+            cache,
+            doc_cache,
+        }
     }
 }
 

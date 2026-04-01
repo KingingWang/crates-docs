@@ -90,6 +90,7 @@ temp-env = "0.3"
 mockall = "0.14"
 wiremock = "0.6"
 mockito = "1.6"
+serial_test = "3.0"
 
 [[bin]]
 name = "crates-docs"

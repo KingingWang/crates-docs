@@ -17,6 +17,92 @@ fn test_cache_config_default_values() {
     assert_eq!(config.memory_size, Some(1000));
     assert_eq!(config.default_ttl, Some(3600));
     assert!(config.redis_url.is_none());
+    assert_eq!(config.key_prefix, String::new());
+    assert_eq!(config.crate_docs_ttl_secs, Some(3600));
+    assert_eq!(config.item_docs_ttl_secs, Some(1800));
+    assert_eq!(config.search_results_ttl_secs, Some(300));
+}
+
+#[test]
+fn test_cache_config_custom_values() {
+    let config = CacheConfig {
+        cache_type: "redis".to_string(),
+        memory_size: Some(500),
+        default_ttl: Some(7200),
+        redis_url: Some("redis://localhost:6379".to_string()),
+        key_prefix: "myapp".to_string(),
+        crate_docs_ttl_secs: Some(1800),
+        item_docs_ttl_secs: Some(900),
+        search_results_ttl_secs: Some(150),
+    };
+    assert_eq!(config.cache_type, "redis");
+    assert_eq!(config.memory_size, Some(500));
+    assert_eq!(config.default_ttl, Some(7200));
+    assert_eq!(config.redis_url, Some("redis://localhost:6379".to_string()));
+    assert_eq!(config.key_prefix, "myapp");
+    assert_eq!(config.crate_docs_ttl_secs, Some(1800));
+    assert_eq!(config.item_docs_ttl_secs, Some(900));
+    assert_eq!(config.search_results_ttl_secs, Some(150));
+}
+
+#[test]
+fn test_cache_config_serialization() {
+    let config = CacheConfig::default();
+    let json = serde_json::to_string(&config).expect("Failed to serialize");
+    assert!(json.contains("\"cache_type\":\"memory\""));
+    assert!(json.contains("\"memory_size\":1000"));
+
+    let deserialized: CacheConfig = serde_json::from_str(&json).expect("Failed to deserialize");
+    assert_eq!(deserialized.cache_type, config.cache_type);
+    assert_eq!(deserialized.memory_size, config.memory_size);
+    assert_eq!(deserialized.default_ttl, config.default_ttl);
+}
+
+#[test]
+fn test_cache_config_toml_deserialization() {
+    let toml_str = r#"
+        cache_type = "memory"
+        memory_size = 2000
+        key_prefix = "test_prefix"
+        default_ttl = 1800
+    "#;
+
+    let config: CacheConfig = toml::from_str(toml_str).expect("Failed to parse TOML");
+    assert_eq!(config.cache_type, "memory");
+    assert_eq!(config.memory_size, Some(2000));
+    assert_eq!(config.key_prefix, "test_prefix");
+    assert_eq!(config.default_ttl, Some(1800));
+}
+
+#[test]
+fn test_cache_config_defaults_functions() {
+    use crates_docs::cache::{
+        default_crate_docs_ttl, default_item_docs_ttl, default_key_prefix,
+        default_search_results_ttl,
+    };
+
+    assert_eq!(default_crate_docs_ttl(), Some(3600));
+    assert_eq!(default_item_docs_ttl(), Some(1800));
+    assert_eq!(default_search_results_ttl(), Some(300));
+    assert_eq!(default_key_prefix(), String::new());
+}
+
+#[test]
+fn test_cache_config_with_missing_optional_fields() {
+    let toml_str = r#"
+        cache_type = "memory"
+    "#;
+
+    let config: CacheConfig = toml::from_str(toml_str).expect("Failed to parse TOML");
+    assert_eq!(config.cache_type, "memory");
+    assert_eq!(config.memory_size, None);
+    assert_eq!(config.default_ttl, None);
+    assert_eq!(config.redis_url, None);
+    // These should use defaults from serde(default)
+    assert_eq!(config.key_prefix, String::new());
+    assert_eq!(config.crate_docs_ttl_secs, Some(3600));
+    assert_eq!(config.item_docs_ttl_secs, Some(1800));
+    assert_eq!(config.search_results_ttl_secs, Some(300));
 }
 
 // ============================================================================

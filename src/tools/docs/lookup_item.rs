@@ -73,10 +73,11 @@ impl LookupItemToolImpl {
 
     /// Build docs.rs search URL for item
     fn build_search_url(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
+        let base_url = super::docs_rs_base_url();
         let encoded_path = urlencoding::encode(item_path);
         match version {
-            Some(ver) => format!("https://docs.rs/{crate_name}/{ver}/?search={encoded_path}"),
-            None => format!("https://docs.rs/{crate_name}/?search={encoded_path}"),
+            Some(ver) => format!("{base_url}/{crate_name}/{ver}/?search={encoded_path}"),
+            None => format!("{base_url}/{crate_name}/?search={encoded_path}"),
         }
     }
 
@@ -208,22 +209,32 @@ impl Default for LookupItemToolImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_build_search_url_without_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupItemToolImpl::build_search_url("serde", "Serialize", None);
         assert_eq!(url, "https://docs.rs/serde/?search=Serialize");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     }
 
     #[test]
+    #[serial]
     fn test_build_search_url_with_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupItemToolImpl::build_search_url("serde", "Serialize", Some("1.0.0"));
         assert_eq!(url, "https://docs.rs/serde/1.0.0/?search=Serialize");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     }
 
     #[test]
+    #[serial]
     fn test_build_search_url_encodes_special_chars() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupItemToolImpl::build_search_url("std", "collections::HashMap", None);
         assert!(url.contains("collections%3A%3AHashMap"));
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     }
 }

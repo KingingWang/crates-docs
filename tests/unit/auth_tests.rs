@@ -15,7 +15,6 @@ fn test_oauth_config_github() {
     );
     assert!(config.enabled);
     assert_eq!(config.client_id, Some("client_id".to_string()));
-    // OAuthProvider does not implement PartialEq, use Debug for comparison
     assert!(matches!(config.provider, OAuthProvider::GitHub));
 }
 
@@ -43,6 +42,28 @@ fn test_oauth_config_keycloak() {
     assert!(config.enabled);
     assert_eq!(config.client_id, Some("client_id".to_string()));
     assert!(matches!(config.provider, OAuthProvider::Keycloak));
+}
+
+#[test]
+fn test_oauth_config_keycloak_trailing_slash() {
+    let config1 = OAuthConfig::keycloak(
+        "client".to_string(),
+        "secret".to_string(),
+        "http://localhost/callback".to_string(),
+        "https://keycloak.example.com/",
+        "realm",
+    );
+    let config2 = OAuthConfig::keycloak(
+        "client".to_string(),
+        "secret".to_string(),
+        "http://localhost/callback".to_string(),
+        "https://keycloak.example.com",
+        "realm",
+    );
+    assert_eq!(
+        config1.authorization_endpoint,
+        config2.authorization_endpoint
+    );
 }
 
 #[test]
@@ -137,7 +158,7 @@ fn test_oauth_config_validate_invalid_urls() {
         .contains("authorization_endpoint"));
 
     config.authorization_endpoint = Some("https://example.com/auth".to_string());
-    config.token_endpoint = Some("bad-url".to_string());
+    config.token_endpoint = Some("not\\valid".to_string());
     assert!(config
         .validate()
         .unwrap_err()

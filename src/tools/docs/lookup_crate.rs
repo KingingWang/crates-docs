@@ -66,9 +66,10 @@ impl LookupCrateToolImpl {
 
     /// Build docs.rs URL for crate
     fn build_url(crate_name: &str, version: Option<&str>) -> String {
+        let base_url = super::docs_rs_base_url();
         match version {
-            Some(ver) => format!("https://docs.rs/{crate_name}/{ver}/"),
-            None => format!("https://docs.rs/{crate_name}/"),
+            Some(ver) => format!("{base_url}/{crate_name}/{ver}/"),
+            None => format!("{base_url}/{crate_name}/"),
         }
     }
 
@@ -181,16 +182,32 @@ impl Default for LookupCrateToolImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_build_url_without_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupCrateToolImpl::build_url("serde", None);
         assert_eq!(url, "https://docs.rs/serde/");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     }
 
     #[test]
+    #[serial]
     fn test_build_url_with_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
         let url = LookupCrateToolImpl::build_url("serde", Some("1.0.0"));
         assert_eq!(url, "https://docs.rs/serde/1.0.0/");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
+    }
+
+    #[test]
+    #[serial]
+    fn test_build_url_with_custom_base() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "http://mock-server");
+        let url = LookupCrateToolImpl::build_url("serde", None);
+        assert_eq!(url, "http://mock-server/serde/");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     }
 }

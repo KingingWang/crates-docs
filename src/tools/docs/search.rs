@@ -111,7 +111,8 @@ impl SearchCratesToolImpl {
         }
 
         let url = format!(
-            "https://crates.io/api/v1/crates?q={}&per_page={}&sort={}",
+            "{}/api/v1/crates?q={}&per_page={}&sort={}",
+            super::crates_io_base_url(),
             urlencoding::encode(query),
             limit,
             urlencoding::encode(sort)
