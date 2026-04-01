@@ -73,12 +73,7 @@ impl LookupItemToolImpl {
 
     /// Build docs.rs search URL for item
     fn build_search_url(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
-        let base_url = super::docs_rs_base_url();
-        let encoded_path = urlencoding::encode(item_path);
-        match version {
-            Some(ver) => format!("{base_url}/{crate_name}/{ver}/?search={encoded_path}"),
-            None => format!("{base_url}/{crate_name}/?search={encoded_path}"),
-        }
+        super::build_docs_item_url(crate_name, version, item_path)
     }
 
     /// Get item documentation (markdown format)

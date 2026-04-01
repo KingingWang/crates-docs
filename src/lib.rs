@@ -105,20 +105,18 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
     }
 
     // Parse log level
-    let level = match config.level.to_lowercase().as_str() {
-        "trace" => "trace",
-        "debug" => "debug",
-        "warn" => "warn",
-        "error" => "error",
-        _ => "info",
+    let level = config.level.to_lowercase();
+    let level = match level.as_str() {
+        "trace" | "debug" | "warn" | "error" => level.clone(),
+        _ => "info".to_string(),
     };
 
     let filter = EnvFilter::new(level);
 
     // Build log layers based on configuration
     match (config.enable_console, config.enable_file, &config.file_path) {
-        // Enable both console and file logging
         (true, true, Some(file_path)) => {
+            // Enable both console and file logging
             let (log_dir, log_file_name) = parse_log_path(file_path);
             ensure_log_directory(&log_dir)?;
             let file_appender = tracing_appender::rolling::daily(&log_dir, log_file_name);
@@ -129,15 +127,8 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
                 .with(fmt_layer!(file_appender)));
         }
 
-        // Enable console logging only
-        (true, _, _) | (false, false, _) => {
-            try_init!(tracing_subscriber::registry()
-                .with(filter)
-                .with(fmt_layer!()));
-        }
-
-        // Enable file logging only
         (false, true, Some(file_path)) => {
+            // Enable file logging only
             let (log_dir, log_file_name) = parse_log_path(file_path);
             ensure_log_directory(&log_dir)?;
             let file_appender = tracing_appender::rolling::daily(&log_dir, log_file_name);
@@ -147,7 +138,7 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
                 .with(fmt_layer!(file_appender)));
         }
 
-        // Other cases, use default console logging
+        // Default: console logging (covers all other cases)
         _ => {
             try_init!(tracing_subscriber::registry()
                 .with(filter)

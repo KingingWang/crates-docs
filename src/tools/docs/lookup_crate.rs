@@ -66,11 +66,7 @@ impl LookupCrateToolImpl {
 
     /// Build docs.rs URL for crate
     fn build_url(crate_name: &str, version: Option<&str>) -> String {
-        let base_url = super::docs_rs_base_url();
-        match version {
-            Some(ver) => format!("{base_url}/{crate_name}/{ver}/"),
-            None => format!("{base_url}/{crate_name}/"),
-        }
+        super::build_docs_url(crate_name, version)
     }
 
     /// Get crate documentation (markdown format)
