@@ -94,43 +94,125 @@ pub async fn run_stdio_server(server: &CratesDocsServer) -> Result<()> {
     Ok(())
 }
 
-/// Internal helper to run a Hyper-based MCP server with the given configuration.
+/// Hyper server configuration
 ///
-/// This function consolidates the common logic for HTTP, SSE, and Hybrid servers,
-/// which only differ in their SSE support and log messages.
+/// Configuration for HTTP/SSE/Hybrid MCP servers using the Builder pattern.
+///
+/// # Example
+///
+/// ```rust
+/// use crates_docs::server::transport::HyperServerConfig;
+///
+/// let http_config = HyperServerConfig::http();
+/// let sse_config = HyperServerConfig::sse();
+/// let hybrid_config = HyperServerConfig::hybrid();
+/// ```
+#[derive(Debug, Clone)]
+pub struct HyperServerConfig {
+    /// Protocol name for logging (e.g., "HTTP", "SSE", "Hybrid")
+    protocol_name: String,
+    /// Whether SSE support is enabled
+    sse_support: bool,
+}
+
+impl HyperServerConfig {
+    /// Create HTTP server configuration
+    ///
+    /// HTTP mode supports Streamable HTTP protocol for stateless requests.
+    #[must_use]
+    pub fn http() -> Self {
+        Self {
+            protocol_name: "HTTP".to_string(),
+            sse_support: false,
+        }
+    }
+
+    /// Create SSE server configuration
+    ///
+    /// SSE mode supports Server-Sent Events for server push capabilities.
+    #[must_use]
+    pub fn sse() -> Self {
+        Self {
+            protocol_name: "SSE".to_string(),
+            sse_support: true,
+        }
+    }
+
+    /// Create Hybrid server configuration
+    ///
+    /// Hybrid mode supports both HTTP and SSE protocols.
+    #[must_use]
+    pub fn hybrid() -> Self {
+        Self {
+            protocol_name: "Hybrid".to_string(),
+            sse_support: true,
+        }
+    }
+
+    /// Get protocol name
+    #[must_use]
+    pub fn protocol_name(&self) -> &str {
+        &self.protocol_name
+    }
+
+    /// Check if SSE support is enabled
+    #[must_use]
+    pub fn sse_support(&self) -> bool {
+        self.sse_support
+    }
+}
+
+/// Run a Hyper-based MCP server with the given configuration.
+///
+/// This function handles HTTP, SSE, and Hybrid servers based on the configuration.
 ///
 /// # Arguments
 ///
 /// * `server` - `CratesDocsServer` instance
-/// * `protocol_name` - Protocol name for logging (e.g., "HTTP", "SSE", "Hybrid")
-/// * `sse_support` - Whether SSE support is enabled
-async fn run_hyper_server(
-    server: &CratesDocsServer,
-    protocol_name: &str,
-    sse_support: bool,
-) -> Result<()> {
-    let config = server.config();
+/// * `config` - `HyperServerConfig` instance
+///
+/// # Errors
+///
+/// Returns error if server startup fails
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use crates_docs::server::transport::{run_hyper_server, HyperServerConfig};
+/// use crates_docs::{AppConfig, CratesDocsServer};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let config = AppConfig::default();
+///     let server = CratesDocsServer::new(config)?;
+///     let http_config = HyperServerConfig::http();
+///     run_hyper_server(&server, http_config).await?;
+///     Ok(())
+/// }
+/// ```
+pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConfig) -> Result<()> {
+    let server_config = server.config();
     let server_info = server.server_info();
     let handler = CratesDocsHandler::new(Arc::new(server.clone()));
 
     tracing::info!(
         "Starting {} MCP server on {}:{}...",
-        protocol_name,
-        config.server.host,
-        config.server.port
+        config.protocol_name(),
+        server_config.server.host,
+        server_config.server.port
     );
 
     // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
-        host: config.server.host.clone(),
-        port: config.server.port,
+        host: server_config.server.host.clone(),
+        port: server_config.server.port,
         transport_options: Arc::new(TransportOptions::default()),
-        sse_support,
+        sse_support: config.sse_support(),
         event_store: Some(Arc::new(event_store::InMemoryEventStore::default())),
         task_store: None,
         client_task_store: None,
-        allowed_hosts: Some(config.server.allowed_hosts.clone()),
-        allowed_origins: Some(config.server.allowed_origins.clone()),
+        allowed_hosts: Some(server_config.server.allowed_hosts.clone()),
+        allowed_origins: Some(server_config.server.allowed_origins.clone()),
         health_endpoint: Some("/health".to_string()),
         ..Default::default()
     };
@@ -140,16 +222,20 @@ async fn run_hyper_server(
         hyper_server::create_server(server_info, handler.to_mcp_server_handler(), options);
 
     // Build the started message based on the protocol
-    let started_msg = if sse_support && protocol_name != "SSE" {
+    let started_msg = if config.sse_support() && config.protocol_name() != "SSE" {
         // Hybrid mode
         format!(
             "{} MCP server started, listening on {}:{} (HTTP + SSE)",
-            protocol_name, config.server.host, config.server.port
+            config.protocol_name(),
+            server_config.server.host,
+            server_config.server.port
         )
     } else {
         format!(
             "{} MCP server started, listening on {}:{}",
-            protocol_name, config.server.host, config.server.port
+            config.protocol_name(),
+            server_config.server.host,
+            server_config.server.port
         )
     };
     tracing::info!("{}", started_msg);
@@ -160,96 +246,6 @@ async fn run_hyper_server(
         .map_err(|e: McpSdkError| crate::error::Error::mcp("server_start", e.to_string()))?;
 
     Ok(())
-}
-
-/// Run HTTP server (Streamable HTTP)
-///
-/// Starts MCP server supporting Streamable HTTP protocol.
-///
-/// # Arguments
-///
-/// * `server` - `CratesDocsServer` instance
-///
-/// # Errors
-///
-/// Returns error if server startup fails
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use crates_docs::server::transport::run_http_server;
-/// use crates_docs::{AppConfig, CratesDocsServer};
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let config = AppConfig::default();
-///     let server = CratesDocsServer::new(config)?;
-///     run_http_server(&server).await?;
-///     Ok(())
-/// }
-/// ```
-pub async fn run_http_server(server: &CratesDocsServer) -> Result<()> {
-    run_hyper_server(server, "HTTP", false).await
-}
-
-/// Run SSE server (Server-Sent Events)
-///
-/// Starts MCP server supporting Server-Sent Events protocol.
-///
-/// # Arguments
-///
-/// * `server` - `CratesDocsServer` instance
-///
-/// # Errors
-///
-/// Returns error if server startup fails
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use crates_docs::server::transport::run_sse_server;
-/// use crates_docs::{AppConfig, CratesDocsServer};
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let config = AppConfig::default();
-///     let server = CratesDocsServer::new(config)?;
-///     run_sse_server(&server).await?;
-///     Ok(())
-/// }
-/// ```
-pub async fn run_sse_server(server: &CratesDocsServer) -> Result<()> {
-    run_hyper_server(server, "SSE", true).await
-}
-
-/// Run Hybrid server (supports both HTTP and SSE)
-///
-/// Starts MCP server supporting both HTTP and SSE protocols.
-///
-/// # Arguments
-///
-/// * `server` - `CratesDocsServer` instance
-///
-/// # Errors
-///
-/// Returns error if server startup fails
-///
-/// # Example
-///
-/// ```rust,no_run
-/// use crates_docs::server::transport::run_hybrid_server;
-/// use crates_docs::{AppConfig, CratesDocsServer};
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let config = AppConfig::default();
-///     let server = CratesDocsServer::new(config)?;
-///     run_hybrid_server(&server).await?;
-///     Ok(())
-/// }
-/// ```
-pub async fn run_hybrid_server(server: &CratesDocsServer) -> Result<()> {
-    run_hyper_server(server, "Hybrid", true).await
 }
 
 /// Transport mode
@@ -310,12 +306,28 @@ impl std::fmt::Display for TransportMode {
     }
 }
 
+impl TransportMode {
+    /// Convert to `HyperServerConfig`
+    #[must_use]
+    pub fn to_hyper_config(&self) -> Option<HyperServerConfig> {
+        match self {
+            TransportMode::Stdio => None,
+            TransportMode::Http => Some(HyperServerConfig::http()),
+            TransportMode::Sse => Some(HyperServerConfig::sse()),
+            TransportMode::Hybrid => Some(HyperServerConfig::hybrid()),
+        }
+    }
+}
+
 /// Run server with the specified transport mode
 pub async fn run_server_with_mode(server: &CratesDocsServer, mode: TransportMode) -> Result<()> {
     match mode {
         TransportMode::Stdio => run_stdio_server(server).await,
-        TransportMode::Http => run_http_server(server).await,
-        TransportMode::Sse => run_sse_server(server).await,
-        TransportMode::Hybrid => run_hybrid_server(server).await,
+        TransportMode::Http | TransportMode::Sse | TransportMode::Hybrid => {
+            let config = mode
+                .to_hyper_config()
+                .expect("Hyper config should exist for HTTP/SSE/Hybrid");
+            run_hyper_server(server, config).await
+        }
     }
 }

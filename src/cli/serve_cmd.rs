@@ -1,7 +1,7 @@
 //! Serve command implementation
 
 use crate::config_reload::ConfigReloader;
-use crate::server::transport;
+use crate::server::transport::{self, HyperServerConfig};
 use crate::CratesDocsServer;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -76,7 +76,7 @@ fn start_config_reloader(config_path: &std::path::Path, server: &CratesDocsServe
                         if let Some(changes) = change.changes() {
                             tracing::info!("Configuration file changed:");
                             for change_desc in changes {
-                                tracing::info!("  - {}", change_desc);
+                                tracing::info!(" - {}", change_desc);
                             }
                             tracing::warn!("Configuration has been reloaded. Some changes may require server restart.");
                             tracing::warn!("API key changes: New keys are now active. Removed keys are revoked immediately.");
@@ -109,7 +109,7 @@ async fn run_server_by_mode(
                 server.config().server.host,
                 server.config().server.port
             );
-            transport::run_http_server(server)
+            transport::run_hyper_server(server, HyperServerConfig::http())
                 .await
                 .map_err(|e| format!("Failed to start HTTP server: {e}"))?;
         }
@@ -119,7 +119,7 @@ async fn run_server_by_mode(
                 server.config().server.host,
                 server.config().server.port
             );
-            transport::run_sse_server(server)
+            transport::run_hyper_server(server, HyperServerConfig::sse())
                 .await
                 .map_err(|e| format!("Failed to start SSE server: {e}"))?;
         }
@@ -129,7 +129,7 @@ async fn run_server_by_mode(
                 server.config().server.host,
                 server.config().server.port
             );
-            transport::run_hybrid_server(server)
+            transport::run_hyper_server(server, HyperServerConfig::hybrid())
                 .await
                 .map_err(|e| format!("Failed to start hybrid server: {e}"))?;
         }

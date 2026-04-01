@@ -1222,3 +1222,65 @@ async fn test_doc_cache_concurrent_access() {
         handle.await.expect("task failed");
     }
 }
+
+// ============================================================================
+// Format Parsing Tests
+// ============================================================================
+
+#[test]
+fn test_parse_format_none() {
+    use crates_docs::tools::docs::{parse_format, Format};
+    assert_eq!(parse_format(None).unwrap(), Format::Markdown);
+}
+
+#[test]
+fn test_parse_format_markdown() {
+    use crates_docs::tools::docs::{parse_format, Format};
+    assert_eq!(parse_format(Some("markdown")).unwrap(), Format::Markdown);
+    assert_eq!(parse_format(Some("MARKDOWN")).unwrap(), Format::Markdown);
+    assert_eq!(parse_format(Some("Markdown")).unwrap(), Format::Markdown);
+}
+
+#[test]
+fn test_parse_format_text() {
+    use crates_docs::tools::docs::{parse_format, Format};
+    assert_eq!(parse_format(Some("text")).unwrap(), Format::Text);
+    assert_eq!(parse_format(Some("TEXT")).unwrap(), Format::Text);
+}
+
+#[test]
+fn test_parse_format_html() {
+    use crates_docs::tools::docs::{parse_format, Format};
+    assert_eq!(parse_format(Some("html")).unwrap(), Format::Html);
+    assert_eq!(parse_format(Some("HTML")).unwrap(), Format::Html);
+}
+
+#[test]
+fn test_parse_format_json() {
+    use crates_docs::tools::docs::{parse_format, Format};
+    assert_eq!(parse_format(Some("json")).unwrap(), Format::Json);
+    assert_eq!(parse_format(Some("JSON")).unwrap(), Format::Json);
+}
+
+#[test]
+fn test_parse_format_invalid() {
+    use crates_docs::tools::docs::parse_format;
+    assert!(parse_format(Some("invalid")).is_err());
+    assert!(parse_format(Some("xml")).is_err());
+    assert!(parse_format(Some("")).is_err());
+}
+
+#[test]
+fn test_format_display() {
+    use crates_docs::tools::docs::Format;
+    assert_eq!(Format::Markdown.to_string(), "markdown");
+    assert_eq!(Format::Text.to_string(), "text");
+    assert_eq!(Format::Html.to_string(), "html");
+    assert_eq!(Format::Json.to_string(), "json");
+}
+
+#[test]
+fn test_format_default() {
+    use crates_docs::tools::docs::Format;
+    assert_eq!(Format::default(), Format::Markdown);
+}

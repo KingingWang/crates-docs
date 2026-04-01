@@ -32,26 +32,26 @@ impl TokenStore {
 
     /// Store token
     pub fn store_token(&self, key: String, token: TokenInfo) {
-        let mut tokens = self.tokens.write().unwrap();
+        let mut tokens = self.tokens.write().expect("Token store RwLock poisoned");
         tokens.insert(key, token);
     }
 
     /// Get token
     pub fn get_token(&self, key: &str) -> Option<TokenInfo> {
-        let tokens = self.tokens.read().unwrap();
+        let tokens = self.tokens.read().expect("Token store RwLock poisoned");
         tokens.get(key).cloned()
     }
 
     /// Remove token
     pub fn remove_token(&self, key: &str) {
-        let mut tokens = self.tokens.write().unwrap();
+        let mut tokens = self.tokens.write().expect("Token store RwLock poisoned");
         tokens.remove(key);
     }
 
     /// Cleanup expired tokens
     pub fn cleanup_expired(&self) {
         let now = chrono::Utc::now();
-        let mut tokens = self.tokens.write().unwrap();
+        let mut tokens = self.tokens.write().expect("Token store RwLock poisoned");
         tokens.retain(|_, token| token.expires_at > now);
     }
 }

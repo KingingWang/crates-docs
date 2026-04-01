@@ -24,6 +24,54 @@ pub mod redis;
 
 use std::time::Duration;
 
+/// Default memory cache capacity
+///
+/// # Value
+///
+/// 1000 entries
+///
+/// # Rationale
+///
+/// Provides good balance between memory usage and cache hit rate for typical workloads.
+/// Configurable via `CacheConfig::memory_size`.
+const DEFAULT_MEMORY_CACHE_SIZE: usize = 1000;
+
+/// Default crate documentation TTL in seconds
+///
+/// # Value
+///
+/// 3600 seconds (1 hour)
+///
+/// # Rationale
+///
+/// Reused from ttl.rs for consistency. Crate documentation changes infrequently.
+/// Configurable via `CacheConfig::crate_docs_ttl_secs`.
+const DEFAULT_CRATE_DOCS_TTL_SECS: u64 = 3600;
+
+/// Default item documentation TTL in seconds
+///
+/// # Value
+///
+/// 1800 seconds (30 minutes)
+///
+/// # Rationale
+///
+/// Reused from ttl.rs for consistency. Item documentation changes moderately often.
+/// Configurable via `CacheConfig::item_docs_ttl_secs`.
+const DEFAULT_ITEM_DOCS_TTL_SECS: u64 = 1800;
+
+/// Default search results TTL in seconds
+///
+/// # Value
+///
+/// 300 seconds (5 minutes)
+///
+/// # Rationale
+///
+/// Reused from ttl.rs for consistency. Search results change frequently.
+/// Configurable via `CacheConfig::search_results_ttl_secs`.
+const DEFAULT_SEARCH_RESULTS_TTL_SECS: u64 = 300;
+
 /// Cache trait
 ///
 /// Defines basic cache operation interface, supporting async read/write, TTL expiration, and bulk cleanup.
@@ -163,19 +211,19 @@ pub struct CacheConfig {
 /// Default crate document TTL (1 hour)
 #[must_use]
 pub fn default_crate_docs_ttl() -> Option<u64> {
-    Some(3600)
+    Some(DEFAULT_CRATE_DOCS_TTL_SECS)
 }
 
 /// Default item document TTL (30 minutes)
 #[must_use]
 pub fn default_item_docs_ttl() -> Option<u64> {
-    Some(1800)
+    Some(DEFAULT_ITEM_DOCS_TTL_SECS)
 }
 
 /// Default search result TTL (5 minutes)
 #[must_use]
 pub fn default_search_results_ttl() -> Option<u64> {
-    Some(300)
+    Some(DEFAULT_SEARCH_RESULTS_TTL_SECS)
 }
 
 /// Default key prefix
@@ -188,10 +236,10 @@ impl Default for CacheConfig {
     fn default() -> Self {
         Self {
             cache_type: "memory".to_string(),
-            memory_size: Some(1000),
+            memory_size: Some(DEFAULT_MEMORY_CACHE_SIZE),
             redis_url: None,
             key_prefix: String::new(),
-            default_ttl: Some(3600), // 1 hour
+            default_ttl: Some(DEFAULT_CRATE_DOCS_TTL_SECS),
             crate_docs_ttl_secs: default_crate_docs_ttl(),
             item_docs_ttl_secs: default_item_docs_ttl(),
             search_results_ttl_secs: default_search_results_ttl(),
@@ -222,7 +270,7 @@ pub fn create_cache(config: &CacheConfig) -> Result<Box<dyn Cache>, crate::error
         "memory" => {
             #[cfg(feature = "cache-memory")]
             {
-                let size = config.memory_size.unwrap_or(1000);
+                let size = config.memory_size.unwrap_or(DEFAULT_MEMORY_CACHE_SIZE);
                 Ok(Box::new(memory::MemoryCache::new(size)))
             }
             #[cfg(not(feature = "cache-memory"))]
@@ -288,7 +336,7 @@ pub async fn create_cache_async(
 ) -> Result<Box<dyn Cache>, crate::error::Error> {
     match config.cache_type.as_str() {
         "memory" => {
-            let size = config.memory_size.unwrap_or(1000);
+            let size = config.memory_size.unwrap_or(DEFAULT_MEMORY_CACHE_SIZE);
             Ok(Box::new(memory::MemoryCache::new(size)))
         }
         "redis" => {
