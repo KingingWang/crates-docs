@@ -185,10 +185,10 @@ async fn test_hybrid_server_actual_start() {
     config.server.enable_sse = true;
 
     let server = CratesDocsServer::new_async(config).await.unwrap();
-    let handle =
-        tokio::spawn(
-            async move { crates_docs::server::transport::run_hybrid_server(&server).await },
-        );
+    let handle = tokio::spawn(async move {
+        let config = crates_docs::server::transport::HyperServerConfig::hybrid();
+        crates_docs::server::transport::run_hyper_server(&server, config).await
+    });
 
     // Wait for server to start
     let result = tokio::time::timeout(

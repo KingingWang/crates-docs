@@ -9,12 +9,10 @@
 //! - `transport`: Transport layer implementation
 //! - `auth`: OAuth authentication support
 //!
-//! # Handler Design Pattern
+//! # Handler Design
 //!
-//! Uses composition pattern to eliminate code duplication:
-//! - `HandlerCore`: Encapsulates shared core handling logic
-//! - `CratesDocsHandler`: Standard MCP handler (delegates to `HandlerCore`)
-//! - `CratesDocsHandlerCore`: Core handler (delegates to `HandlerCore`)
+//! Single-layer architecture with all handling logic directly in `CratesDocsHandler`:
+//! - `CratesDocsHandler`: Implements MCP protocol handler interface
 //! - `HandlerConfig`: Configuration class, supports merge operation
 //!
 //! # Example
@@ -28,7 +26,7 @@
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let config = AppConfig::default();
 //!     let server = Arc::new(CratesDocsServer::new(config)?);
-//!     
+//!
 //!     // Create handler with merged config
 //!     let base_config = HandlerConfig::default();
 //!     let override_config = HandlerConfig::new().with_verbose_logging();
@@ -37,9 +35,10 @@
 //!         base_config,
 //!         Some(override_config)
 //!     );
-//!     
+//!
 //!     // Run HTTP server
-//!     crates_docs::server::transport::run_http_server(&handler.server()).await?;
+//!     let http_config = crates_docs::server::transport::HyperServerConfig::http();
+//!     crates_docs::server::transport::run_hyper_server(&handler.server(), http_config).await?;
 //!
 //!     Ok(())
 //! }
@@ -64,6 +63,9 @@ pub use crate::config::ServerConfig;
 
 /// Re-export `CratesDocsHandler` from handler module
 pub use handler::CratesDocsHandler;
+
+/// Re-export `HyperServerConfig` from transport module
+pub use transport::HyperServerConfig;
 
 /// Crates Docs MCP Server
 ///
@@ -233,7 +235,7 @@ impl CratesDocsServer {
             protocol_version: ProtocolVersion::V2025_11_25.into(),
             instructions: Some(
                 "Use this server to query Rust crate documentation. Supports crate lookup, crate search, and health check."
-                    .to_string(),
+                .to_string(),
             ),
             meta: None,
         }
@@ -254,7 +256,7 @@ impl CratesDocsServer {
     ///
     /// Returns error if server startup fails
     pub async fn run_http(&self) -> Result<()> {
-        transport::run_http_server(self).await
+        transport::run_hyper_server(self, transport::HyperServerConfig::http()).await
     }
 
     /// Run SSE server
@@ -263,6 +265,6 @@ impl CratesDocsServer {
     ///
     /// Returns error if server startup fails
     pub async fn run_sse(&self) -> Result<()> {
-        transport::run_sse_server(self).await
+        transport::run_hyper_server(self, transport::HyperServerConfig::sse()).await
     }
 }

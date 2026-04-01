@@ -150,18 +150,28 @@ impl Tool for LookupCrateToolImpl {
             )
         })?;
 
-        let format = params.format.as_deref().unwrap_or("markdown");
+        let format = super::parse_format(params.format.as_deref()).map_err(|_| {
+            rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                "lookup_crate",
+                Some("Invalid format".to_string()),
+            )
+        })?;
         let content = match format {
-            "text" => {
+            super::Format::Text => {
                 self.fetch_crate_docs_as_text(&params.crate_name, params.version.as_deref())
                     .await?
             }
-            "html" => {
+            super::Format::Html => {
                 self.fetch_crate_docs_as_html(&params.crate_name, params.version.as_deref())
                     .await?
             }
-            _ => {
-                // "markdown" and other formats default to markdown
+            super::Format::Json => {
+                return Err(rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                    "lookup_crate",
+                    Some("JSON format is not supported by this tool".to_string()),
+                ))
+            }
+            super::Format::Markdown => {
                 self.fetch_crate_docs(&params.crate_name, params.version.as_deref())
                     .await?
             }

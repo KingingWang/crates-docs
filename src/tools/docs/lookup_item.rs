@@ -165,9 +165,14 @@ impl Tool for LookupItemToolImpl {
             )
         })?;
 
-        let format = params.format.as_deref().unwrap_or("markdown");
+        let format = super::parse_format(params.format.as_deref()).map_err(|_| {
+            rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                "lookup_item",
+                Some("Invalid format".to_string()),
+            )
+        })?;
         let content = match format {
-            "text" => {
+            super::Format::Text => {
                 self.fetch_item_docs_as_text(
                     &params.crate_name,
                     &params.item_path,
@@ -175,7 +180,7 @@ impl Tool for LookupItemToolImpl {
                 )
                 .await?
             }
-            "html" => {
+            super::Format::Html => {
                 self.fetch_item_docs_as_html(
                     &params.crate_name,
                     &params.item_path,
@@ -183,8 +188,13 @@ impl Tool for LookupItemToolImpl {
                 )
                 .await?
             }
-            _ => {
-                // "markdown" and other formats default to markdown
+            super::Format::Json => {
+                return Err(rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                    "lookup_item",
+                    Some("JSON format is not supported by this tool".to_string()),
+                ))
+            }
+            super::Format::Markdown => {
                 self.fetch_item_docs(
                     &params.crate_name,
                     &params.item_path,

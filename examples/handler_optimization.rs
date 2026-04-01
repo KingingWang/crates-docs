@@ -1,6 +1,6 @@
 //! Handler optimization example
 //!
-//! Demonstrates how to use the refactored Handler, including:
+//! Demonstrates how to use the simplified Handler, including:
 //! - Configuration using HandlerConfig
 //! - Merging configurations using merge functionality
 //! - Metrics integration
@@ -16,7 +16,7 @@ use std::sync::Arc;
 use crates_docs::config::AppConfig;
 use crates_docs::metrics::ServerMetrics;
 use crates_docs::server::{
-    handler::{CratesDocsHandler, CratesDocsHandlerCore, HandlerConfig, HandlerCore},
+    handler::{CratesDocsHandler, HandlerConfig},
     CratesDocsServer,
 };
 
@@ -35,12 +35,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let handler_default = CratesDocsHandler::new(server.clone());
     println!(
         "   - Verbose logging: {}",
-        handler_default.core().config().verbose_logging
+        handler_default.config().verbose_logging
     );
-    println!(
-        "   - Metrics: {}",
-        handler_default.core().config().enable_metrics
-    );
+    println!("   - Metrics: {}", handler_default.config().enable_metrics);
     println!();
 
     // 3. Example 2: Create Handler with custom configuration
@@ -49,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let handler_custom = CratesDocsHandler::with_config(server.clone(), custom_config);
     println!(
         "   - Verbose logging: {}",
-        handler_custom.core().config().verbose_logging
+        handler_custom.config().verbose_logging
     );
     println!();
 
@@ -63,8 +60,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   - Override config: verbose_logging=true, enable_metrics=true");
     println!(
         "   - Merged result: verbose_logging={}, enable_metrics={}",
-        handler_merged.core().config().verbose_logging,
-        handler_merged.core().config().enable_metrics
+        handler_merged.config().verbose_logging,
+        handler_merged.config().enable_metrics
     );
     println!();
 
@@ -82,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Simulate tool execution (structure demonstration only)
     println!("   - Handler has Metrics instance attached");
-    let list_tools = handler_with_metrics.core().list_tools();
+    let list_tools = handler_with_metrics.list_tools();
     println!("   - Available tools count: {}", list_tools.tools.len());
 
     // Check if metrics are recorded
@@ -90,10 +87,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   - Metrics generated: {}", !metrics_output.is_empty());
     println!();
 
-    // 7. Example 6: Using HandlerCore directly
-    println!("📝 Example 6: Using HandlerCore");
-    let core = HandlerCore::new(server.clone());
-    let tools = core.list_tools();
+    // 7. Example 6: Direct tool listing
+    println!("📝 Example 6: Direct tool listing");
+    let tools = handler_with_metrics.list_tools();
     println!("   - Tool list:");
     for tool in &tools.tools {
         if let Some(desc) = &tool.description {
@@ -102,14 +98,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!();
 
-    // 8. Example 7: CratesDocsHandlerCore usage
-    println!("📝 Example 7: CratesDocsHandlerCore");
-    let _core_handler = CratesDocsHandlerCore::new(server);
-    println!("   - Core handler created, supports fine-grained control");
-    println!();
-
-    // 9. Example 8: Test HandlerConfig merge override logic
-    println!("📝 Example 8: Test merge override logic");
+    // 8. Example 7: Test HandlerConfig merge override logic
+    println!("📝 Example 7: Test merge override logic");
 
     // Test 1: None override (returns original config)
     let config1 = HandlerConfig::default();

@@ -68,9 +68,6 @@ const VALID_SEARCH_SORTS: &[&str] = &[
     "new",
 ];
 
-/// Default output format for search results
-const DEFAULT_FORMAT: &str = "markdown";
-
 pub struct SearchCratesToolImpl {
     service: Arc<super::DocService>,
 }
@@ -209,10 +206,12 @@ fn parse_crates_response(json: &serde_json::Value, limit: usize) -> Vec<CrateInf
 }
 
 #[inline]
-fn format_search_results(crates: &[CrateInfo], format: &str) -> String {
+fn format_search_results(crates: &[CrateInfo], format: super::Format) -> String {
     match format {
-        "json" => serde_json::to_string_pretty(crates).unwrap_or_else(|_| "[]".to_string()),
-        "text" => format_text_results(crates),
+        super::Format::Json => {
+            serde_json::to_string_pretty(crates).unwrap_or_else(|_| "[]".to_string())
+        }
+        super::Format::Text => format_text_results(crates),
         _ => format_markdown_results(crates),
     }
 }
@@ -298,7 +297,12 @@ impl Tool for SearchCratesToolImpl {
         let sort = normalize_search_sort(params.sort.as_deref())?;
         let crates = self.search_crates(&params.query, limit, &sort).await?;
 
-        let format = params.format.as_deref().unwrap_or(DEFAULT_FORMAT);
+        let format = super::parse_format(params.format.as_deref()).map_err(|_| {
+            rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                "search_crates",
+                Some("Invalid format".to_string()),
+            )
+        })?;
         let content = format_search_results(&crates, format);
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![

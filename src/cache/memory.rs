@@ -1,4 +1,4 @@
-//! Memory cache implementation
+//!//! Memory cache implementation
 //!
 //! Memory cache using `moka::sync::Cache` with `TinyLFU` eviction policy.
 //! This provides better performance and hit rate than simple LRU.
@@ -108,9 +108,18 @@ mod tests {
     use crate::cache::Cache;
     use tokio::time::sleep;
 
+    /// Default cache capacity for tests
+    const DEFAULT_TEST_CACHE_CAPACITY: usize = 10;
+
+    /// Test TTL duration in milliseconds
+    const TEST_TTL_MS: u64 = 100;
+
+    /// Test TTL wait duration in milliseconds
+    const TEST_TTL_WAIT_MS: u64 = 150;
+
     #[tokio::test]
     async fn test_memory_cache_basic() {
-        let cache = MemoryCache::new(10);
+        let cache = MemoryCache::new(DEFAULT_TEST_CACHE_CAPACITY);
 
         // Test set and get
         cache
@@ -136,21 +145,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_memory_cache_ttl() {
-        let cache = MemoryCache::new(10);
+        let cache = MemoryCache::new(DEFAULT_TEST_CACHE_CAPACITY);
 
         // Test cache with TTL
         cache
             .set(
                 "key1".to_string(),
                 "value1".to_string(),
-                Some(Duration::from_millis(100)),
+                Some(Duration::from_millis(TEST_TTL_MS)),
             )
             .await
             .expect("set should succeed");
         assert_eq!(cache.get("key1").await, Some("value1".to_string()));
 
         // Wait for expiration
-        sleep(Duration::from_millis(150)).await;
+        sleep(Duration::from_millis(TEST_TTL_WAIT_MS)).await;
         // Run pending tasks to ensure expiration is processed
         cache.cache.run_pending_tasks();
         assert_eq!(cache.get("key1").await, None);
@@ -184,7 +193,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_memory_cache_exists() {
-        let cache = MemoryCache::new(10);
+        let cache = MemoryCache::new(DEFAULT_TEST_CACHE_CAPACITY);
 
         cache
             .set("key1".to_string(), "value1".to_string(), None)

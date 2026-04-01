@@ -32,6 +32,50 @@ use crate::config::PerformanceConfig;
 use rust_mcp_sdk::schema::CallToolError;
 use std::sync::Arc;
 
+/// Output format for documentation
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Format {
+    /// Markdown format
+    #[default]
+    Markdown,
+    /// Plain text format
+    Text,
+    /// HTML format
+    Html,
+    /// JSON format (used by search tool)
+    Json,
+}
+
+impl std::fmt::Display for Format {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Markdown => write!(f, "markdown"),
+            Self::Text => write!(f, "text"),
+            Self::Html => write!(f, "html"),
+            Self::Json => write!(f, "json"),
+        }
+    }
+}
+
+/// Parse format string into Format enum
+pub fn parse_format(format_str: Option<&str>) -> Result<Format, CallToolError> {
+    match format_str {
+        None => Ok(Format::Markdown),
+        Some(s) => match s.to_lowercase().as_str() {
+            "markdown" => Ok(Format::Markdown),
+            "text" => Ok(Format::Text),
+            "html" => Ok(Format::Html),
+            "json" => Ok(Format::Json),
+            _ => Err(CallToolError::invalid_arguments(
+                "format",
+                Some(format!(
+                    "Invalid format '{s}'. Expected one of: markdown, text, html, json"
+                )),
+            )),
+        },
+    }
+}
+
 #[cfg(not(test))]
 const DOCS_RS_BASE_URL: &str = "https://docs.rs";
 
@@ -64,6 +108,41 @@ pub fn crates_io_base_url() -> String {
 /// Get the crates.io base URL
 pub fn crates_io_base_url() -> String {
     CRATES_IO_BASE_URL.to_string()
+}
+/// Build docs.rs URL for crate documentation
+#[must_use]
+pub fn build_docs_url(crate_name: &str, version: Option<&str>) -> String {
+    let base_url = docs_rs_base_url();
+    match version {
+        Some(ver) => format!("{base_url}/{crate_name}/{ver}/"),
+        None => format!("{base_url}/{crate_name}/"),
+    }
+}
+
+/// Build docs.rs search URL for item lookup
+#[must_use]
+pub fn build_docs_item_url(crate_name: &str, version: Option<&str>, item_path: &str) -> String {
+    let base_url = docs_rs_base_url();
+    let encoded_path = urlencoding::encode(item_path);
+    match version {
+        Some(ver) => format!("{base_url}/{crate_name}/{ver}/?search={encoded_path}"),
+        None => format!("{base_url}/{crate_name}/?search={encoded_path}"),
+    }
+}
+
+/// Build crates.io API search URL
+#[must_use]
+pub fn build_crates_io_search_url(query: &str, sort: Option<&str>, limit: Option<usize>) -> String {
+    let base_url = crates_io_base_url();
+    let sort = sort.unwrap_or("relevance");
+    let limit = limit.unwrap_or(10);
+    format!(
+        "{}/api/v1/crates?q={}&per_page={}&sort={}",
+        base_url,
+        urlencoding::encode(query),
+        limit,
+        urlencoding::encode(sort)
+    )
 }
 
 /// Document service
@@ -293,5 +372,126 @@ mod tests {
         let _ = service.client();
         let _ = service.cache();
         let _ = service.doc_cache();
+    }
+
+    #[test]
+    fn test_parse_format_none() {
+        assert_eq!(parse_format(None).unwrap(), Format::Markdown);
+    }
+
+    #[test]
+    fn test_parse_format_markdown() {
+        assert_eq!(parse_format(Some("markdown")).unwrap(), Format::Markdown);
+        assert_eq!(parse_format(Some("MARKDOWN")).unwrap(), Format::Markdown);
+        assert_eq!(parse_format(Some("Markdown")).unwrap(), Format::Markdown);
+    }
+
+    #[test]
+    fn test_parse_format_text() {
+        assert_eq!(parse_format(Some("text")).unwrap(), Format::Text);
+        assert_eq!(parse_format(Some("TEXT")).unwrap(), Format::Text);
+    }
+
+    #[test]
+    fn test_parse_format_html() {
+        assert_eq!(parse_format(Some("html")).unwrap(), Format::Html);
+        assert_eq!(parse_format(Some("HTML")).unwrap(), Format::Html);
+    }
+
+    #[test]
+    fn test_parse_format_json() {
+        assert_eq!(parse_format(Some("json")).unwrap(), Format::Json);
+        assert_eq!(parse_format(Some("JSON")).unwrap(), Format::Json);
+    }
+
+    #[test]
+    fn test_parse_format_invalid() {
+        assert!(parse_format(Some("invalid")).is_err());
+        assert!(parse_format(Some("xml")).is_err());
+        assert!(parse_format(Some("")).is_err());
+    }
+
+    #[test]
+    fn test_format_display() {
+        assert_eq!(Format::Markdown.to_string(), "markdown");
+        assert_eq!(Format::Text.to_string(), "text");
+        assert_eq!(Format::Html.to_string(), "html");
+        assert_eq!(Format::Json.to_string(), "json");
+    }
+
+    #[test]
+    fn test_format_default() {
+        assert_eq!(Format::default(), Format::Markdown);
+    }
+
+    // URL building tests
+    #[test]
+    fn test_build_docs_url_without_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
+        let url = build_docs_url("serde", None);
+        assert_eq!(url, "https://docs.rs/serde/");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
+    }
+
+    #[test]
+    fn test_build_docs_url_with_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
+        let url = build_docs_url("serde", Some("1.0.0"));
+        assert_eq!(url, "https://docs.rs/serde/1.0.0/");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
+    }
+
+    #[test]
+    fn test_build_docs_item_url_without_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
+        let url = build_docs_item_url("serde", None, "Serialize");
+        assert_eq!(url, "https://docs.rs/serde/?search=Serialize");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
+    }
+
+    #[test]
+    fn test_build_docs_item_url_with_version() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
+        let url = build_docs_item_url("serde", Some("1.0.0"), "Serialize");
+        assert_eq!(url, "https://docs.rs/serde/1.0.0/?search=Serialize");
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
+    }
+
+    #[test]
+    fn test_build_docs_item_url_encodes_special_chars() {
+        std::env::set_var("CRATES_DOCS_DOCS_RS_URL", "https://docs.rs");
+        let url = build_docs_item_url("std", None, "collections::HashMap");
+        assert!(url.contains("collections%3A%3AHashMap"));
+        std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
+    }
+
+    #[test]
+    fn test_build_crates_io_search_url_defaults() {
+        std::env::set_var("CRATES_DOCS_CRATES_IO_URL", "https://crates.io");
+        let url = build_crates_io_search_url("web framework", None, None);
+        assert!(url.contains("crates.io/api/v1/crates"));
+        assert!(url.contains("q=web+framework") || url.contains("q=web%20framework"));
+        assert!(url.contains("per_page=10"));
+        assert!(url.contains("sort=relevance"));
+        std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
+    }
+
+    #[test]
+    fn test_build_crates_io_search_url_with_params() {
+        std::env::set_var("CRATES_DOCS_CRATES_IO_URL", "https://crates.io");
+        let url = build_crates_io_search_url("async", Some("downloads"), Some(20));
+        assert!(url.contains("crates.io/api/v1/crates"));
+        assert!(url.contains("q=async"));
+        assert!(url.contains("per_page=20"));
+        assert!(url.contains("sort=downloads"));
+        std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
+    }
+
+    #[test]
+    fn test_build_crates_io_search_url_encodes_query() {
+        std::env::set_var("CRATES_DOCS_CRATES_IO_URL", "https://crates.io");
+        let url = build_crates_io_search_url("web framework", None, None);
+        assert!(url.contains("web+framework") || url.contains("web%20framework"));
+        std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
     }
 }
