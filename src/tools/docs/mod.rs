@@ -242,6 +242,22 @@ impl DocService {
             CallToolError::from_message(format!("{prefix}Failed to read response: {e}"))
         })
     }
+
+    /// Create new document service with custom HTTP client (for testing)
+    #[must_use]
+    pub fn with_custom_client(
+        cache: Arc<dyn Cache>,
+        cache_config: &CacheConfig,
+        client: Arc<reqwest_middleware::ClientWithMiddleware>,
+    ) -> Self {
+        let ttl = cache::DocCacheTtl::from_cache_config(cache_config);
+        let doc_cache = cache::DocCache::with_ttl(cache.clone(), ttl);
+        Self {
+            client,
+            cache,
+            doc_cache,
+        }
+    }
 }
 
 impl Default for DocService {

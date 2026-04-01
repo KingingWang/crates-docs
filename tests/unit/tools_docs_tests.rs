@@ -7,6 +7,32 @@ use crates_docs::tools::docs::{
 use serial_test::serial;
 use std::sync::Arc;
 
+struct EnvVarGuard {
+    key: &'static str,
+    original_value: Option<String>,
+}
+
+impl EnvVarGuard {
+    fn new(key: &'static str, value: &str) -> Self {
+        let original_value = std::env::var(key).ok();
+        std::env::set_var(key, value);
+        Self {
+            key,
+            original_value,
+        }
+    }
+}
+
+impl Drop for EnvVarGuard {
+    fn drop(&mut self) {
+        if let Some(ref value) = self.original_value {
+            std::env::set_var(self.key, value);
+        } else {
+            std::env::remove_var(self.key);
+        }
+    }
+}
+
 /// Test DocCacheTtl default values
 #[test]
 fn test_doc_cache_ttl_default() {
@@ -220,12 +246,13 @@ fn test_lookup_crate_tool_params() {
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_crate_tool_execute_markdown() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <!DOCTYPE html>
     <html>
@@ -245,14 +272,18 @@ async fn test_lookup_crate_tool_execute_markdown() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
 
@@ -262,17 +293,17 @@ async fn test_lookup_crate_tool_execute_markdown() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_crate_tool_execute_text_format() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <html><body><h1>Serde</h1><p>Serialization framework</p></body></html>
     "#;
@@ -283,14 +314,18 @@ async fn test_lookup_crate_tool_execute_text_format() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
 
@@ -300,17 +335,17 @@ async fn test_lookup_crate_tool_execute_text_format() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_crate_tool_execute_html_format() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <html><body><h1>Serde</h1><p>Serialization framework</p></body></html>
     "#;
@@ -321,14 +356,18 @@ async fn test_lookup_crate_tool_execute_html_format() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
 
@@ -338,17 +377,17 @@ async fn test_lookup_crate_tool_execute_html_format() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_crate_tool_execute_with_version() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <html><body><h1>Serde 1.0.0</h1><p>Version 1.0.0 docs</p></body></html>
     "#;
@@ -359,14 +398,18 @@ async fn test_lookup_crate_tool_execute_with_version() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
 
@@ -377,7 +420,6 @@ async fn test_lookup_crate_tool_execute_with_version() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
@@ -389,8 +431,12 @@ async fn test_lookup_crate_tool_invalid_params() {
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
 
@@ -425,12 +471,13 @@ fn test_lookup_item_tool_params() {
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_item_tool_execute_markdown() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <html><body><h1>Serialize Trait</h1><p>Serialize data structure</p></body></html>
     "#;
@@ -441,14 +488,18 @@ async fn test_lookup_item_tool_execute_markdown() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
 
@@ -459,17 +510,17 @@ async fn test_lookup_item_tool_execute_markdown() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_item_tool_execute_text_format() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <html><body><h1>Serialize Trait</h1><p>Serialize data structure</p></body></html>
     "#;
@@ -480,14 +531,18 @@ async fn test_lookup_item_tool_execute_text_format() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
 
@@ -498,17 +553,17 @@ async fn test_lookup_item_tool_execute_text_format() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_item_tool_execute_html_format() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <html><body><h1>Serialize Trait</h1><p>Serialize data structure</p></body></html>
     "#;
@@ -519,14 +574,18 @@ async fn test_lookup_item_tool_execute_html_format() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
 
@@ -537,17 +596,17 @@ async fn test_lookup_item_tool_execute_html_format() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(docs_rs_env)]
 async fn test_lookup_item_tool_execute_with_version() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_html = r#"
     <html><body><h1>Serialize Trait v1.0.0</h1></body></html>
     "#;
@@ -558,14 +617,18 @@ async fn test_lookup_item_tool_execute_with_version() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_DOCS_RS_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
 
@@ -577,7 +640,6 @@ async fn test_lookup_item_tool_execute_with_version() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_DOCS_RS_URL");
     assert!(result.is_ok());
 }
 
@@ -589,8 +651,12 @@ async fn test_lookup_item_tool_invalid_params() {
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
 
@@ -625,12 +691,13 @@ fn test_search_crates_tool_params() {
 }
 
 #[tokio::test]
-#[serial]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_execute_markdown() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_response = r#"
     {
         "crates": [
@@ -652,14 +719,18 @@ async fn test_search_crates_tool_execute_markdown() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_CRATES_IO_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
 
@@ -671,17 +742,17 @@ async fn test_search_crates_tool_execute_markdown() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_execute_text_format() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_response = r#"
     {
     "crates": [
@@ -701,14 +772,18 @@ async fn test_search_crates_tool_execute_text_format() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_CRATES_IO_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
 
@@ -718,17 +793,17 @@ async fn test_search_crates_tool_execute_text_format() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
     assert!(result.is_ok());
 }
 
 #[tokio::test]
-#[serial]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_execute_json_format() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_response = r#"
     {
         "crates": [
@@ -748,14 +823,18 @@ async fn test_search_crates_tool_execute_json_format() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_CRATES_IO_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
 
@@ -765,7 +844,6 @@ async fn test_search_crates_tool_execute_json_format() {
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
     assert!(result.is_ok());
 }
 
@@ -777,8 +855,12 @@ async fn test_search_crates_tool_invalid_sort() {
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
 
@@ -792,12 +874,13 @@ async fn test_search_crates_tool_invalid_sort() {
 }
 
 #[tokio::test]
-#[serial]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_limit_clamping() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
     let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
     let mock_response = r#"{"crates": []}"#;
 
     Mock::given(matchers::method("GET"))
@@ -806,25 +889,27 @@ async fn test_search_crates_tool_limit_clamping() {
         .mount(&mock_server)
         .await;
 
-    std::env::set_var("CRATES_DOCS_CRATES_IO_URL", mock_server.uri());
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
 
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
 
-    // Test limit > 100 (should be clamped to 100)
     let args = serde_json::json!({
         "query": "test",
         "limit": 200
     });
 
     let result = tool.execute(args).await;
-    std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
     assert!(result.is_ok());
 }
 
@@ -849,8 +934,12 @@ async fn test_doc_service_fetch_html_success() {
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let url = format!("{}/test", mock_server.uri());
     let result = service.fetch_html(&url, Some("test_tool")).await;
@@ -874,8 +963,12 @@ async fn test_doc_service_fetch_html_404_error() {
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     let url = format!("{}/notfound", mock_server.uri());
     let result = service.fetch_html(&url, Some("test_tool")).await;
@@ -888,8 +981,12 @@ async fn test_doc_service_fetch_html_timeout_error() {
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let service = crates_docs::tools::docs::DocService::with_config(cache, &cache_config)
-        .expect("Failed to create DocService");
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
 
     // Test with invalid URL that should fail
     let result = service
