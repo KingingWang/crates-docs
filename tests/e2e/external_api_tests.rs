@@ -272,7 +272,11 @@ async fn test_concurrent_cache_access() {
                 .await
                 .expect("Set failed");
             let retrieved = cache.get(&key).await;
-            assert!(retrieved.is_some(), "Concurrent access failed for key {}", i);
+            assert!(
+                retrieved.is_some(),
+                "Concurrent access failed for key {}",
+                i
+            );
             assert_eq!(
                 retrieved.unwrap().as_str(),
                 value.as_str(),

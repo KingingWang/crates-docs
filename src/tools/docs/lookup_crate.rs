@@ -6,12 +6,6 @@
 
 #![allow(missing_docs)]
 
-//! Tool parameters for looking up crate documentation from docs.rs
-//!
-//! This struct defines the parameters needed to retrieve documentation
-//! for a specific Rust crate, including the crate name, optional version,
-//! and desired output format.
-
 use crate::tools::docs::html;
 use crate::tools::docs::DocService;
 use crate::tools::Tool;
