@@ -342,7 +342,33 @@ impl DocService {
 impl Default for DocService {
     fn default() -> Self {
         let cache = Arc::new(crate::cache::memory::MemoryCache::new(1000));
-        Self::new(cache).expect("Failed to create default DocService")
+        let cache_config = CacheConfig::default();
+
+        // Create HTTP client directly with default settings
+        // This is infallible for Default impl - HTTP client creation with
+        // default settings should never fail in practice
+        let client: Arc<reqwest_middleware::ClientWithMiddleware> =
+            if let Ok(c) = crate::utils::HttpClientBuilder::new().build() {
+                Arc::new(c)
+            } else {
+                // Fallback: create a minimal client without retry middleware
+                // This should only happen in extreme circumstances
+                let plain_client = reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(30))
+                    .connect_timeout(std::time::Duration::from_secs(10))
+                    .build()
+                    .expect("Failed to create even minimal HTTP client");
+                Arc::new(reqwest_middleware::ClientBuilder::new(plain_client).build())
+            };
+
+        let ttl = cache::DocCacheTtl::from_cache_config(&cache_config);
+        let doc_cache = cache::DocCache::with_ttl(cache.clone(), ttl);
+
+        Self {
+            client,
+            cache,
+            doc_cache,
+        }
     }
 }
 
