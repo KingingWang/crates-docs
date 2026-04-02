@@ -108,7 +108,11 @@ fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     }
 
     // Apply all replacements in a single pass over the result string
-    // Process in reverse order to handle nested elements correctly
+    // Sort by element_html length ascending (shorter first) to process nested (child) elements
+    // before parent elements. Child elements have shorter HTML because they don't contain
+    // their parent container, so processing them first ensures correct replacement.
+    elements_to_process.sort_by(|a, b| a.0.len().cmp(&b.0.len()));
+
     for (element_html, replacement) in elements_to_process {
         match replacement {
             Some(text) => result = result.replace(&element_html, &text),
