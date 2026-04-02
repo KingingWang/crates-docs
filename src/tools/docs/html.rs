@@ -50,7 +50,7 @@ static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// malformed HTML better than manual parsing.
 ///
 /// This function performs a single-pass HTML parsing and removal of all
-/// unwanted elements (SKIP_TAGS, NAV_TAGS, UI_TAGS) to minimize parsing overhead.
+/// unwanted elements (`SKIP_TAGS`, `NAV_TAGS`, `UI_TAGS`) to minimize parsing overhead.
 #[must_use]
 pub fn clean_html(html: &str) -> String {
     let document = Html::parse_document(html);
@@ -60,9 +60,9 @@ pub fn clean_html(html: &str) -> String {
 /// Remove unwanted elements from HTML using scraper for parsing
 ///
 /// This function performs single-pass removal of all unwanted elements:
-/// - SKIP_TAGS: script, style, noscript, iframe (removed with content)
-/// - NAV_TAGS: nav, header, footer, aside (removed with content)
-/// - UI_TAGS: button (removed), summary (tag removed, content preserved)
+/// - `SKIP_TAGS`: script, style, noscript, iframe (removed with content)
+/// - `NAV_TAGS`: nav, header, footer, aside (removed with content)
+/// - `UI_TAGS`: button (removed), summary (tag removed, content preserved)
 #[inline]
 fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     let mut result = original_html.to_string();

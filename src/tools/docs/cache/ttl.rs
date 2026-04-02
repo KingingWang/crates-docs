@@ -15,6 +15,16 @@ use std::time::Duration;
 /// Configurable via `DocCacheTtl::jitter_ratio` field.
 const DEFAULT_JITTER_RATIO: f64 = 0.1;
 
+/// Minimum valid jitter ratio
+///
+/// Must be > 0.0 to have any effect. A value of 0.0 disables jitter.
+const MIN_JITTER_RATIO: f64 = 0.0;
+
+/// Maximum valid jitter ratio
+///
+/// Must be <= 1.0 (100%) to prevent negative or excessive TTL values.
+const MAX_JITTER_RATIO: f64 = 1.0;
+
 /// Default crate documentation TTL in seconds
 ///
 /// # Value
@@ -99,7 +109,7 @@ impl DocCacheTtl {
     ///
     /// # Returns
     ///
-    /// Returns TTL configuration based on config
+    /// Returns TTL configuration based on config with validated `jitter_ratio`
     #[must_use]
     pub fn from_cache_config(config: &crate::cache::CacheConfig) -> Self {
         Self {
@@ -113,6 +123,56 @@ impl DocCacheTtl {
                 .item_docs_ttl_secs
                 .unwrap_or(DEFAULT_ITEM_DOCS_TTL_SECS),
             jitter_ratio: DEFAULT_JITTER_RATIO,
+        }
+    }
+
+    /// Create TTL configuration with custom jitter ratio
+    ///
+    /// # Arguments
+    ///
+    /// * `crate_docs_secs` - Crate docs TTL in seconds
+    /// * `search_results_secs` - Search results TTL in seconds
+    /// * `item_docs_secs` - Item docs TTL in seconds
+    /// * `jitter_ratio` - Jitter ratio (0.0-1.0), out-of-range values are clamped
+    ///
+    /// # Returns
+    ///
+    /// Returns TTL configuration with validated and clamped `jitter_ratio`
+    #[must_use]
+    pub fn with_jitter(
+        crate_docs_secs: u64,
+        search_results_secs: u64,
+        item_docs_secs: u64,
+        jitter_ratio: f64,
+    ) -> Self {
+        Self {
+            crate_docs_secs,
+            search_results_secs,
+            item_docs_secs,
+            jitter_ratio: Self::validate_jitter_ratio(jitter_ratio),
+        }
+    }
+
+    /// Validate and clamp jitter ratio to valid range
+    ///
+    /// Ensures `jitter_ratio` is within `[MIN_JITTER_RATIO, MAX_JITTER_RATIO]`.
+    /// Values outside this range are clamped to the nearest valid value.
+    ///
+    /// # Arguments
+    ///
+    /// * `ratio` - The jitter ratio to validate
+    ///
+    /// # Returns
+    ///
+    /// Returns clamped jitter ratio in range [0.0, 1.0]
+    #[must_use]
+    fn validate_jitter_ratio(ratio: f64) -> f64 {
+        if ratio.is_nan() || ratio < MIN_JITTER_RATIO {
+            MIN_JITTER_RATIO
+        } else if ratio > MAX_JITTER_RATIO {
+            MAX_JITTER_RATIO
+        } else {
+            ratio
         }
     }
 
@@ -130,11 +190,13 @@ impl DocCacheTtl {
     #[allow(clippy::cast_sign_loss)]
     #[allow(clippy::cast_precision_loss)]
     pub fn apply_jitter(&self, base_ttl: u64) -> u64 {
-        if self.jitter_ratio <= 0.0 {
+        // Clamp jitter_ratio to valid range for safety (handles direct struct construction)
+        let ratio = self.jitter_ratio.clamp(MIN_JITTER_RATIO, MAX_JITTER_RATIO);
+
+        if ratio <= MIN_JITTER_RATIO {
             return base_ttl;
         }
 
-        let ratio = self.jitter_ratio.clamp(0.0, 1.0);
         let rng = fastrand::f64();
         let offset = (rng * 2.0 - 1.0) * ratio;
 

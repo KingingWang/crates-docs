@@ -347,7 +347,7 @@ impl Default for DocService {
 }
 
 impl DocService {
-    /// Create DocService with default settings using fallible initialization
+    /// Create `DocService` with default settings using fallible initialization
     ///
     /// This method attempts to create a fully configured HTTP client.
     /// If that fails, it falls back to a basic client without retry middleware.
