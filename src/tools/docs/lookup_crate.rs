@@ -1,4 +1,8 @@
 //! Lookup crate documentation tool
+//!
+//! Provides functionality to retrieve complete documentation for a Rust crate
+//! from docs.rs. Returns the main documentation page content including modules,
+//! structs, functions, etc.
 #![allow(missing_docs)]
 
 use crate::tools::docs::html;
@@ -11,7 +15,9 @@ use std::sync::Arc;
 
 const TOOL_NAME: &str = "lookup_crate";
 
-/// Lookup crate documentation tool
+/// Lookup crate documentation tool parameters
+///
+/// Used to specify which crate to look up and in what format to return the documentation.
 #[rust_mcp_sdk::macros::mcp_tool(
     name = "lookup_crate",
     title = "Lookup Crate Documentation",
@@ -29,21 +35,21 @@ const TOOL_NAME: &str = "lookup_crate";
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupCrateTool {
-    /// Crate name
+    /// Crate name to lookup (e.g., "serde", "tokio", "reqwest")
     #[json_schema(
         title = "Crate Name",
         description = "Crate name to lookup, e.g.: serde, tokio, reqwest"
     )]
     pub crate_name: String,
 
-    /// Version (optional, defaults to latest)
+    /// Crate version (optional, defaults to latest)
     #[json_schema(
         title = "Version",
         description = "Crate version, e.g.: 1.0.0. Uses latest version if not specified"
     )]
     pub version: Option<String>,
 
-    /// Output format: markdown, text, or html
+    /// Output format: "markdown", "text", or "html" (defaults to "markdown")
     #[json_schema(
         title = "Output Format",
         description = "Output format: markdown (default), text (plain text), html",

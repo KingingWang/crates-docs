@@ -35,6 +35,32 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+// HTTP Client defaults
+const DEFAULT_HTTP_CLIENT_POOL_SIZE: usize = 10;
+const DEFAULT_HTTP_CLIENT_POOL_IDLE_TIMEOUT_SECS: u64 = 90;
+const DEFAULT_HTTP_CLIENT_CONNECT_TIMEOUT_SECS: u64 = 10;
+const DEFAULT_HTTP_CLIENT_TIMEOUT_SECS: u64 = 30;
+const DEFAULT_HTTP_CLIENT_READ_TIMEOUT_SECS: u64 = 30;
+const DEFAULT_HTTP_CLIENT_MAX_RETRIES: u32 = 3;
+const DEFAULT_HTTP_CLIENT_RETRY_INITIAL_DELAY_MS: u64 = 100;
+const DEFAULT_HTTP_CLIENT_RETRY_MAX_DELAY_MS: u64 = 10_000;
+
+// Server defaults
+const DEFAULT_SERVER_PORT: u16 = 8080;
+const DEFAULT_SERVER_MAX_CONNECTIONS: usize = 100;
+const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 30;
+const DEFAULT_RESPONSE_TIMEOUT_SECS: u64 = 60;
+
+// Cache/Rate limit defaults
+const DEFAULT_CACHE_MAX_SIZE: usize = 1000;
+const DEFAULT_CACHE_DEFAULT_TTL_SECS: u64 = 3600;
+const DEFAULT_RATE_LIMIT_PER_SECOND: u32 = 100;
+const DEFAULT_CONCURRENT_REQUEST_LIMIT: usize = 50;
+
+// File upload defaults
+const DEFAULT_MAX_FILE_SIZE_MB: u64 = 100;
+const DEFAULT_MAX_FILES: usize = 10;
+
 /// Application configuration
 ///
 /// Contains server, cache, authentication, logging, and performance configuration.
@@ -280,13 +306,13 @@ impl Default for ServerConfig {
             icons: default_icons(),
             website_url: Some("https://github.com/KingingWang/crates-docs".to_string()),
             host: "127.0.0.1".to_string(),
-            port: 8080,
+            port: DEFAULT_SERVER_PORT,
             transport_mode: "hybrid".to_string(),
             enable_sse: true,
             enable_oauth: false,
-            max_connections: 100,
-            request_timeout_secs: 30,
-            response_timeout_secs: 60,
+            max_connections: DEFAULT_SERVER_MAX_CONNECTIONS,
+            request_timeout_secs: DEFAULT_REQUEST_TIMEOUT_SECS,
+            response_timeout_secs: DEFAULT_RESPONSE_TIMEOUT_SECS,
             // Secure defaults: only allow localhost by default
             allowed_hosts: vec!["localhost".to_string(), "127.0.0.1".to_string()],
             allowed_origins: vec!["http://localhost:*".to_string()],
@@ -301,8 +327,8 @@ impl Default for LoggingConfig {
             file_path: Some("./logs/crates-docs.log".to_string()),
             enable_console: true,
             enable_file: false, // Default: console output only
-            max_file_size_mb: 100,
-            max_files: 10,
+            max_file_size_mb: DEFAULT_MAX_FILE_SIZE_MB,
+            max_files: DEFAULT_MAX_FILES,
         }
     }
 }
@@ -310,18 +336,18 @@ impl Default for LoggingConfig {
 impl Default for PerformanceConfig {
     fn default() -> Self {
         Self {
-            http_client_pool_size: 10,
-            http_client_pool_idle_timeout_secs: 90,
-            http_client_connect_timeout_secs: 10,
-            http_client_timeout_secs: 30,
-            http_client_read_timeout_secs: 30,
-            http_client_max_retries: 3,
-            http_client_retry_initial_delay_ms: 100,
-            http_client_retry_max_delay_ms: 10000,
-            cache_max_size: 1000,
-            cache_default_ttl_secs: 3600,
-            rate_limit_per_second: 100,
-            concurrent_request_limit: 50,
+            http_client_pool_size: DEFAULT_HTTP_CLIENT_POOL_SIZE,
+            http_client_pool_idle_timeout_secs: DEFAULT_HTTP_CLIENT_POOL_IDLE_TIMEOUT_SECS,
+            http_client_connect_timeout_secs: DEFAULT_HTTP_CLIENT_CONNECT_TIMEOUT_SECS,
+            http_client_timeout_secs: DEFAULT_HTTP_CLIENT_TIMEOUT_SECS,
+            http_client_read_timeout_secs: DEFAULT_HTTP_CLIENT_READ_TIMEOUT_SECS,
+            http_client_max_retries: DEFAULT_HTTP_CLIENT_MAX_RETRIES,
+            http_client_retry_initial_delay_ms: DEFAULT_HTTP_CLIENT_RETRY_INITIAL_DELAY_MS,
+            http_client_retry_max_delay_ms: DEFAULT_HTTP_CLIENT_RETRY_MAX_DELAY_MS,
+            cache_max_size: DEFAULT_CACHE_MAX_SIZE,
+            cache_default_ttl_secs: DEFAULT_CACHE_DEFAULT_TTL_SECS,
+            rate_limit_per_second: DEFAULT_RATE_LIMIT_PER_SECOND,
+            concurrent_request_limit: DEFAULT_CONCURRENT_REQUEST_LIMIT,
             enable_response_compression: true,
             enable_metrics: true,
             metrics_port: 0,

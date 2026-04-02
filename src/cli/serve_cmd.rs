@@ -28,12 +28,12 @@ fn load_from_env(config: &mut crate::config::AppConfig) -> Result<(), Box<dyn st
         Err(_) => None,
     };
 
-    *config = crate::config::AppConfig::merge(Some(config.clone()), env_config);
+    *config = crate::config::AppConfig::merge(Some(std::mem::take(config)), env_config);
 
     #[cfg(feature = "api-key")]
     if !config.auth.api_key.keys.is_empty() {
-        config.auth.api_key.keys =
-            normalize_api_keys(&config.auth.api_key, config.auth.api_key.keys.clone())?;
+        let keys = std::mem::take(&mut config.auth.api_key.keys);
+        config.auth.api_key.keys = normalize_api_keys(&config.auth.api_key, keys)?;
     }
 
     Ok(())
@@ -44,8 +44,10 @@ fn init_logging(
     debug: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if debug {
-        let mut debug_config = config.logging.clone();
-        debug_config.level = "debug".to_string();
+        let debug_config = crate::config::LoggingConfig {
+            level: "debug".to_string(),
+            ..config.logging.clone()
+        };
         crate::init_logging_with_config(&debug_config)
             .map_err(|e| format!("Failed to initialize logging system: {e}"))?;
     } else {
@@ -172,7 +174,7 @@ pub async fn run_serve_command(
         api_key_query_param,
     )?;
 
-    let transport_mode = config.server.transport_mode.clone();
+    let transport_mode = &config.server.transport_mode;
 
     init_logging(&config, debug)?;
 
@@ -192,7 +194,7 @@ pub async fn run_serve_command(
         start_config_reloader(config_path, &server);
     }
 
-    run_server_by_mode(&server, &transport_mode).await
+    run_server_by_mode(&server, transport_mode).await
 }
 
 /// Load configuration

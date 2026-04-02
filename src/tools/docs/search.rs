@@ -1,4 +1,8 @@
 //! Search crates tool
+//!
+//! Provides functionality to search for Rust crates from crates.io.
+//! Returns a list of matching crates with metadata like name, description,
+//! version, downloads, etc.
 #![allow(missing_docs)]
 
 use crate::tools::Tool;
@@ -8,7 +12,14 @@ use rust_mcp_sdk::schema::CallToolError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+const DEFAULT_SEARCH_LIMIT: u32 = 10;
+const DEFAULT_SEARCH_CACHE_TTL_SECS: u64 = 300;
+const ESTIMATED_MARKDOWN_ENTRY_SIZE: usize = 200;
+const ESTIMATED_TEXT_ENTRY_SIZE: usize = 100;
+
 /// Search crates tool parameters
+///
+/// Used to specify search criteria for finding Rust crates on crates.io.
 #[macros::mcp_tool(
     name = "search_crates",
     title = "Search Crates",
@@ -23,16 +34,17 @@ use std::sync::Arc;
         (src = "https://crates.io/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "dark")
     ]
 )]
+#[allow(missing_docs)]
 #[derive(Debug, Clone, Deserialize, Serialize, macros::JsonSchema)]
 pub struct SearchCratesTool {
-    /// Search query
+    /// Search keywords (e.g., "web framework", "async", "http client")
     #[json_schema(
         title = "Search Query",
         description = "Search keywords, e.g.: web framework, async, http client, serialization"
     )]
     pub query: String,
 
-    /// Result count limit
+    /// Maximum number of results to return (range 1-100, defaults to 10)
     #[json_schema(
         title = "Result Limit",
         description = "Maximum number of results to return, range 1-100",
@@ -42,7 +54,7 @@ pub struct SearchCratesTool {
     )]
     pub limit: Option<u32>,
 
-    /// Sort order
+    /// Sort order: "relevance", "downloads", "recent-downloads", "recent-updates", "new"
     #[json_schema(
         title = "Sort Order",
         description = "Sort order: relevance (default), downloads, recent-downloads, recent-updates, new",
@@ -50,7 +62,7 @@ pub struct SearchCratesTool {
     )]
     pub sort: Option<String>,
 
-    /// Output format
+    /// Output format: "markdown", "text", or "json" (defaults to "markdown")
     #[json_schema(
         title = "Output Format",
         description = "Output format: markdown (default), text (plain text), json (raw JSON)",
@@ -68,7 +80,9 @@ const VALID_SEARCH_SORTS: &[&str] = &[
     "new",
 ];
 
+/// Search crates tool implementation
 pub struct SearchCratesToolImpl {
+    /// The document service used for HTTP requests and caching
     service: Arc<super::DocService>,
 }
 
@@ -146,7 +160,9 @@ impl SearchCratesToolImpl {
             .set(
                 cache_key,
                 cache_value,
-                Some(std::time::Duration::from_secs(300)),
+                Some(std::time::Duration::from_secs(
+                    DEFAULT_SEARCH_CACHE_TTL_SECS,
+                )),
             )
             .await
             .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
@@ -155,13 +171,20 @@ impl SearchCratesToolImpl {
     }
 }
 
+/// Crate information from search results
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CrateInfo {
+    /// Crate name
     name: String,
+    /// Crate description
     description: Option<String>,
+    /// Latest version
     version: String,
+    /// Total downloads
     downloads: u64,
+    /// Repository URL
     repository: Option<String>,
+    /// Documentation URL
     documentation: Option<String>,
 }
 
@@ -219,7 +242,7 @@ fn format_search_results(crates: &[CrateInfo], format: super::Format) -> String 
 fn format_markdown_results(crates: &[CrateInfo]) -> String {
     // SAFETY: writeln! to String never fails (writes to memory buffer). unwrap() is safe here.
     use std::fmt::Write;
-    let estimated_size = crates.len() * 200 + 20;
+    let estimated_size = crates.len().saturating_mul(ESTIMATED_MARKDOWN_ENTRY_SIZE) + 20;
     let mut output = String::with_capacity(estimated_size);
     output.push_str("# Search Results\n\n");
 
@@ -254,7 +277,7 @@ fn format_markdown_results(crates: &[CrateInfo]) -> String {
 fn format_text_results(crates: &[CrateInfo]) -> String {
     // SAFETY: writeln! to String never fails (writes to memory buffer). unwrap() is safe here.
     use std::fmt::Write;
-    let estimated_size = crates.len() * 100;
+    let estimated_size = crates.len().saturating_mul(ESTIMATED_TEXT_ENTRY_SIZE);
     let mut output = String::with_capacity(estimated_size);
 
     for (i, crate_info) in crates.iter().enumerate() {
@@ -293,7 +316,7 @@ impl Tool for SearchCratesToolImpl {
             )
         })?;
 
-        let limit = params.limit.unwrap_or(10).min(100);
+        let limit = params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(100);
         let sort = normalize_search_sort(params.sort.as_deref())?;
         let crates = self.search_crates(&params.query, limit, &sort).await?;
 
