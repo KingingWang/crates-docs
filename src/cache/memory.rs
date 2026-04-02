@@ -1,4 +1,4 @@
-//!//! Memory cache implementation
+//! Memory cache implementation
 //!
 //! Memory cache using `moka::sync::Cache` with `TinyLFU` eviction policy.
 //! This provides better performance and hit rate than simple LRU.
@@ -51,6 +51,27 @@ impl MemoryCache {
                 .expire_after(CacheExpiry)
                 .build(),
         }
+    }
+
+    /// Run pending maintenance tasks on the cache.
+    /// This is primarily used in tests to ensure TTL expiration is processed.
+    ///
+    /// # Note
+    /// This method is only available in test builds via `#[cfg(test)]`.
+    #[cfg(test)]
+    pub fn run_pending_tasks(&self) {
+        self.cache.run_pending_tasks();
+    }
+
+    /// Get the number of entries in the cache.
+    /// This is primarily used in tests to verify cache state.
+    ///
+    /// # Note
+    /// This method is only available in test builds via `#[cfg(test)]`.
+    #[cfg(test)]
+    #[must_use]
+    pub fn entry_count(&self) -> usize {
+        usize::try_from(self.cache.entry_count()).expect("cache entry count should fit in usize")
     }
 }
 
@@ -139,7 +160,7 @@ mod tests {
             .expect("set should succeed");
         cache.clear().await.expect("clear should succeed");
         // Wait for async invalidation to complete
-        cache.cache.run_pending_tasks();
+        cache.run_pending_tasks();
         assert_eq!(cache.get("key2").await, None);
     }
 
@@ -161,7 +182,7 @@ mod tests {
         // Wait for expiration
         sleep(Duration::from_millis(TEST_TTL_WAIT_MS)).await;
         // Run pending tasks to ensure expiration is processed
-        cache.cache.run_pending_tasks();
+        cache.run_pending_tasks();
         assert_eq!(cache.get("key1").await, None);
     }
 
@@ -181,10 +202,10 @@ mod tests {
         }
 
         // Run pending tasks to ensure eviction is processed
-        cache.cache.run_pending_tasks();
+        cache.run_pending_tasks();
 
         // Cache should not exceed max capacity significantly
-        let entry_count = cache.cache.entry_count();
+        let entry_count = cache.entry_count();
         assert!(
             entry_count <= 5,
             "Entry count should be at most 5, got {entry_count}"

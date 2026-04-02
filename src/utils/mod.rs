@@ -70,16 +70,20 @@ pub fn init_global_http_client(config: &crate::config::PerformanceConfig) -> Res
 
 /// Get the global HTTP client singleton
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if the global HTTP client has not been initialized.
+/// Returns an error if the global HTTP client has not been initialized.
 /// Call `init_global_http_client()` before using this function.
-#[must_use]
-pub fn get_global_http_client() -> Arc<reqwest_middleware::ClientWithMiddleware> {
-    GLOBAL_HTTP_CLIENT
-        .get()
-        .cloned()
-        .expect("Global HTTP client not initialized. Call init_global_http_client() first.")
+///
+/// If you need automatic initialization, use `get_or_init_global_http_client()` instead.
+#[must_use = "returns a Result that should be checked"]
+pub fn get_global_http_client() -> Result<Arc<reqwest_middleware::ClientWithMiddleware>> {
+    GLOBAL_HTTP_CLIENT.get().cloned().ok_or_else(|| {
+        Error::initialization(
+            "global_http_client",
+            "Global HTTP client not initialized. Call init_global_http_client() first.",
+        )
+    })
 }
 
 /// Get or initialize the global HTTP client with default config

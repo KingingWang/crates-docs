@@ -1383,7 +1383,8 @@ fn test_config_from_env_overrides_additional_fields() {
             ("CRATES_DOCS_ENABLE_FILE", Some("false")),
         ],
         || {
-            let config = AppConfig::from_env().unwrap();
+            let env_config = AppConfig::from_env().unwrap();
+            let config = AppConfig::merge(None, Some(env_config));
             assert_eq!(config.server.name, "custom-server");
             assert_eq!(config.server.host, "0.0.0.0");
             assert_eq!(config.server.port, 9000);
@@ -1397,7 +1398,7 @@ fn test_config_from_env_overrides_additional_fields() {
 
 #[test]
 fn test_config_merge_env_overrides_file() {
-    use crates_docs::config::AppConfig;
+    use crates_docs::config::{AppConfig, EnvAppConfig, EnvLoggingConfig, EnvServerConfig};
 
     let mut file = AppConfig::default();
     file.server.name = "file-server".to_string();
@@ -1406,12 +1407,22 @@ fn test_config_merge_env_overrides_file() {
     file.server.transport_mode = "sse".to_string();
     file.logging.level = "warn".to_string();
 
-    let mut env = AppConfig::default();
-    env.server.name = "env-server".to_string();
-    env.server.host = "0.0.0.0".to_string();
-    env.server.port = 9000;
-    env.server.transport_mode = "http".to_string();
-    env.logging.level = "debug".to_string();
+    // Create EnvAppConfig with explicit overrides (simulating env vars)
+    let env = EnvAppConfig {
+        server: EnvServerConfig {
+            name: Some("env-server".to_string()),
+            host: Some("0.0.0.0".to_string()),
+            port: Some(9000),
+            transport_mode: Some("http".to_string()),
+        },
+        logging: EnvLoggingConfig {
+            level: Some("debug".to_string()),
+            enable_console: None,
+            enable_file: None,
+        },
+        #[cfg(feature = "api-key")]
+        auth_api_key: Default::default(),
+    };
 
     let merged = AppConfig::merge(Some(file), Some(env));
     assert_eq!(merged.server.name, "env-server");

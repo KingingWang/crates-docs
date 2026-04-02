@@ -146,7 +146,9 @@ fn test_config_from_env() {
             ("CRATES_DOCS_LOG_LEVEL", Some("debug")),
         ],
         || {
-            let config = AppConfig::from_env().unwrap();
+            let env_config = AppConfig::from_env().unwrap();
+            // from_env returns EnvAppConfig - need to merge to get AppConfig
+            let config = AppConfig::merge(None, Some(env_config));
             assert_eq!(config.server.name, "custom-server");
             assert_eq!(config.server.host, "0.0.0.0");
             assert_eq!(config.server.port, 9000);
@@ -171,13 +173,24 @@ fn test_config_from_env_invalid_port() {
 
 #[test]
 fn test_config_merge() {
+    use crates_docs::config::{EnvAppConfig, EnvServerConfig};
+
     let mut file_config = AppConfig::default();
     file_config.server.name = "file-server".to_string();
     file_config.server.port = 7000;
 
-    let mut env_config = AppConfig::default();
-    env_config.server.name = "env-server".to_string();
-    env_config.server.port = 9000;
+    // Create EnvAppConfig with explicit overrides
+    let env_config = EnvAppConfig {
+        server: EnvServerConfig {
+            name: Some("env-server".to_string()),
+            host: None,
+            port: Some(9000),
+            transport_mode: None,
+        },
+        logging: Default::default(),
+        #[cfg(feature = "api-key")]
+        auth_api_key: Default::default(),
+    };
 
     let merged = AppConfig::merge(Some(file_config), Some(env_config));
     // Environment variables take priority
