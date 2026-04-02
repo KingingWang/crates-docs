@@ -52,6 +52,22 @@ impl MemoryCache {
                 .build(),
         }
     }
+
+    /// Run pending maintenance tasks on the cache.
+    /// This is primarily used in tests to ensure TTL expiration is processed.
+    #[cfg(test)]
+    pub fn run_pending_tasks(&self) {
+        self.cache.run_pending_tasks();
+    }
+
+    /// Get the number of entries in the cache.
+    /// This is primarily used in tests to verify cache state.
+    #[cfg(test)]
+    #[must_use]
+    pub fn entry_count(&self) -> usize {
+        usize::try_from(self.cache.entry_count())
+            .expect("cache entry count should fit in usize")
+    }
 }
 
 #[async_trait::async_trait]
@@ -139,7 +155,7 @@ mod tests {
             .expect("set should succeed");
         cache.clear().await.expect("clear should succeed");
         // Wait for async invalidation to complete
-        cache.cache.run_pending_tasks();
+        cache.run_pending_tasks();
         assert_eq!(cache.get("key2").await, None);
     }
 
@@ -161,7 +177,7 @@ mod tests {
         // Wait for expiration
         sleep(Duration::from_millis(TEST_TTL_WAIT_MS)).await;
         // Run pending tasks to ensure expiration is processed
-        cache.cache.run_pending_tasks();
+        cache.run_pending_tasks();
         assert_eq!(cache.get("key1").await, None);
     }
 
@@ -181,10 +197,10 @@ mod tests {
         }
 
         // Run pending tasks to ensure eviction is processed
-        cache.cache.run_pending_tasks();
+        cache.run_pending_tasks();
 
         // Cache should not exceed max capacity significantly
-        let entry_count = cache.cache.entry_count();
+        let entry_count = cache.entry_count();
         assert!(
             entry_count <= 5,
             "Entry count should be at most 5, got {entry_count}"
