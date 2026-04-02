@@ -54,10 +54,9 @@ fn test_server_new_async_and_accessors() {
             .set("server-cache-key".to_string(), "value".to_string(), None)
             .await
             .expect("cache set should succeed");
-        assert_eq!(
-            cache.get("server-cache-key").await,
-            Some("value".to_string())
-        );
+        let cached_value = cache.get("server-cache-key").await;
+        assert!(cached_value.is_some());
+        assert_eq!(cached_value.unwrap().as_ref(), "value");
     });
 }
 

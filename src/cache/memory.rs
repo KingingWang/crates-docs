@@ -3,12 +3,13 @@
 //! Memory cache using `moka::sync::Cache` with `TinyLFU` eviction policy.
 //! This provides better performance and hit rate than simple LRU.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Cache entry with optional TTL
 #[derive(Clone, Debug)]
 struct CacheEntry {
-    value: String,
+    value: Arc<String>,
     ttl: Option<Duration>,
 }
 
@@ -78,8 +79,8 @@ impl MemoryCache {
 #[async_trait::async_trait]
 impl super::Cache for MemoryCache {
     #[tracing::instrument(skip(self), level = "trace")]
-    async fn get(&self, key: &str) -> Option<String> {
-        let result = self.cache.get(key).map(|entry| entry.value.clone());
+    async fn get(&self, key: &str) -> Option<Arc<String>> {
+        let result = self.cache.get(key).map(|entry| Arc::clone(&entry.value));
         if result.is_some() {
             tracing::trace!(cache_type = "memory", key = %key, "Cache hit");
         } else {
@@ -95,7 +96,10 @@ impl super::Cache for MemoryCache {
         value: String,
         ttl: Option<Duration>,
     ) -> crate::error::Result<()> {
-        let entry = CacheEntry { value, ttl };
+        let entry = CacheEntry {
+            value: Arc::new(value),
+            ttl,
+        };
         tracing::trace!(cache_type = "memory", key = %key, "Setting cache entry");
         self.cache.insert(key, entry);
         Ok(())
@@ -147,7 +151,9 @@ mod tests {
             .set("key1".to_string(), "value1".to_string(), None)
             .await
             .expect("set should succeed");
-        assert_eq!(cache.get("key1").await, Some("value1".to_string()));
+        let result = cache.get("key1").await;
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().as_ref(), "value1");
 
         // Test delete
         cache.delete("key1").await.expect("delete should succeed");
@@ -177,7 +183,9 @@ mod tests {
             )
             .await
             .expect("set should succeed");
-        assert_eq!(cache.get("key1").await, Some("value1".to_string()));
+        let result = cache.get("key1").await;
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().as_ref(), "value1");
 
         // Wait for expiration
         sleep(Duration::from_millis(TEST_TTL_WAIT_MS)).await;
