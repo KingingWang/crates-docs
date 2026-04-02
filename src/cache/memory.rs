@@ -65,8 +65,7 @@ impl MemoryCache {
     #[cfg(test)]
     #[must_use]
     pub fn entry_count(&self) -> usize {
-        usize::try_from(self.cache.entry_count())
-            .expect("cache entry count should fit in usize")
+        usize::try_from(self.cache.entry_count()).expect("cache entry count should fit in usize")
     }
 }
 
