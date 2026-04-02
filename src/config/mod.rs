@@ -36,29 +36,51 @@ use std::fs;
 use std::path::Path;
 
 // HTTP Client defaults
+
+/// Default HTTP client connection pool size (10 connections)
 const DEFAULT_HTTP_CLIENT_POOL_SIZE: usize = 10;
+/// Default HTTP client pool idle timeout in seconds (90 seconds)
 const DEFAULT_HTTP_CLIENT_POOL_IDLE_TIMEOUT_SECS: u64 = 90;
+/// Default HTTP client connection timeout in seconds (10 seconds)
 const DEFAULT_HTTP_CLIENT_CONNECT_TIMEOUT_SECS: u64 = 10;
+/// Default HTTP client request timeout in seconds (30 seconds)
 const DEFAULT_HTTP_CLIENT_TIMEOUT_SECS: u64 = 30;
+/// Default HTTP client read timeout in seconds (30 seconds)
 const DEFAULT_HTTP_CLIENT_READ_TIMEOUT_SECS: u64 = 30;
+/// Default HTTP client max retry attempts (3 retries)
 const DEFAULT_HTTP_CLIENT_MAX_RETRIES: u32 = 3;
+/// Default HTTP client retry initial delay in milliseconds (100ms)
 const DEFAULT_HTTP_CLIENT_RETRY_INITIAL_DELAY_MS: u64 = 100;
+/// Default HTTP client retry max delay in milliseconds (10 seconds)
 const DEFAULT_HTTP_CLIENT_RETRY_MAX_DELAY_MS: u64 = 10_000;
 
 // Server defaults
+
+/// Default server port (8080)
 const DEFAULT_SERVER_PORT: u16 = 8080;
+/// Default server max concurrent connections (100 connections)
 const DEFAULT_SERVER_MAX_CONNECTIONS: usize = 100;
+/// Default request timeout in seconds (30 seconds)
 const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 30;
+/// Default response timeout in seconds (60 seconds)
 const DEFAULT_RESPONSE_TIMEOUT_SECS: u64 = 60;
 
 // Cache/Rate limit defaults
+
+/// Default cache max size in number of entries (1000 entries)
 const DEFAULT_CACHE_MAX_SIZE: usize = 1000;
+/// Default cache TTL in seconds (1 hour = 3600 seconds)
 const DEFAULT_CACHE_DEFAULT_TTL_SECS: u64 = 3600;
+/// Default rate limit per second (100 requests)
 const DEFAULT_RATE_LIMIT_PER_SECOND: u32 = 100;
+/// Default concurrent request limit (50 requests)
 const DEFAULT_CONCURRENT_REQUEST_LIMIT: usize = 50;
 
 // File upload defaults
+
+/// Default max log file size in MB (100 MB)
 const DEFAULT_MAX_FILE_SIZE_MB: u64 = 100;
+/// Default number of log files to retain (10 files)
 const DEFAULT_MAX_FILES: usize = 10;
 
 /// Application configuration

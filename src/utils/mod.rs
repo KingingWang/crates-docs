@@ -476,8 +476,11 @@ pub mod time {
 pub mod validation {
     use crate::error::Error;
 
+    /// Maximum allowed length for crate names (100 characters)
     const MAX_CRATE_NAME_LENGTH: usize = 100;
+    /// Maximum allowed length for version strings (50 characters)
     const MAX_VERSION_LENGTH: usize = 50;
+    /// Maximum allowed length for search queries (200 characters)
     const MAX_SEARCH_QUERY_LENGTH: usize = 200;
 
     /// Validate crate name

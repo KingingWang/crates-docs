@@ -28,6 +28,7 @@ fn load_from_env(config: &mut crate::config::AppConfig) -> Result<(), Box<dyn st
         Err(_) => None,
     };
 
+    // Using mem::take to move ownership without cloning, leaving default values in place
     *config = crate::config::AppConfig::merge(Some(std::mem::take(config)), env_config);
 
     #[cfg(feature = "api-key")]
