@@ -1121,12 +1121,11 @@ fn test_html_to_text_with_code_block() {
 fn test_doc_cache_ttl_apply_jitter() {
     use crates_docs::tools::docs::cache::DocCacheTtl;
 
-    let ttl = DocCacheTtl {
-        crate_docs_secs: 3600,
-        search_results_secs: 300,
-        item_docs_secs: 1800,
-        jitter_ratio: 0.1,
-    };
+    let mut ttl = DocCacheTtl::default();
+    ttl.crate_docs_secs = 3600;
+    ttl.search_results_secs = 300;
+    ttl.item_docs_secs = 1800;
+    ttl.set_jitter_ratio(0.1);
 
     let base = 3600;
     let jittered = ttl.apply_jitter(base);
@@ -1140,12 +1139,11 @@ fn test_doc_cache_ttl_apply_jitter() {
 fn test_doc_cache_ttl_zero_jitter() {
     use crates_docs::tools::docs::cache::DocCacheTtl;
 
-    let ttl = DocCacheTtl {
-        crate_docs_secs: 3600,
-        search_results_secs: 300,
-        item_docs_secs: 1800,
-        jitter_ratio: 0.0,
-    };
+    let mut ttl = DocCacheTtl::default();
+    ttl.crate_docs_secs = 3600;
+    ttl.search_results_secs = 300;
+    ttl.item_docs_secs = 1800;
+    ttl.set_jitter_ratio(0.0);
 
     let base = 3600;
     let jittered = ttl.apply_jitter(base);

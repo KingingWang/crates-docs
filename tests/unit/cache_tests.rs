@@ -270,17 +270,16 @@ fn test_doc_cache_ttl_default_includes_jitter() {
     assert_eq!(ttl.search_results_secs, 300);
     assert_eq!(ttl.item_docs_secs, 1800);
     // Default jitter is 10%
-    assert!((ttl.jitter_ratio - 0.1).abs() < f64::EPSILON);
+    assert!((ttl.jitter_ratio() - 0.1).abs() < f64::EPSILON);
 }
 
 #[test]
 fn test_apply_jitter_zero_ratio_returns_base_ttl() {
-    let ttl = DocCacheTtl {
-        crate_docs_secs: 3600,
-        search_results_secs: 300,
-        item_docs_secs: 1800,
-        jitter_ratio: 0.0,
-    };
+    let mut ttl = DocCacheTtl::default();
+    ttl.crate_docs_secs = 3600;
+    ttl.search_results_secs = 300;
+    ttl.item_docs_secs = 1800;
+    ttl.set_jitter_ratio(0.0);
 
     // When jitter_ratio is 0, should return original value
     assert_eq!(ttl.apply_jitter(3600), 3600);
@@ -289,12 +288,11 @@ fn test_apply_jitter_zero_ratio_returns_base_ttl() {
 
 #[test]
 fn test_apply_jitter_within_expected_range() {
-    let ttl = DocCacheTtl {
-        crate_docs_secs: 3600,
-        search_results_secs: 300,
-        item_docs_secs: 1800,
-        jitter_ratio: 0.1, // 10% jitter
-    };
+    let mut ttl = DocCacheTtl::default();
+    ttl.crate_docs_secs = 3600;
+    ttl.search_results_secs = 300;
+    ttl.item_docs_secs = 1800;
+    ttl.set_jitter_ratio(0.1); // 10% jitter
 
     // Call multiple times to ensure results are within expected range
     for _ in 0..100 {
@@ -314,22 +312,20 @@ fn test_apply_jitter_within_expected_range() {
 #[test]
 fn test_apply_jitter_clamps_to_valid_range() {
     // Test negative jitter_ratio (should be clamped to 0)
-    let ttl_negative = DocCacheTtl {
-        crate_docs_secs: 3600,
-        search_results_secs: 300,
-        item_docs_secs: 1800,
-        jitter_ratio: -0.5,
-    };
+    let mut ttl_negative = DocCacheTtl::default();
+    ttl_negative.crate_docs_secs = 3600;
+    ttl_negative.search_results_secs = 300;
+    ttl_negative.item_docs_secs = 1800;
+    ttl_negative.set_jitter_ratio(-0.5);
     // Negative values should be treated as 0, returning original value
     assert_eq!(ttl_negative.apply_jitter(3600), 3600);
 
     // Test jitter_ratio above 1.0 (should be clamped to 1.0)
-    let ttl_high = DocCacheTtl {
-        crate_docs_secs: 3600,
-        search_results_secs: 300,
-        item_docs_secs: 1800,
-        jitter_ratio: 2.0,
-    };
+    let mut ttl_high = DocCacheTtl::default();
+    ttl_high.crate_docs_secs = 3600;
+    ttl_high.search_results_secs = 300;
+    ttl_high.item_docs_secs = 1800;
+    ttl_high.set_jitter_ratio(2.0);
     // 200% jitter means result can be in [0, 7200] range, but minimum is 1
     for _ in 0..100 {
         let result = ttl_high.apply_jitter(3600);
@@ -343,12 +339,11 @@ fn test_apply_jitter_clamps_to_valid_range() {
 
 #[test]
 fn test_apply_jitter_different_base_values() {
-    let ttl = DocCacheTtl {
-        crate_docs_secs: 3600,
-        search_results_secs: 300,
-        item_docs_secs: 1800,
-        jitter_ratio: 0.1,
-    };
+    let mut ttl = DocCacheTtl::default();
+    ttl.crate_docs_secs = 3600;
+    ttl.search_results_secs = 300;
+    ttl.item_docs_secs = 1800;
+    ttl.set_jitter_ratio(0.1);
 
     // Test different base TTL values
     let base_values = [60, 300, 1800, 3600, 7200];

@@ -88,15 +88,14 @@ impl DocCache {
     /// use crates_docs::cache::memory::MemoryCache;
     ///
     /// let cache = Arc::new(MemoryCache::new(1000));
-    /// let ttl = DocCacheTtl {
-    ///     crate_docs_secs: 7200,
-    ///     search_results_secs: 600,
-    ///     item_docs_secs: 3600,
-    ///     jitter_ratio: 0.1,
-    /// };
+    /// let ttl = DocCacheTtl::with_jitter(
+    ///     7200,  // crate_docs_secs
+    ///     600,   // search_results_secs
+    ///     3600,  // item_docs_secs
+    ///     0.1,   // jitter_ratio
+    /// );
     /// let doc_cache = DocCache::with_ttl(cache, ttl);
     /// ```
-    #[must_use]
     pub fn with_ttl(cache: Arc<dyn Cache>, ttl: DocCacheTtl) -> Self {
         Self {
             cache,
@@ -330,12 +329,11 @@ mod tests {
         let memory_cache = MemoryCache::new(100);
         let cache = Arc::new(memory_cache);
 
-        let ttl = DocCacheTtl {
-            crate_docs_secs: 7200,
-            search_results_secs: 600,
-            item_docs_secs: 3600,
-            jitter_ratio: 0.0, // Disable jitter for predictable tests
-        };
+        let mut ttl = DocCacheTtl::default();
+        ttl.crate_docs_secs = 7200;
+        ttl.search_results_secs = 600;
+        ttl.item_docs_secs = 3600;
+        ttl.set_jitter_ratio(0.0); // Disable jitter for predictable tests
 
         let doc_cache = DocCache::with_ttl(cache, ttl);
 

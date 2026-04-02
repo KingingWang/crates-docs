@@ -48,6 +48,9 @@ static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 ///
 /// Uses the `scraper` crate for robust HTML5 parsing, which handles
 /// malformed HTML better than manual parsing.
+///
+/// This function performs a single-pass HTML parsing and removal of all
+/// unwanted elements (`SKIP_TAGS`, `NAV_TAGS`, `UI_TAGS`) to minimize parsing overhead.
 #[must_use]
 pub fn clean_html(html: &str) -> String {
     let document = Html::parse_document(html);
@@ -55,55 +58,65 @@ pub fn clean_html(html: &str) -> String {
 }
 
 /// Remove unwanted elements from HTML using scraper for parsing
+///
+/// This function performs single-pass removal of all unwanted elements:
+/// - `SKIP_TAGS`: script, style, noscript, iframe (removed with content)
+/// - `NAV_TAGS`: nav, header, footer, aside (removed with content)
+/// - `UI_TAGS`: button (removed), summary (tag removed, content preserved)
 #[inline]
 fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     let mut result = original_html.to_string();
 
-    // Remove skip tags with their content using scraper
+    // Collect all elements to remove in a single pass
+    // Tuple: (element_html, replacement_text)
+    // If replacement_text is None, the element is completely removed
+    let mut elements_to_process: Vec<(String, Option<String>)> = Vec::new();
+
+    // Process SKIP_TAGS - remove completely
     for tag in SKIP_TAGS {
         if let Ok(selector) = Selector::parse(tag) {
-            let elements: Vec<_> = document.select(&selector).collect();
-            for element in elements {
-                let element_html = element.html();
-                result = result.replace(&element_html, "");
+            for element in document.select(&selector) {
+                elements_to_process.push((element.html(), None));
             }
         }
     }
 
-    // Re-parse after removing skip tags
-    let mut updated_doc = Html::parse_document(&result);
-
-    // Remove navigation/structure elements
+    // Process NAV_TAGS - remove completely
     for tag in NAV_TAGS {
         if let Ok(selector) = Selector::parse(tag) {
-            let elements: Vec<_> = updated_doc.select(&selector).collect();
-            for element in elements {
-                let element_html = element.html();
-                result = result.replace(&element_html, "");
+            for element in document.select(&selector) {
+                elements_to_process.push((element.html(), None));
             }
         }
     }
 
-    // Re-parse after removing nav tags
-    updated_doc = Html::parse_document(&result);
-
-    // Remove UI elements (buttons, summary)
-    // For buttons: remove completely
-    // For summary: remove the tag but keep the text content
+    // Process UI_TAGS - special handling for summary
     for tag in UI_TAGS {
         if let Ok(selector) = Selector::parse(tag) {
-            let elements: Vec<_> = updated_doc.select(&selector).collect();
-            for element in elements {
+            for element in document.select(&selector) {
                 let element_html = element.html();
                 if tag == &"summary" {
                     // For summary tags, extract and keep the text content
                     let text_content: String = element.text().collect();
-                    result = result.replace(&element_html, &text_content);
+                    elements_to_process.push((element_html, Some(text_content)));
                 } else {
                     // For other UI tags (like button), remove completely
-                    result = result.replace(&element_html, "");
+                    elements_to_process.push((element_html, None));
                 }
             }
+        }
+    }
+
+    // Apply all replacements in a single pass over the result string
+    // Sort by element_html length ascending (shorter first) to process nested (child) elements
+    // before parent elements. Child elements have shorter HTML because they don't contain
+    // their parent container, so processing them first ensures correct replacement.
+    elements_to_process.sort_by(|a, b| a.0.len().cmp(&b.0.len()));
+
+    for (element_html, replacement) in elements_to_process {
+        match replacement {
+            Some(text) => result = result.replace(&element_html, &text),
+            None => result = result.replace(&element_html, ""),
         }
     }
 

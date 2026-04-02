@@ -341,27 +341,29 @@ impl DocService {
 
 impl Default for DocService {
     fn default() -> Self {
+        // Try to create with fallible initialization
+        Self::try_default_with_fallback()
+    }
+}
+
+impl DocService {
+    /// Create `DocService` with default settings using fallible initialization
+    ///
+    /// This method attempts to create a fully configured HTTP client.
+    /// If that fails, it falls back to a basic client without retry middleware.
+    /// The fallback uses `Client::new()` which is infallible.
+    fn try_default_with_fallback() -> Self {
         let cache = Arc::new(crate::cache::memory::MemoryCache::new(1000));
         let cache_config = CacheConfig::default();
 
-        // Create HTTP client directly with default settings
-        // This is infallible for Default impl - HTTP client creation with
-        // default settings should never fail in practice
+        // Try to create client with full configuration (may fail in extreme cases)
         let client: Arc<reqwest_middleware::ClientWithMiddleware> =
             if let Ok(c) = crate::utils::HttpClientBuilder::new().build() {
                 Arc::new(c)
             } else {
                 // Fallback: create a minimal client without retry middleware
-                // This should only happen in extreme circumstances
-                // This expect is acceptable because:
-                // 1. reqwest::Client::default() only fails in extreme circumstances (resource exhaustion)
-                // 2. If we can't even create a minimal client, the system is in a critical state
-                // 3. This path is primarily used for tests and examples; production code uses DocService::new()
-                let plain_client = reqwest::Client::builder()
-                    .timeout(std::time::Duration::from_secs(30))
-                    .connect_timeout(std::time::Duration::from_secs(10))
-                    .build()
-                    .expect("Failed to create even minimal HTTP client");
+                // Using Client::new() which is infallible - never panics
+                let plain_client = reqwest::Client::new();
                 Arc::new(reqwest_middleware::ClientBuilder::new(plain_client).build())
             };
 
