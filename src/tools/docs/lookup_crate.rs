@@ -3,7 +3,14 @@
 //! Provides functionality to retrieve complete documentation for a Rust crate
 //! from docs.rs. Returns the main documentation page content including modules,
 //! structs, functions, etc.
+
 #![allow(missing_docs)]
+
+//! Tool parameters for looking up crate documentation from docs.rs
+//!
+//! This struct defines the parameters needed to retrieve documentation
+//! for a specific Rust crate, including the crate name, optional version,
+//! and desired output format.
 
 use crate::tools::docs::html;
 use crate::tools::docs::DocService;
@@ -14,8 +21,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 const TOOL_NAME: &str = "lookup_crate";
-
-/// Lookup crate documentation tool parameters
 ///
 /// Used to specify which crate to look up and in what format to return the documentation.
 #[rust_mcp_sdk::macros::mcp_tool(
@@ -32,7 +37,10 @@ const TOOL_NAME: &str = "lookup_crate";
         (src = "https://docs.rs/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "dark")
     ]
 )]
-#[allow(missing_docs)]
+/// Parameters for the `lookup_crate` tool
+///
+/// Defines the input parameters for retrieving crate documentation,
+/// including the crate name, optional version specification, and output format.
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupCrateTool {
     /// Crate name to lookup (e.g., "serde", "tokio", "reqwest")
@@ -58,8 +66,12 @@ pub struct LookupCrateTool {
     pub format: Option<String>,
 }
 
-/// Lookup crate documentation tool implementation
+/// Implementation of the lookup crate documentation tool
+///
+/// Handles the execution of crate documentation lookups, including
+/// cache management, HTTP fetching from docs.rs, and result formatting.
 pub struct LookupCrateToolImpl {
+    /// Shared document service for HTTP requests and caching
     service: Arc<DocService>,
 }
 

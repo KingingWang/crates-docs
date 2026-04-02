@@ -3,6 +3,7 @@
 //! Provides functionality to search for Rust crates from crates.io.
 //! Returns a list of matching crates with metadata like name, description,
 //! version, downloads, etc.
+
 #![allow(missing_docs)]
 
 use crate::tools::Tool;
@@ -34,7 +35,10 @@ const ESTIMATED_TEXT_ENTRY_SIZE: usize = 100;
         (src = "https://crates.io/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "dark")
     ]
 )]
-#[allow(missing_docs)]
+/// Parameters for the `search_crates` tool
+///
+/// Defines the input parameters for searching Rust crates on crates.io,
+/// including the search query, result limit, sort order, and output format.
 #[derive(Debug, Clone, Deserialize, Serialize, macros::JsonSchema)]
 pub struct SearchCratesTool {
     /// Search keywords (e.g., "web framework", "async", "http client")
@@ -80,9 +84,12 @@ const VALID_SEARCH_SORTS: &[&str] = &[
     "new",
 ];
 
-/// Search crates tool implementation
+/// Implementation of the search crates tool
+///
+/// Handles the execution of crate searches on crates.io, including
+/// cache management, HTTP requests, and result formatting.
 pub struct SearchCratesToolImpl {
-    /// The document service used for HTTP requests and caching
+    /// Shared document service for HTTP requests and caching
     service: Arc<super::DocService>,
 }
 
