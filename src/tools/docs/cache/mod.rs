@@ -122,7 +122,8 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        result
+        // Convert Arc<String> to String for API compatibility
+        result.map(|arc| (*arc).clone())
     }
 
     /// Set crate document cache
@@ -167,7 +168,8 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        result
+        // Convert Arc<String> to String for API compatibility
+        result.map(|arc| (*arc).clone())
     }
 
     /// Set search results cache
@@ -218,7 +220,8 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        result
+        // Convert Arc<String> to String for API compatibility
+        result.map(|arc| (*arc).clone())
     }
 
     /// Set item docs cache

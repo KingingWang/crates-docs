@@ -2,6 +2,7 @@
 //!
 //! Provides Redis backend cache support with safe operations.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::error::Error;
@@ -82,7 +83,7 @@ impl RedisCache {
 
 #[async_trait::async_trait]
 impl super::Cache for RedisCache {
-    async fn get(&self, key: &str) -> Option<String> {
+    async fn get(&self, key: &str) -> Option<Arc<String>> {
         let mut conn = self.conn.clone();
         let full_key = self.build_key(key);
         redis::cmd("GET")
@@ -90,6 +91,7 @@ impl super::Cache for RedisCache {
             .query_async(&mut conn)
             .await
             .ok()
+            .map(Arc::new)
     }
 
     #[allow(clippy::cast_possible_truncation)]
@@ -233,7 +235,8 @@ mod tests {
             .await
             .expect("set should succeed");
         let value = cache.get("test_key").await;
-        assert_eq!(value, Some("test_value".to_string()));
+        assert!(value.is_some());
+        assert_eq!(value.unwrap().as_ref(), "test_value");
 
         // Test delete
         cache
@@ -257,7 +260,8 @@ mod tests {
             .await
             .expect("set should succeed");
         cache.clear().await.expect("clear should succeed");
-        assert_eq!(cache.get("clear_test").await, None);
+        let cleared_value = cache.get("clear_test").await;
+        assert!(cleared_value.is_none());
     }
 
     #[test]

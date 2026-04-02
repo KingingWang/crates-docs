@@ -21,7 +21,8 @@ async fn test_cache_functionality() {
         .await
         .expect("set should succeed");
     let value = cache.get("test_key").await;
-    assert_eq!(value, Some("test_value".to_string()));
+    assert!(value.is_some());
+    assert_eq!(value.unwrap().as_ref(), "test_value");
 
     // Test cache expiration
     cache
@@ -33,7 +34,8 @@ async fn test_cache_functionality() {
         .await
         .expect("set should succeed");
     let value = cache.get("expiring_key").await;
-    assert_eq!(value, Some("expiring_value".to_string()));
+    assert!(value.is_some());
+    assert_eq!(value.unwrap().as_ref(), "expiring_value");
 
     // Wait for expiration
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
