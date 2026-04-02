@@ -19,7 +19,7 @@ streamable-http = ["rust-mcp-sdk/streamable-http"]
 sse = ["rust-mcp-sdk/sse"]
 stdio = ["rust-mcp-sdk/stdio"]
 macros = ["rust-mcp-sdk/macros"]
-auth = ["rust-mcp-sdk/auth", "rust-mcp-extra"]
+auth = ["rust-mcp-sdk/auth"]
 api-key = ["dep:api-keys-simplified"]
 cache-memory = ["dep:moka"]
 cache-redis = ["dep:redis"]
@@ -29,9 +29,6 @@ logging = []
 [dependencies]
 # MCP core dependencies
 rust-mcp-sdk = { version = "0.9", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http", "sse"] }
-rust-mcp-macros = "0.9.0"
-rust-mcp-schema = "0.10"
-rust-mcp-extra = { version = "0.2.3", optional = true }
 
 # HTTP client
 reqwest = { version = "0.13", features = ["json"] }
@@ -67,8 +64,6 @@ html2md = "0.2"
 scraper = "0.26"
 regex = "1.11"
 url = "2.5"
-base64 = "0.22"
-parking_lot = "0.12"
 flate2 = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 urlencoding = "2.1"
@@ -87,9 +82,7 @@ reqwest = { version = "0.13", features = ["json"] }
 serde_json = "1.0"
 tempfile = "3.27.0"
 temp-env = "0.3"
-mockall = "0.14"
 wiremock = "0.6"
-mockito = "1.6"
 serial_test = "3.0"
 
 [[bin]]
