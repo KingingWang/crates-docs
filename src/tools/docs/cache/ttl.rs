@@ -196,7 +196,7 @@ impl DocCacheTtl {
     /// # Examples
     ///
     /// ```
-    /// use mcp_crates_docs::tools::docs::cache::DocCacheTtl;
+    /// use crates_docs::tools::docs::cache::DocCacheTtl;
     ///
     /// let mut ttl = DocCacheTtl::default();
     /// ttl.set_jitter_ratio(0.2);
