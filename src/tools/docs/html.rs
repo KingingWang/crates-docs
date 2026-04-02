@@ -44,6 +44,18 @@ static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\[[^\]]*\]\([a-zA-Z][^)]*\.html\)").expect("hardcoded valid regex pattern")
 });
 
+/// Regex to collapse three or more newlines to two newlines
+static MULTIPLE_NEWLINES_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\n\n\n+").expect("hardcoded valid regex pattern"));
+
+/// Cached CSS selector for body element
+static BODY_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("body").expect("hardcoded valid selector"));
+
+/// Cached CSS selector for all elements
+static ALL_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("*").expect("hardcoded valid selector"));
+
 /// Clean HTML by removing unwanted tags and their content
 ///
 /// Uses the `scraper` crate for robust HTML5 parsing, which handles
@@ -111,7 +123,7 @@ fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     // Sort by element_html length ascending (shorter first) to process nested (child) elements
     // before parent elements. Child elements have shorter HTML because they don't contain
     // their parent container, so processing them first ensures correct replacement.
-    elements_to_process.sort_by(|a, b| a.0.len().cmp(&b.0.len()));
+    elements_to_process.sort_by_key(|(html, _)| html.len());
 
     for (element_html, replacement) in elements_to_process {
         match replacement {
@@ -146,14 +158,11 @@ pub fn html_to_text(html: &str) -> String {
     let mut text_parts = Vec::new();
 
     // Select the root and extract text, handling skip tags
-    let body_selector = Selector::parse("body").unwrap();
-
-    if let Some(body) = document.select(&body_selector).next() {
+    if let Some(body) = document.select(&BODY_SELECTOR).next() {
         extract_text_excluding_skip_tags(&body, &mut text_parts);
     } else {
         // No body tag, extract from entire document
-        let all_selector = Selector::parse("*").unwrap();
-        if let Some(root) = document.select(&all_selector).next() {
+        if let Some(root) = document.select(&ALL_SELECTOR).next() {
             extract_text_excluding_skip_tags(&root, &mut text_parts);
         }
     }
@@ -198,10 +207,12 @@ pub fn extract_documentation(html: &str) -> String {
 /// Clean markdown output by removing relative links and UI artifacts
 #[inline]
 fn clean_markdown(markdown: &str) -> String {
+    // Use Cow to avoid allocations when no replacements are needed
+    // Chain replacements to process in a single traversal
     let result = SOURCE_LINK_REGEX.replace_all(markdown, Cow::Borrowed(""));
     let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
-    let result = result.replace("\n\n\n", "\n\n");
+    let result = MULTIPLE_NEWLINES_REGEX.replace_all(&result, Cow::Borrowed("\n\n"));
     result.trim().to_string()
 }
 
