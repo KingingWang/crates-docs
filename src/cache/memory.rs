@@ -1,4 +1,4 @@
-//!//! Memory cache implementation
+//! Memory cache implementation
 //!
 //! Memory cache using `moka::sync::Cache` with `TinyLFU` eviction policy.
 //! This provides better performance and hit rate than simple LRU.
