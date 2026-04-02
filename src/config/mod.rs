@@ -329,6 +329,69 @@ impl Default for PerformanceConfig {
     }
 }
 
+/// Environment variable configuration for server
+///
+/// All fields are `Option<T>` to distinguish between "not set" and "explicitly set"
+#[derive(Debug, Clone, Default)]
+pub struct EnvServerConfig {
+    /// Server name
+    pub name: Option<String>,
+    /// Host address
+    pub host: Option<String>,
+    /// Port
+    pub port: Option<u16>,
+    /// Transport mode
+    pub transport_mode: Option<String>,
+}
+
+/// Environment variable configuration for logging
+///
+/// All fields are `Option<T>` to distinguish between "not set" and "explicitly set"
+#[derive(Debug, Clone, Default)]
+pub struct EnvLoggingConfig {
+    /// Log level
+    pub level: Option<String>,
+    /// Whether to enable console logging
+    pub enable_console: Option<bool>,
+    /// Whether to enable file logging
+    pub enable_file: Option<bool>,
+}
+
+/// Environment variable configuration for API key (when feature enabled)
+///
+/// All fields are `Option<T>` to distinguish between "not set" and "explicitly set"
+#[cfg(feature = "api-key")]
+#[derive(Debug, Clone, Default)]
+pub struct EnvApiKeyConfig {
+    /// Whether API key authentication is enabled
+    pub enabled: Option<bool>,
+    /// List of valid API keys
+    pub keys: Option<Vec<String>>,
+    /// Header name for API key
+    pub header_name: Option<String>,
+    /// Query parameter name for API key
+    pub query_param_name: Option<String>,
+    /// Whether to allow API key in query parameters
+    pub allow_query_param: Option<bool>,
+    /// API key prefix
+    pub key_prefix: Option<String>,
+}
+
+/// Environment variable configuration
+///
+/// Uses `Option<T>` for all fields to properly distinguish between
+/// "not set" and "explicitly set to default value".
+#[derive(Debug, Clone, Default)]
+pub struct EnvAppConfig {
+    /// Server configuration from environment
+    pub server: EnvServerConfig,
+    /// Logging configuration from environment
+    pub logging: EnvLoggingConfig,
+    /// API key configuration from environment
+    #[cfg(feature = "api-key")]
+    pub auth_api_key: EnvApiKeyConfig,
+}
+
 impl AppConfig {
     /// Load configuration from file
     ///
@@ -465,82 +528,91 @@ impl AppConfig {
 
     /// Load configuration from environment variables
     ///
+    /// Returns an `EnvAppConfig` where all fields are `Option<T>`, allowing
+    /// the caller to distinguish between "not set" and "explicitly set".
+    ///
     /// # Errors
     ///
-    /// Returns an error if environment variable format is invalid or configuration validation fails
-    pub fn from_env() -> Result<Self, crate::error::Error> {
-        let mut config = Self::default();
+    /// Returns an error if environment variable format is invalid (e.g., non-numeric port)
+    pub fn from_env() -> Result<EnvAppConfig, crate::error::Error> {
+        let mut config = EnvAppConfig::default();
 
-        // Override configuration from environment variables
+        // Load server configuration from environment variables
         if let Ok(name) = std::env::var("CRATES_DOCS_NAME") {
-            config.server.name = name;
+            config.server.name = Some(name);
         }
 
         if let Ok(host) = std::env::var("CRATES_DOCS_HOST") {
-            config.server.host = host;
+            config.server.host = Some(host);
         }
 
         if let Ok(port) = std::env::var("CRATES_DOCS_PORT") {
-            config.server.port = port
-                .parse()
-                .map_err(|e| crate::error::Error::config("port", format!("Invalid port: {e}")))?;
+            config.server.port =
+                Some(port.parse().map_err(|e| {
+                    crate::error::Error::config("port", format!("Invalid port: {e}"))
+                })?);
         }
 
         if let Ok(mode) = std::env::var("CRATES_DOCS_TRANSPORT_MODE") {
-            config.server.transport_mode = mode;
+            config.server.transport_mode = Some(mode);
         }
 
+        // Load logging configuration from environment variables
         if let Ok(level) = std::env::var("CRATES_DOCS_LOG_LEVEL") {
-            config.logging.level = level;
+            config.logging.level = Some(level);
         }
 
         if let Ok(enable_console) = std::env::var("CRATES_DOCS_ENABLE_CONSOLE") {
-            config.logging.enable_console = enable_console.parse().unwrap_or(false);
+            config.logging.enable_console = enable_console.parse().ok();
         }
 
         if let Ok(enable_file) = std::env::var("CRATES_DOCS_ENABLE_FILE") {
-            config.logging.enable_file = enable_file.parse().unwrap_or(false);
+            config.logging.enable_file = enable_file.parse().ok();
         }
 
         #[cfg(feature = "api-key")]
         {
             if let Ok(enabled) = std::env::var("CRATES_DOCS_API_KEY_ENABLED") {
-                config.auth.api_key.enabled = enabled.parse().unwrap_or(false);
+                config.auth_api_key.enabled = enabled.parse().ok();
             }
 
             if let Ok(keys) = std::env::var("CRATES_DOCS_API_KEYS") {
-                config.auth.api_key.keys = keys
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                    .map(ToOwned::to_owned)
-                    .collect();
+                config.auth_api_key.keys = Some(
+                    keys.split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(ToOwned::to_owned)
+                        .collect(),
+                );
             }
 
             if let Ok(header_name) = std::env::var("CRATES_DOCS_API_KEY_HEADER") {
-                config.auth.api_key.header_name = header_name;
+                config.auth_api_key.header_name = Some(header_name);
             }
 
             if let Ok(query_param_name) = std::env::var("CRATES_DOCS_API_KEY_QUERY_PARAM_NAME") {
-                config.auth.api_key.query_param_name = query_param_name;
+                config.auth_api_key.query_param_name = Some(query_param_name);
             }
 
             if let Ok(allow_query_param) = std::env::var("CRATES_DOCS_API_KEY_ALLOW_QUERY") {
-                config.auth.api_key.allow_query_param = allow_query_param.parse().unwrap_or(false);
+                config.auth_api_key.allow_query_param = allow_query_param.parse().ok();
             }
 
             if let Ok(key_prefix) = std::env::var("CRATES_DOCS_API_KEY_PREFIX") {
-                config.auth.api_key.key_prefix = key_prefix;
+                config.auth_api_key.key_prefix = Some(key_prefix);
             }
         }
 
-        config.validate()?;
         Ok(config)
     }
 
     /// Merge configuration (environment variables take precedence over file configuration)
+    ///
+    /// Uses `Option<T>` semantics from `EnvAppConfig` to determine which values
+    /// were explicitly set via environment variables. This eliminates fragile
+    /// hardcoded default comparisons.
     #[must_use]
-    pub fn merge(file_config: Option<Self>, env_config: Option<Self>) -> Self {
+    pub fn merge(file_config: Option<Self>, env_config: Option<EnvAppConfig>) -> Self {
         let mut config = Self::default();
 
         // First apply file configuration
@@ -549,52 +621,52 @@ impl AppConfig {
         }
 
         // Then apply environment variable configuration (overrides file configuration)
+        // Uses Option::is_some() to check if value was explicitly set
         if let Some(env) = env_config {
-            // Merge server configuration
-            if env.server.name != "crates-docs" {
-                config.server.name = env.server.name;
+            // Merge server configuration - only override if explicitly set
+            if let Some(name) = env.server.name {
+                config.server.name = name;
             }
-            if env.server.host != "127.0.0.1" {
-                config.server.host = env.server.host;
+            if let Some(host) = env.server.host {
+                config.server.host = host;
             }
-            if env.server.port != 8080 {
-                config.server.port = env.server.port;
+            if let Some(port) = env.server.port {
+                config.server.port = port;
             }
-            if env.server.transport_mode != "hybrid" {
-                config.server.transport_mode = env.server.transport_mode;
+            if let Some(transport_mode) = env.server.transport_mode {
+                config.server.transport_mode = transport_mode;
             }
 
-            // Merge logging configuration
-            if env.logging.level != "info" {
-                config.logging.level = env.logging.level;
+            // Merge logging configuration - only override if explicitly set
+            if let Some(level) = env.logging.level {
+                config.logging.level = level;
+            }
+            if let Some(enable_console) = env.logging.enable_console {
+                config.logging.enable_console = enable_console;
+            }
+            if let Some(enable_file) = env.logging.enable_file {
+                config.logging.enable_file = enable_file;
             }
 
             #[cfg(feature = "api-key")]
             {
-                let default_api_key = crate::server::auth::ApiKeyConfig::default();
-
-                if env.auth.api_key.enabled != default_api_key.enabled {
-                    config.auth.api_key.enabled = env.auth.api_key.enabled;
+                if let Some(enabled) = env.auth_api_key.enabled {
+                    config.auth.api_key.enabled = enabled;
                 }
-
-                if env.auth.api_key.keys != default_api_key.keys {
-                    config.auth.api_key.keys = env.auth.api_key.keys;
+                if let Some(keys) = env.auth_api_key.keys {
+                    config.auth.api_key.keys = keys;
                 }
-
-                if env.auth.api_key.header_name != default_api_key.header_name {
-                    config.auth.api_key.header_name = env.auth.api_key.header_name;
+                if let Some(header_name) = env.auth_api_key.header_name {
+                    config.auth.api_key.header_name = header_name;
                 }
-
-                if env.auth.api_key.query_param_name != default_api_key.query_param_name {
-                    config.auth.api_key.query_param_name = env.auth.api_key.query_param_name;
+                if let Some(query_param_name) = env.auth_api_key.query_param_name {
+                    config.auth.api_key.query_param_name = query_param_name;
                 }
-
-                if env.auth.api_key.allow_query_param != default_api_key.allow_query_param {
-                    config.auth.api_key.allow_query_param = env.auth.api_key.allow_query_param;
+                if let Some(allow_query_param) = env.auth_api_key.allow_query_param {
+                    config.auth.api_key.allow_query_param = allow_query_param;
                 }
-
-                if env.auth.api_key.key_prefix != default_api_key.key_prefix {
-                    config.auth.api_key.key_prefix = env.auth.api_key.key_prefix;
+                if let Some(key_prefix) = env.auth_api_key.key_prefix {
+                    config.auth.api_key.key_prefix = key_prefix;
                 }
             }
         }

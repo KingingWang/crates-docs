@@ -55,7 +55,10 @@ pub mod server;
 pub mod tools;
 pub mod utils;
 
-pub use crate::config::{AppConfig, ServerConfig};
+pub use crate::config::{
+    AppConfig, EnvAppConfig, EnvLoggingConfig, EnvServerConfig, LoggingConfig, PerformanceConfig,
+    ServerConfig,
+};
 /// Re-export error types
 pub use crate::error::{Error, Result};
 /// Re-export server types

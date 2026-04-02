@@ -86,7 +86,7 @@ fn test_config_loading() {
             assert!(env_config.is_ok());
 
             // Verify environment variables are effective
-            let config = env_config.unwrap();
+            let config = AppConfig::merge(None, Some(env_config.unwrap()));
             assert_eq!(config.server.host, "127.0.0.1");
             assert_eq!(config.server.port, 9090);
         },
