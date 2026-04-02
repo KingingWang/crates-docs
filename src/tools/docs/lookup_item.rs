@@ -1,4 +1,8 @@
 //! Lookup item documentation tool
+//!
+//! Provides functionality to retrieve documentation for a specific item
+//! (function, struct, trait, module, etc.) from a Rust crate on docs.rs.
+//! Supports search paths like `serde::Serialize`, `std::collections::HashMap`, etc.
 #![allow(missing_docs)]
 
 use crate::tools::docs::html;
@@ -11,7 +15,9 @@ use std::sync::Arc;
 
 const TOOL_NAME: &str = "lookup_item";
 
-/// Lookup item documentation tool
+/// Lookup item documentation tool parameters
+///
+/// Used to specify which crate item to look up and in what format to return the documentation.
 #[rust_mcp_sdk::macros::mcp_tool(
     name = "lookup_item",
     title = "Lookup Item Documentation",
@@ -29,28 +35,28 @@ const TOOL_NAME: &str = "lookup_item";
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupItemTool {
-    /// Crate name
+    /// Crate name containing the item (e.g., "serde", "tokio", "std")
     #[json_schema(
         title = "Crate Name",
         description = "Crate name to lookup, e.g.: serde, tokio, std"
     )]
     pub crate_name: String,
 
-    /// Item path (e.g., `std::collections::HashMap`)
+    /// Item path within the crate (e.g., `"std::collections::HashMap"`)
     #[json_schema(
         title = "Item Path",
         description = "Item path in format 'module::submodule::item', e.g.: serde::Serialize, tokio::runtime::Runtime, std::collections::HashMap"
     )]
     pub item_path: String,
 
-    /// Version (optional, defaults to latest)
+    /// Crate version (optional, defaults to latest)
     #[json_schema(
         title = "Version",
         description = "Crate version. Uses latest version if not specified"
     )]
     pub version: Option<String>,
 
-    /// Output format: markdown, text, or html
+    /// Output format: "markdown", "text", or "html" (defaults to "markdown")
     #[json_schema(
         title = "Output Format",
         description = "Output format: markdown (default), text (plain text), html",

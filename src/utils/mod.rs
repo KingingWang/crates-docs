@@ -476,13 +476,20 @@ pub mod time {
 pub mod validation {
     use crate::error::Error;
 
+    /// Maximum allowed length for crate names (100 characters)
+    const MAX_CRATE_NAME_LENGTH: usize = 100;
+    /// Maximum allowed length for version strings (50 characters)
+    const MAX_VERSION_LENGTH: usize = 50;
+    /// Maximum allowed length for search queries (200 characters)
+    const MAX_SEARCH_QUERY_LENGTH: usize = 200;
+
     /// Validate crate name
     pub fn validate_crate_name(name: &str) -> Result<(), Error> {
         if name.is_empty() {
             return Err(Error::Other("Crate name cannot be empty".to_string()));
         }
 
-        if name.len() > 100 {
+        if name.len() > MAX_CRATE_NAME_LENGTH {
             return Err(Error::Other("Crate name is too long".to_string()));
         }
 
@@ -505,7 +512,7 @@ pub mod validation {
             return Err(Error::Other("Version cannot be empty".to_string()));
         }
 
-        if version.len() > 50 {
+        if version.len() > MAX_VERSION_LENGTH {
             return Err(Error::Other("Version is too long".to_string()));
         }
 
@@ -523,7 +530,7 @@ pub mod validation {
             return Err(Error::Other("Search query cannot be empty".to_string()));
         }
 
-        if query.len() > 200 {
+        if query.len() > MAX_SEARCH_QUERY_LENGTH {
             return Err(Error::Other("Search query is too long".to_string()));
         }
 
