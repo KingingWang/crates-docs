@@ -331,7 +331,23 @@ impl Default for PerformanceConfig {
 
 /// Environment variable configuration for server
 ///
-/// All fields are `Option<T>` to distinguish between "not set" and "explicitly set"
+/// All fields are `Option<T>` to distinguish between "not set from environment"
+/// and "explicitly set from environment".
+///
+/// # Semantics
+///
+/// - `None` - The environment variable was not set; use the config file or default value
+/// - `Some(value)` - The environment variable was explicitly set to `value`
+///
+/// # Example
+///
+/// ```rust,ignore
+/// // CRATES_DOCS_HOST not set
+/// let config = EnvServerConfig::from_env(); // host == None, use default
+///
+/// // CRATES_DOCS_HOST=127.0.0.1
+/// let config = EnvServerConfig::from_env(); // host == Some("127.0.0.1")
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct EnvServerConfig {
     /// Server name
@@ -346,7 +362,13 @@ pub struct EnvServerConfig {
 
 /// Environment variable configuration for logging
 ///
-/// All fields are `Option<T>` to distinguish between "not set" and "explicitly set"
+/// All fields are `Option<T>` to distinguish between "not set from environment"
+/// and "explicitly set from environment".
+///
+/// # Semantics
+///
+/// - `None` - The environment variable was not set; use the config file or default value
+/// - `Some(value)` - The environment variable was explicitly set to `value`
 #[derive(Debug, Clone, Default)]
 pub struct EnvLoggingConfig {
     /// Log level
@@ -359,7 +381,13 @@ pub struct EnvLoggingConfig {
 
 /// Environment variable configuration for API key (when feature enabled)
 ///
-/// All fields are `Option<T>` to distinguish between "not set" and "explicitly set"
+/// All fields are `Option<T>` to distinguish between "not set from environment"
+/// and "explicitly set from environment".
+///
+/// # Semantics
+///
+/// - `None` - The environment variable was not set; use the config file or default value
+/// - `Some(value)` - The environment variable was explicitly set to `value`
 #[cfg(feature = "api-key")]
 #[derive(Debug, Clone, Default)]
 pub struct EnvApiKeyConfig {

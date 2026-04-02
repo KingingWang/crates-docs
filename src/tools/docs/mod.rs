@@ -353,6 +353,10 @@ impl Default for DocService {
             } else {
                 // Fallback: create a minimal client without retry middleware
                 // This should only happen in extreme circumstances
+                // This expect is acceptable because:
+                // 1. reqwest::Client::default() only fails in extreme circumstances (resource exhaustion)
+                // 2. If we can't even create a minimal client, the system is in a critical state
+                // 3. This path is primarily used for tests and examples; production code uses DocService::new()
                 let plain_client = reqwest::Client::builder()
                     .timeout(std::time::Duration::from_secs(30))
                     .connect_timeout(std::time::Duration::from_secs(10))

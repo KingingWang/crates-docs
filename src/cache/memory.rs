@@ -55,6 +55,9 @@ impl MemoryCache {
 
     /// Run pending maintenance tasks on the cache.
     /// This is primarily used in tests to ensure TTL expiration is processed.
+    ///
+    /// # Note
+    /// This method is only available in test builds via `#[cfg(test)]`.
     #[cfg(test)]
     pub fn run_pending_tasks(&self) {
         self.cache.run_pending_tasks();
@@ -62,6 +65,9 @@ impl MemoryCache {
 
     /// Get the number of entries in the cache.
     /// This is primarily used in tests to verify cache state.
+    ///
+    /// # Note
+    /// This method is only available in test builds via `#[cfg(test)]`.
     #[cfg(test)]
     #[must_use]
     pub fn entry_count(&self) -> usize {
