@@ -3,6 +3,15 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+/// Normalize crate name to lowercase
+///
+/// Crate names are case-insensitive on crates.io, so we normalize
+/// to lowercase for consistent cache key generation.
+#[must_use]
+fn normalize_crate_name(name: &str) -> String {
+    name.trim().to_lowercase()
+}
+
 fn normalize_version(version: Option<&str>) -> Option<String> {
     version.map(|v| v.trim().to_lowercase())
 }
@@ -31,13 +40,13 @@ impl CacheKeyGenerator {
     ///
     /// # Normalization rules
     ///
-    /// - `crate_name`: lowercase
+    /// - `crate_name`: lowercase (via `normalize_crate_name`)
     /// - `version`: lowercase, trimmed
     /// - Invalid characters in `crate_name` (non-alphanumeric, non-underscore, non-hyphen)
     ///   will result in a hashed key to prevent injection
     #[must_use]
     pub fn crate_cache_key(crate_name: &str, version: Option<&str>) -> String {
-        let normalized_name = crate_name.to_lowercase();
+        let normalized_name = normalize_crate_name(crate_name);
 
         if !is_valid_crate_name(&normalized_name) {
             let mut hasher = DefaultHasher::new();
@@ -70,12 +79,12 @@ impl CacheKeyGenerator {
     ///
     /// # Normalization rules
     ///
-    /// - `crate_name`: lowercase
+    /// - `crate_name`: lowercase (via `normalize_crate_name`)
     /// - `item_path`: trimmed but case-sensitive (Rust paths are case-sensitive)
     /// - `version`: lowercase, trimmed
     #[must_use]
     pub fn item_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
-        let normalized_name = crate_name.to_lowercase();
+        let normalized_name = normalize_crate_name(crate_name);
         let normalized_path = item_path.trim();
 
         if !is_valid_crate_name(&normalized_name) || !is_valid_item_path(normalized_path) {
