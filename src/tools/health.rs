@@ -1,4 +1,9 @@
 //! Health check tool
+//!
+//! Provides functionality to check the health status of the server
+//! and external services (docs.rs, crates.io). Used for diagnosing
+//! connection issues and monitoring system availability.
+
 #![allow(missing_docs)]
 
 use crate::tools::Tool;
@@ -7,7 +12,10 @@ use rust_mcp_sdk::macros;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
-/// Health check tool parameters
+/// Parameters for the `health_check` tool
+///
+/// Defines the input parameters for performing health checks,
+/// including the type of check to perform and verbosity level.
 #[macros::mcp_tool(
     name = "health_check",
     title = "Health Check",
@@ -41,31 +49,48 @@ pub struct HealthCheckTool {
     pub verbose: Option<bool>,
 }
 
-/// Health check result
+/// Overall health check result containing all check results
 #[derive(Debug, Clone, Serialize)]
 struct HealthStatus {
+    /// Overall status: "healthy", "unhealthy", or "degraded"
     status: String,
+    /// Timestamp of the health check in RFC3339 format
     timestamp: String,
+    /// Individual check results
     checks: Vec<HealthCheck>,
+    /// Server uptime duration
     uptime: Duration,
 }
 
-/// Single health check
+/// Result of a single health check
 #[derive(Debug, Clone, Serialize)]
 struct HealthCheck {
+    /// Name of the service checked
     name: String,
+    /// Status: "healthy", "unhealthy", or "unknown"
     status: String,
+    /// Duration of the check in milliseconds
     duration_ms: u64,
+    /// Optional success message
     message: Option<String>,
+    /// Optional error message if check failed
     error: Option<String>,
 }
 
-/// Health check tool implementation
+/// Implementation of the health check tool
+///
+/// Handles the execution of health checks for the server and external services,
+/// including docs.rs and crates.io availability checks.
 pub struct HealthCheckToolImpl {
+    /// Server start time for uptime calculation
     start_time: Instant,
 }
 
 impl HealthCheckToolImpl {
+    /// Creates a new health check tool instance
+    ///
+    /// Initializes the tool with the current time as the server start time
+    /// for uptime calculation purposes.
     #[must_use]
     pub fn new() -> Self {
         Self {

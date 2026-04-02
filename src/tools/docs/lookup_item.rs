@@ -3,6 +3,7 @@
 //! Provides functionality to retrieve documentation for a specific item
 //! (function, struct, trait, module, etc.) from a Rust crate on docs.rs.
 //! Supports search paths like `serde::Serialize`, `std::collections::HashMap`, etc.
+
 #![allow(missing_docs)]
 
 use crate::tools::docs::html;
@@ -32,7 +33,10 @@ const TOOL_NAME: &str = "lookup_item";
         (src = "https://docs.rs/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "dark")
     ]
 )]
-#[allow(missing_docs)]
+/// Parameters for the `lookup_item` tool
+///
+/// Defines the input parameters for retrieving item documentation within a crate,
+/// including the crate name, item path, optional version, and output format.
 #[derive(Debug, Clone, Deserialize, Serialize, rust_mcp_sdk::macros::JsonSchema)]
 pub struct LookupItemTool {
     /// Crate name containing the item (e.g., "serde", "tokio", "std")
@@ -65,8 +69,12 @@ pub struct LookupItemTool {
     pub format: Option<String>,
 }
 
-/// Lookup item documentation tool implementation
+/// Implementation of the lookup item documentation tool
+///
+/// Handles the execution of item documentation lookups within crates,
+/// including cache management, HTTP fetching from docs.rs, and result formatting.
 pub struct LookupItemToolImpl {
+    /// Shared document service for HTTP requests and caching
     service: Arc<DocService>,
 }
 

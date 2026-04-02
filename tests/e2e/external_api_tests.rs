@@ -47,7 +47,8 @@ async fn test_doc_service_with_config() {
         .await
         .expect("Cache set failed");
     let value = cache.get("test_key").await;
-    assert_eq!(value, Some("test_value".to_string()));
+    assert!(value.is_some());
+    assert_eq!(value.unwrap().as_ref(), "test_value");
 }
 
 /// Test cache functionality
@@ -70,7 +71,8 @@ async fn test_doc_service_cache_operations() {
 
     // Get cache
     let value = cache.get("crate:serde").await;
-    assert_eq!(value, Some("serde docs".to_string()));
+    assert!(value.is_some());
+    assert_eq!(value.unwrap().as_ref(), "serde docs");
 
     // Delete cache
     cache
@@ -103,7 +105,8 @@ async fn test_doc_service_cache_ttl() {
 
     // Immediate retrieval should succeed
     let value = cache.get("expiring_key").await;
-    assert_eq!(value, Some("expiring_value".to_string()));
+    assert!(value.is_some());
+    assert_eq!(value.unwrap().as_ref(), "expiring_value");
 
     // Wait for expiration
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -194,16 +197,18 @@ async fn test_cache_key_formats() {
     ];
 
     for key in keys {
+        let expected_value = format!("value_for_{}", key);
         cache
-            .set(key.to_string(), format!("value_for_{}", key), None)
+            .set(key.to_string(), expected_value.clone(), None)
             .await
             .expect("Cache set failed");
 
         let value = cache.get(key).await;
+        assert!(value.is_some(), "Cache key {} failed", key);
         assert_eq!(
-            value,
-            Some(format!("value_for_{}", key)),
-            "Cache key {} failed",
+            value.unwrap().as_str(),
+            expected_value.as_str(),
+            "Cache key {} value mismatch",
             key
         );
     }
@@ -267,10 +272,15 @@ async fn test_concurrent_cache_access() {
                 .await
                 .expect("Set failed");
             let retrieved = cache.get(&key).await;
-            assert_eq!(
-                retrieved,
-                Some(value),
+            assert!(
+                retrieved.is_some(),
                 "Concurrent access failed for key {}",
+                i
+            );
+            assert_eq!(
+                retrieved.unwrap().as_str(),
+                value.as_str(),
+                "Concurrent access value mismatch for key {}",
                 i
             );
         });

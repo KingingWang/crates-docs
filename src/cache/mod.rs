@@ -22,6 +22,7 @@ pub mod memory;
 #[cfg(feature = "cache-redis")]
 pub mod redis;
 
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Default memory cache capacity
@@ -90,8 +91,8 @@ pub trait Cache: Send + Sync {
     ///
     /// # Returns
     ///
-    /// If key exists and not expired, returns cache value; otherwise returns `None`
-    async fn get(&self, key: &str) -> Option<String>;
+    /// If key exists and not expired, returns `Arc<String>` to avoid cloning; otherwise returns `None`
+    async fn get(&self, key: &str) -> Option<Arc<String>>;
 
     /// Set cache value
     ///
