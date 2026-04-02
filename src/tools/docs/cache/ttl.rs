@@ -86,7 +86,9 @@ pub struct DocCacheTtl {
     ///
     /// Actual TTL = `base_ttl * (1 + random(-jitter_ratio, jitter_ratio))`
     /// for example:`base_ttl=3600`, `jitter_ratio=0.1` => Actual TTL range `[3240, 3960]`
-    pub jitter_ratio: f64,
+    ///
+    /// Use `set_jitter_ratio()` to modify this value with validation.
+    jitter_ratio: f64,
 }
 
 impl Default for DocCacheTtl {
@@ -176,6 +178,38 @@ impl DocCacheTtl {
         }
     }
 
+    /// Get the current jitter ratio
+    #[must_use]
+    pub const fn jitter_ratio(&self) -> f64 {
+        self.jitter_ratio
+    }
+
+    /// Set the jitter ratio with validation
+    ///
+    /// Values outside [0.0, 1.0] range are clamped to the nearest valid value.
+    /// NaN values are treated as 0.0.
+    ///
+    /// # Arguments
+    ///
+    /// * `ratio` - The jitter ratio to set
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mcp_crates_docs::tools::docs::cache::DocCacheTtl;
+    ///
+    /// let mut ttl = DocCacheTtl::default();
+    /// ttl.set_jitter_ratio(0.2);
+    /// assert!((ttl.jitter_ratio() - 0.2).abs() < f64::EPSILON);
+    ///
+    /// // Out of range values are clamped
+    /// ttl.set_jitter_ratio(1.5);
+    /// assert!((ttl.jitter_ratio() - 1.0).abs() < f64::EPSILON);
+    /// ```
+    pub fn set_jitter_ratio(&mut self, ratio: f64) {
+        self.jitter_ratio = Self::validate_jitter_ratio(ratio);
+    }
+
     /// Calculate actual TTL with jitter
     ///
     /// # Arguments
@@ -232,7 +266,7 @@ mod tests {
         assert_eq!(ttl.crate_docs_secs, DEFAULT_CRATE_DOCS_TTL_SECS);
         assert_eq!(ttl.search_results_secs, DEFAULT_SEARCH_RESULTS_TTL_SECS);
         assert_eq!(ttl.item_docs_secs, DEFAULT_ITEM_DOCS_TTL_SECS);
-        assert!((ttl.jitter_ratio - DEFAULT_JITTER_RATIO).abs() < f64::EPSILON);
+        assert!((ttl.jitter_ratio() - DEFAULT_JITTER_RATIO).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -255,19 +289,15 @@ mod tests {
 
     #[test]
     fn test_apply_jitter_no_jitter() {
-        let ttl = DocCacheTtl {
-            jitter_ratio: 0.0,
-            ..Default::default()
-        };
+        let mut ttl = DocCacheTtl::default();
+        ttl.set_jitter_ratio(0.0);
         assert_eq!(ttl.apply_jitter(1000), 1000);
     }
 
     #[test]
     fn test_apply_jitter_with_jitter() {
-        let ttl = DocCacheTtl {
-            jitter_ratio: 0.5,
-            ..Default::default()
-        };
+        let mut ttl = DocCacheTtl::default();
+        ttl.set_jitter_ratio(0.5);
 
         for _ in 0..100 {
             let jittered = ttl.apply_jitter(1000);
@@ -277,12 +307,11 @@ mod tests {
 
     #[test]
     fn test_durations() {
-        let ttl = DocCacheTtl {
-            jitter_ratio: 0.0,
-            crate_docs_secs: DEFAULT_CRATE_DOCS_TTL_SECS,
-            search_results_secs: DEFAULT_SEARCH_RESULTS_TTL_SECS,
-            item_docs_secs: DEFAULT_ITEM_DOCS_TTL_SECS,
-        };
+        let mut ttl = DocCacheTtl::default();
+        ttl.set_jitter_ratio(0.0);
+        ttl.crate_docs_secs = DEFAULT_CRATE_DOCS_TTL_SECS;
+        ttl.search_results_secs = DEFAULT_SEARCH_RESULTS_TTL_SECS;
+        ttl.item_docs_secs = DEFAULT_ITEM_DOCS_TTL_SECS;
 
         assert_eq!(
             ttl.crate_docs_duration(),
@@ -296,5 +325,77 @@ mod tests {
             ttl.item_docs_duration(),
             Duration::from_secs(DEFAULT_ITEM_DOCS_TTL_SECS)
         );
+    }
+
+    #[test]
+    fn test_jitter_ratio_setter_validation() {
+        let mut ttl = DocCacheTtl::default();
+
+        // Valid values should be accepted
+        ttl.set_jitter_ratio(0.5);
+        assert!((ttl.jitter_ratio() - 0.5).abs() < f64::EPSILON);
+
+        // Value at boundaries should be accepted
+        ttl.set_jitter_ratio(0.0);
+        assert!((ttl.jitter_ratio()).abs() < f64::EPSILON);
+
+        ttl.set_jitter_ratio(1.0);
+        assert!((ttl.jitter_ratio() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_jitter_ratio_clamping() {
+        let mut ttl = DocCacheTtl::default();
+
+        // Values > 1.0 should be clamped to 1.0
+        ttl.set_jitter_ratio(1.5);
+        assert!((ttl.jitter_ratio() - 1.0).abs() < f64::EPSILON);
+
+        ttl.set_jitter_ratio(100.0);
+        assert!((ttl.jitter_ratio() - 1.0).abs() < f64::EPSILON);
+
+        // Negative values should be clamped to 0.0
+        ttl.set_jitter_ratio(-0.1);
+        assert!(ttl.jitter_ratio().abs() < f64::EPSILON);
+
+        ttl.set_jitter_ratio(-100.0);
+        assert!(ttl.jitter_ratio().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_jitter_ratio_nan_handling() {
+        let mut ttl = DocCacheTtl::default();
+
+        // NaN should be treated as 0.0
+        ttl.set_jitter_ratio(f64::NAN);
+        assert!(ttl.jitter_ratio().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_jitter_ratio_infinity_handling() {
+        let mut ttl = DocCacheTtl::default();
+
+        // Positive infinity should be clamped to 1.0
+        ttl.set_jitter_ratio(f64::INFINITY);
+        assert!((ttl.jitter_ratio() - 1.0).abs() < f64::EPSILON);
+
+        // Negative infinity should be clamped to 0.0
+        ttl.set_jitter_ratio(f64::NEG_INFINITY);
+        assert!(ttl.jitter_ratio().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_apply_jitter_with_extreme_values() {
+        // Test with jitter_ratio = 0.0 (no jitter)
+        let mut ttl = DocCacheTtl::default();
+        ttl.set_jitter_ratio(0.0);
+        assert_eq!(ttl.apply_jitter(1000), 1000);
+
+        // Test with jitter_ratio = 1.0 (max jitter, range [0, 2000])
+        ttl.set_jitter_ratio(1.0);
+        for _ in 0..100 {
+            let jittered = ttl.apply_jitter(1000);
+            assert!((0..=2000).contains(&jittered));
+        }
     }
 }

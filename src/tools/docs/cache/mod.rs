@@ -330,12 +330,11 @@ mod tests {
         let memory_cache = MemoryCache::new(100);
         let cache = Arc::new(memory_cache);
 
-        let ttl = DocCacheTtl {
-            crate_docs_secs: 7200,
-            search_results_secs: 600,
-            item_docs_secs: 3600,
-            jitter_ratio: 0.0, // Disable jitter for predictable tests
-        };
+        let mut ttl = DocCacheTtl::default();
+        ttl.crate_docs_secs = 7200;
+        ttl.search_results_secs = 600;
+        ttl.item_docs_secs = 3600;
+        ttl.set_jitter_ratio(0.0); // Disable jitter for predictable tests
 
         let doc_cache = DocCache::with_ttl(cache, ttl);
 
