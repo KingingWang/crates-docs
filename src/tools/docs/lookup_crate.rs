@@ -87,6 +87,34 @@ impl LookupCrateToolImpl {
         super::build_docs_url(crate_name, version)
     }
 
+    async fn fetch_crate_html(
+        &self,
+        crate_name: &str,
+        version: Option<&str>,
+    ) -> std::result::Result<String, CallToolError> {
+        if let Some(cached) = self
+            .service
+            .doc_cache()
+            .get_crate_html(crate_name, version)
+            .await
+        {
+            return Ok(cached);
+        }
+
+        let url = Self::build_url(crate_name, version);
+        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
+
+        self.service
+            .doc_cache()
+            .set_crate_html(crate_name, version, html.clone())
+            .await
+            .map_err(|e| {
+                CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
+            })?;
+
+        Ok(html)
+    }
+
     /// Get crate documentation (markdown format)
     async fn fetch_crate_docs(
         &self,
@@ -103,9 +131,7 @@ impl LookupCrateToolImpl {
             return Ok(cached);
         }
 
-        // Fetch from docs.rs
-        let url = Self::build_url(crate_name, version);
-        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
+        let html = self.fetch_crate_html(crate_name, version).await?;
 
         // Extract documentation
         let docs = html::extract_documentation(&html);
@@ -128,8 +154,7 @@ impl LookupCrateToolImpl {
         crate_name: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        let url = Self::build_url(crate_name, version);
-        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
+        let html = self.fetch_crate_html(crate_name, version).await?;
         Ok(html::html_to_text(&html))
     }
 
@@ -139,8 +164,7 @@ impl LookupCrateToolImpl {
         crate_name: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        let url = Self::build_url(crate_name, version);
-        self.service.fetch_html(&url, Some(TOOL_NAME)).await
+        self.fetch_crate_html(crate_name, version).await
     }
 }
 
