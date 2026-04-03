@@ -714,7 +714,7 @@ async fn test_search_crates_tool_execute_markdown() {
     "#;
 
     Mock::given(matchers::method("GET"))
-        .and(matchers::path("/api/v1/crates"))
+        .and(matchers::path_regex(r"/api/v1/crates.*"))
         .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
         .mount(&mock_server)
         .await;
@@ -767,7 +767,7 @@ async fn test_search_crates_tool_execute_text_format() {
     "#;
 
     Mock::given(matchers::method("GET"))
-        .and(matchers::path("/api/v1/crates"))
+        .and(matchers::path_regex(r"/api/v1/crates.*"))
         .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
         .mount(&mock_server)
         .await;
@@ -818,7 +818,7 @@ async fn test_search_crates_tool_execute_json_format() {
     "#;
 
     Mock::given(matchers::method("GET"))
-        .and(matchers::path("/api/v1/crates"))
+        .and(matchers::path_regex(r"/api/v1/crates.*"))
         .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
         .mount(&mock_server)
         .await;
