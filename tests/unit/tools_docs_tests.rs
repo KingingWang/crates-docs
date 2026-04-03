@@ -884,7 +884,7 @@ async fn test_search_crates_tool_limit_clamping() {
     let mock_response = r#"{"crates": []}"#;
 
     Mock::given(matchers::method("GET"))
-        .and(matchers::path("/api/v1/crates"))
+        .and(matchers::path_regex(r"/api/v1/crates.*"))
         .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
         .mount(&mock_server)
         .await;
