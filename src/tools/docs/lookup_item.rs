@@ -90,6 +90,35 @@ impl LookupItemToolImpl {
         super::build_docs_item_url(crate_name, version, item_path)
     }
 
+    async fn fetch_item_html(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+    ) -> std::result::Result<String, CallToolError> {
+        if let Some(cached) = self
+            .service
+            .doc_cache()
+            .get_item_html(crate_name, item_path, version)
+            .await
+        {
+            return Ok(cached);
+        }
+
+        let url = Self::build_search_url(crate_name, item_path, version);
+        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
+
+        self.service
+            .doc_cache()
+            .set_item_html(crate_name, item_path, version, html.clone())
+            .await
+            .map_err(|e| {
+                CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
+            })?;
+
+        Ok(html)
+    }
+
     /// Get item documentation (markdown format)
     async fn fetch_item_docs(
         &self,
@@ -107,9 +136,7 @@ impl LookupItemToolImpl {
             return Ok(cached);
         }
 
-        // Fetch from docs.rs
-        let url = Self::build_search_url(crate_name, item_path, version);
-        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
+        let html = self.fetch_item_html(crate_name, item_path, version).await?;
 
         // Extract search results
         let docs = html::extract_search_results(&html, item_path);
@@ -133,8 +160,7 @@ impl LookupItemToolImpl {
         item_path: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        let url = Self::build_search_url(crate_name, item_path, version);
-        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
+        let html = self.fetch_item_html(crate_name, item_path, version).await?;
         Ok(format!(
             "Search results: {}\n\n{}",
             item_path,
@@ -149,8 +175,7 @@ impl LookupItemToolImpl {
         item_path: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        let url = Self::build_search_url(crate_name, item_path, version);
-        self.service.fetch_html(&url, Some(TOOL_NAME)).await
+        self.fetch_item_html(crate_name, item_path, version).await
     }
 }
 

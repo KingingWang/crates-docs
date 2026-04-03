@@ -36,6 +36,18 @@ fn is_valid_item_path(path: &str) -> bool {
 pub struct CacheKeyGenerator;
 
 impl CacheKeyGenerator {
+    /// Build a raw crate HTML cache key with normalization.
+    ///
+    /// This key stores the fetched docs.rs HTML artifact shared across
+    /// markdown, text, and html responses for the same crate lookup.
+    ///
+    /// Key format: `crate:{name}:html` or `crate:{name}:{version}:html`
+    #[must_use]
+    pub fn crate_html_cache_key(crate_name: &str, version: Option<&str>) -> String {
+        let base_key = Self::crate_cache_key(crate_name, version);
+        format!("{base_key}:html")
+    }
+
     /// Build crate cache key with normalization
     ///
     /// # Normalization rules
@@ -107,6 +119,18 @@ impl CacheKeyGenerator {
             None => format!("item:{normalized_name}:{normalized_path}"),
         }
     }
+
+    /// Build a raw item HTML cache key with normalization.
+    ///
+    /// This key stores the fetched docs.rs search-result HTML artifact shared
+    /// across markdown, text, and html responses for the same item lookup.
+    ///
+    /// Key format: `item:{crate}:{path}:html` or `item:{crate}:{version}:{path}:html`
+    #[must_use]
+    pub fn item_html_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
+        let base_key = Self::item_cache_key(crate_name, item_path, version);
+        format!("{base_key}:html")
+    }
 }
 
 #[cfg(test)]
@@ -123,6 +147,10 @@ mod tests {
             CacheKeyGenerator::crate_cache_key("serde", Some("1.0")),
             "crate:serde:1.0"
         );
+        assert_eq!(
+            CacheKeyGenerator::crate_html_cache_key("serde", Some("1.0")),
+            "crate:serde:1.0:html"
+        );
 
         assert_eq!(
             CacheKeyGenerator::search_cache_key("web framework", 10),
@@ -136,6 +164,10 @@ mod tests {
         assert_eq!(
             CacheKeyGenerator::item_cache_key("serde", "Serialize", Some("1.0")),
             "item:serde:1.0:Serialize"
+        );
+        assert_eq!(
+            CacheKeyGenerator::item_html_cache_key("serde", "Serialize", Some("1.0")),
+            "item:serde:1.0:Serialize:html"
         );
     }
 

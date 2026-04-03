@@ -150,6 +150,36 @@ impl DocCache {
         Ok(())
     }
 
+    /// Get cached crate HTML
+    pub async fn get_crate_html(&self, crate_name: &str, version: Option<&str>) -> Option<String> {
+        let key = CacheKeyGenerator::crate_html_cache_key(crate_name, version);
+        let result = self.cache.get(&key).await;
+        if result.is_some() {
+            self.stats.record_hit();
+        } else {
+            self.stats.record_miss();
+        }
+        result.map(|arc| (*arc).clone())
+    }
+
+    /// Set crate HTML cache
+    ///
+    /// # Errors
+    ///
+    /// Returns error if cache operation fails
+    pub async fn set_crate_html(
+        &self,
+        crate_name: &str,
+        version: Option<&str>,
+        content: String,
+    ) -> crate::error::Result<()> {
+        let key = CacheKeyGenerator::crate_html_cache_key(crate_name, version);
+        let ttl = self.ttl.crate_docs_duration();
+        self.cache.set(key, content, Some(ttl)).await?;
+        self.stats.record_set();
+        Ok(())
+    }
+
     /// Get cached search results
     ///
     /// # Arguments
@@ -244,6 +274,42 @@ impl DocCache {
         content: String,
     ) -> crate::error::Result<()> {
         let key = CacheKeyGenerator::item_cache_key(crate_name, item_path, version);
+        let ttl = self.ttl.item_docs_duration();
+        self.cache.set(key, content, Some(ttl)).await?;
+        self.stats.record_set();
+        Ok(())
+    }
+
+    /// Get cached item HTML
+    pub async fn get_item_html(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+    ) -> Option<String> {
+        let key = CacheKeyGenerator::item_html_cache_key(crate_name, item_path, version);
+        let result = self.cache.get(&key).await;
+        if result.is_some() {
+            self.stats.record_hit();
+        } else {
+            self.stats.record_miss();
+        }
+        result.map(|arc| (*arc).clone())
+    }
+
+    /// Set item HTML cache
+    ///
+    /// # Errors
+    ///
+    /// Returns error if cache operation fails
+    pub async fn set_item_html(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+        content: String,
+    ) -> crate::error::Result<()> {
+        let key = CacheKeyGenerator::item_html_cache_key(crate_name, item_path, version);
         let ttl = self.ttl.item_docs_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
