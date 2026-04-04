@@ -1154,6 +1154,7 @@ async fn test_search_crates_tool_execute_json_format() {
 }
 
 #[tokio::test]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_invalid_sort() {
     use crates_docs::tools::Tool;
 
