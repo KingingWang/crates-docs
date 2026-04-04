@@ -1,5 +1,6 @@
 //! Unit tests for tools/docs module
 
+use crates_docs::cache::Cache;
 use crates_docs::tools::docs::{
     cache::{DocCache, DocCacheTtl},
     html::{clean_html, extract_documentation, extract_search_results, html_to_text},
@@ -130,7 +131,10 @@ async fn test_doc_cache_crate_docs() {
         .expect("set_crate_docs should succeed");
 
     let result = doc_cache.get_crate_docs("serde", Some("1.0.0")).await;
-    assert_eq!(result, Some("Serde documentation".to_string()));
+    assert_eq!(
+        result.as_deref().map(String::as_str),
+        Some("Serde documentation")
+    );
 
     // Test get non-existent crate
     let result = doc_cache.get_crate_docs("nonexistent", None).await;
@@ -158,7 +162,10 @@ async fn test_doc_cache_search_results() {
     let result = doc_cache
         .get_search_results("web framework", 10, Some("relevance"))
         .await;
-    assert_eq!(result, Some("Search results".to_string()));
+    assert_eq!(
+        result.as_deref().map(String::as_str),
+        Some("Search results")
+    );
 
     // Test different limit
     let result = doc_cache
@@ -188,7 +195,10 @@ async fn test_doc_cache_item_docs() {
     let result = doc_cache
         .get_item_docs("serde", "serde::Serialize", Some("1.0.0"))
         .await;
-    assert_eq!(result, Some("Serialize trait docs".to_string()));
+    assert_eq!(
+        result.as_deref().map(String::as_str),
+        Some("Serialize trait docs")
+    );
 }
 
 /// Test HTML cleaning
@@ -1650,7 +1660,7 @@ async fn test_doc_cache_version_normalization() {
 
     // Should be accessible with normalized version
     let result = doc_cache.get_crate_docs("serde", Some("1.0.0")).await;
-    assert_eq!(result, Some("docs".to_string()));
+    assert_eq!(result.as_deref().map(String::as_str), Some("docs"));
 }
 
 #[tokio::test]
@@ -1666,7 +1676,7 @@ async fn test_doc_cache_case_insensitive_crate_name() {
 
     // Should be accessible with lowercase
     let result = doc_cache.get_crate_docs("serde", None).await;
-    assert_eq!(result, Some("docs".to_string()));
+    assert_eq!(result.as_deref().map(String::as_str), Some("docs"));
 }
 
 // ============================================================================
@@ -1691,7 +1701,10 @@ async fn test_doc_cache_concurrent_access() {
                 .expect("set should succeed");
 
             let result = doc_cache_clone.get_crate_docs(&key, None).await;
-            assert_eq!(result, Some(format!("docs_{}", i)));
+            assert_eq!(
+                result.as_deref().map(String::as_str),
+                Some(format!("docs_{}", i).as_str())
+            );
         });
         handles.push(handle);
     }
@@ -1702,8 +1715,103 @@ async fn test_doc_cache_concurrent_access() {
 }
 
 // ============================================================================
-// Format Parsing Tests - These test the public API behavior
-// Note: Unit tests for parse_format() are in src/tools/docs/mod.rs in the #[cfg(test)] module
+// Arc<String> preservation tests
+// ============================================================================
+
+/// Test that DocCache getters preserve shared ownership (Arc<String>)
+/// This verifies the optimization that avoids unnecessary cloning on cache hits.
+#[tokio::test]
+async fn test_doc_cache_preserves_arc_on_get_crate_docs() {
+    use crates_docs::tools::docs::cache::CacheKeyGenerator;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = DocCache::new(cache.clone());
+
+    // Set up cache with a large document
+    let large_doc = "Large documentation content".to_string();
+    doc_cache
+        .set_crate_docs("test_crate", Some("1.0.0"), large_doc.clone())
+        .await
+        .expect("set_crate_docs should succeed");
+
+    // Get from DocCache - should return Arc<String>
+    let from_doc_cache = doc_cache
+        .get_crate_docs("test_crate", Some("1.0.0"))
+        .await
+        .expect("should get from doc cache");
+
+    // Get directly from backend cache - should return same Arc<String>
+    let key = CacheKeyGenerator::crate_cache_key("test_crate", Some("1.0.0"));
+    let from_backend = cache.get(&key).await.expect("should get from backend");
+
+    // Verify they point to the same allocation (no clone occurred)
+    assert!(
+        Arc::ptr_eq(&from_doc_cache, &from_backend),
+        "DocCache should preserve Arc<String> without cloning"
+    );
+}
+
+/// Test that DocCache preserves Arc<String> for search results
+#[tokio::test]
+async fn test_doc_cache_preserves_arc_on_get_search_results() {
+    use crates_docs::tools::docs::cache::CacheKeyGenerator;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = DocCache::new(cache.clone());
+
+    let search_results = "Search results content".to_string();
+    doc_cache
+        .set_search_results("test query", 10, Some("relevance"), search_results.clone())
+        .await
+        .expect("set_search_results should succeed");
+
+    let from_doc_cache = doc_cache
+        .get_search_results("test query", 10, Some("relevance"))
+        .await
+        .expect("should get search results");
+
+    let key = CacheKeyGenerator::search_cache_key("test query", 10, Some("relevance"));
+    let from_backend = cache.get(&key).await.expect("should get from backend");
+
+    assert!(
+        Arc::ptr_eq(&from_doc_cache, &from_backend),
+        "DocCache should preserve Arc<String> for search results"
+    );
+}
+
+/// Test that DocCache preserves Arc<String> for item docs
+#[tokio::test]
+async fn test_doc_cache_preserves_arc_on_get_item_docs() {
+    use crates_docs::tools::docs::cache::CacheKeyGenerator;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = DocCache::new(cache.clone());
+
+    let item_docs = "Item documentation content".to_string();
+    doc_cache
+        .set_item_docs("test_crate", "test::Item", Some("1.0.0"), item_docs.clone())
+        .await
+        .expect("set_item_docs should succeed");
+
+    let from_doc_cache = doc_cache
+        .get_item_docs("test_crate", "test::Item", Some("1.0.0"))
+        .await
+        .expect("should get item docs");
+
+    let key = CacheKeyGenerator::item_cache_key("test_crate", "test::Item", Some("1.0.0"));
+    let from_backend = cache.get(&key).await.expect("should get from backend");
+
+    assert!(
+        Arc::ptr_eq(&from_doc_cache, &from_backend),
+        "DocCache should preserve Arc<String> for item docs"
+    );
+}
+
+// ============================================================================
+// Format Parsing Tests
 // ============================================================================
 
 #[test]

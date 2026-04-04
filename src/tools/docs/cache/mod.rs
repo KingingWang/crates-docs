@@ -114,7 +114,11 @@ impl DocCache {
     /// # Returns
     ///
     /// Returns document content if cache hit; otherwise returns `None`
-    pub async fn get_crate_docs(&self, crate_name: &str, version: Option<&str>) -> Option<String> {
+    pub async fn get_crate_docs(
+        &self,
+        crate_name: &str,
+        version: Option<&str>,
+    ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::crate_cache_key(crate_name, version);
         let result = self.cache.get(&key).await;
         if result.is_some() {
@@ -122,8 +126,7 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        // Convert Arc<String> to String for API compatibility
-        result.map(|arc| (*arc).clone())
+        result
     }
 
     /// Set crate document cache
@@ -196,7 +199,7 @@ impl DocCache {
         query: &str,
         limit: u32,
         sort: Option<&str>,
-    ) -> Option<String> {
+    ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::search_cache_key(query, limit, sort);
         let result = self.cache.get(&key).await;
         if result.is_some() {
@@ -204,8 +207,7 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        // Convert Arc<String> to String for API compatibility
-        result.map(|arc| (*arc).clone())
+        result
     }
 
     /// Set search results cache
@@ -250,7 +252,7 @@ impl DocCache {
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
-    ) -> Option<String> {
+    ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::item_cache_key(crate_name, item_path, version);
         let result = self.cache.get(&key).await;
         if result.is_some() {
@@ -258,8 +260,7 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        // Convert Arc<String> to String for API compatibility
-        result.map(|arc| (*arc).clone())
+        result
     }
 
     /// Set item docs cache
@@ -370,7 +371,7 @@ mod tests {
             .await
             .expect("set_crate_docs should succeed");
         let cached = doc_cache.get_crate_docs("serde", Some("1.0")).await;
-        assert_eq!(cached, Some("Test docs".to_string()));
+        assert_eq!(cached.as_deref().map(String::as_str), Some("Test docs"));
 
         // Test search results cache
         doc_cache
@@ -385,7 +386,10 @@ mod tests {
         let search_cached = doc_cache
             .get_search_results("web framework", 10, Some("relevance"))
             .await;
-        assert_eq!(search_cached, Some("Search results".to_string()));
+        assert_eq!(
+            search_cached.as_deref().map(String::as_str),
+            Some("Search results")
+        );
 
         // Test item docs cache
         doc_cache
@@ -400,12 +404,38 @@ mod tests {
         let item_cached = doc_cache
             .get_item_docs("serde", "serde::Serialize", Some("1.0"))
             .await;
-        assert_eq!(item_cached, Some("Item docs".to_string()));
+        assert_eq!(
+            item_cached.as_deref().map(String::as_str),
+            Some("Item docs")
+        );
 
         // Test clear
         doc_cache.clear().await.expect("clear should succeed");
         let cleared = doc_cache.get_crate_docs("serde", Some("1.0")).await;
         assert_eq!(cleared, None);
+    }
+
+    #[tokio::test]
+    async fn test_doc_cache_getters_preserve_shared_ownership() {
+        let memory_cache = Arc::new(MemoryCache::new(100));
+        let doc_cache = DocCache::new(memory_cache.clone());
+
+        doc_cache
+            .set_crate_docs("serde", Some("1.0"), "Test docs".to_string())
+            .await
+            .expect("set_crate_docs should succeed");
+
+        let key = CacheKeyGenerator::crate_cache_key("serde", Some("1.0"));
+        let cached_from_doc_cache = doc_cache
+            .get_crate_docs("serde", Some("1.0"))
+            .await
+            .expect("doc cache should return cached docs");
+        let cached_from_backend = memory_cache
+            .get(&key)
+            .await
+            .expect("backend cache should return cached docs");
+
+        assert!(Arc::ptr_eq(&cached_from_doc_cache, &cached_from_backend));
     }
 
     #[tokio::test]
