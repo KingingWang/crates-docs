@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 const DEFAULT_SEARCH_LIMIT: u32 = 10;
-const DEFAULT_SEARCH_CACHE_TTL_SECS: u64 = 300;
 const ESTIMATED_MARKDOWN_ENTRY_SIZE: usize = 200;
 const ESTIMATED_TEXT_ENTRY_SIZE: usize = 100;
 
@@ -121,20 +120,17 @@ impl SearchCratesToolImpl {
         limit: u32,
         sort: &str,
     ) -> std::result::Result<Vec<CrateInfo>, CallToolError> {
-        let cache_key = format!("search:{query}:{sort}:{limit}");
-
-        if let Some(cached) = self.service.cache().get(&cache_key).await {
+        if let Some(cached) = self
+            .service
+            .doc_cache()
+            .get_search_results(query, limit)
+            .await
+        {
             return serde_json::from_str(&cached)
                 .map_err(|e| CallToolError::from_message(format!("Cache parsing failed: {e}")));
         }
 
-        let url = format!(
-            "{}/api/v1/crates?q={}&per_page={}&sort={}",
-            super::crates_io_base_url(),
-            urlencoding::encode(query),
-            limit,
-            urlencoding::encode(sort)
-        );
+        let url = super::build_crates_io_search_url(query, Some(sort), Some(limit as usize));
 
         let response = self
             .service
@@ -163,14 +159,8 @@ impl SearchCratesToolImpl {
             .map_err(|e| CallToolError::from_message(format!("Serialization failed: {e}")))?;
 
         self.service
-            .cache()
-            .set(
-                cache_key,
-                cache_value,
-                Some(std::time::Duration::from_secs(
-                    DEFAULT_SEARCH_CACHE_TTL_SECS,
-                )),
-            )
+            .doc_cache()
+            .set_search_results(query, limit, cache_value)
             .await
             .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
 
@@ -327,12 +317,7 @@ impl Tool for SearchCratesToolImpl {
         let sort = normalize_search_sort(params.sort.as_deref())?;
         let crates = self.search_crates(&params.query, limit, &sort).await?;
 
-        let format = super::parse_format(params.format.as_deref()).map_err(|_| {
-            rust_mcp_sdk::schema::CallToolError::invalid_arguments(
-                "search_crates",
-                Some("Invalid format".to_string()),
-            )
-        })?;
+        let format = super::parse_format(params.format.as_deref())?;
         let content = format_search_results(&crates, format);
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![

@@ -1181,6 +1181,94 @@ async fn test_search_crates_tool_invalid_sort() {
 
 #[tokio::test]
 #[serial(crates_io_env)]
+async fn test_search_crates_tool_invalid_format_preserves_detailed_message() {
+    use crates_docs::tools::Tool;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "query": "test",
+        "format": "xml"
+    });
+
+    let result = tool.execute(args).await;
+    let error = result.expect_err("invalid format should fail");
+    let error_message = error.to_string();
+
+    assert!(error_message.contains("Invalid format 'xml'"));
+    assert!(error_message.contains("markdown, text, html, json"));
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_search_crates_tool_uses_canonical_search_cache_key() {
+    use crates_docs::tools::Tool;
+    use wiremock::MockServer;
+
+    let mock_server = MockServer::start().await;
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_server.uri());
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    service
+        .doc_cache()
+        .set_search_results(
+            "serde",
+            10,
+            serde_json::json!([
+                {
+                    "name": "serde",
+                    "description": "Serialization framework",
+                    "version": "1.0.0",
+                    "downloads": 1000000,
+                    "repository": "https://github.com/serde-rs/serde",
+                    "documentation": "https://docs.rs/serde"
+                }
+            ])
+            .to_string(),
+        )
+        .await
+        .expect("set_search_results should succeed");
+
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "query": "  SERDE  ",
+        "limit": 10,
+        "sort": "relevance",
+        "format": "json"
+    });
+
+    let result = tool.execute(args).await;
+    assert!(
+        result.is_ok(),
+        "expected canonical cache hit, got error: {:?}",
+        result.err()
+    );
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_limit_clamping() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
@@ -1528,51 +1616,9 @@ async fn test_doc_cache_concurrent_access() {
 }
 
 // ============================================================================
-// Format Parsing Tests
+// Format Parsing Tests - These test the public API behavior
+// Note: Unit tests for parse_format() are in src/tools/docs/mod.rs in the #[cfg(test)] module
 // ============================================================================
-
-#[test]
-fn test_parse_format_none() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(None).unwrap(), Format::Markdown);
-}
-
-#[test]
-fn test_parse_format_markdown() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("markdown")).unwrap(), Format::Markdown);
-    assert_eq!(parse_format(Some("MARKDOWN")).unwrap(), Format::Markdown);
-    assert_eq!(parse_format(Some("Markdown")).unwrap(), Format::Markdown);
-}
-
-#[test]
-fn test_parse_format_text() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("text")).unwrap(), Format::Text);
-    assert_eq!(parse_format(Some("TEXT")).unwrap(), Format::Text);
-}
-
-#[test]
-fn test_parse_format_html() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("html")).unwrap(), Format::Html);
-    assert_eq!(parse_format(Some("HTML")).unwrap(), Format::Html);
-}
-
-#[test]
-fn test_parse_format_json() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("json")).unwrap(), Format::Json);
-    assert_eq!(parse_format(Some("JSON")).unwrap(), Format::Json);
-}
-
-#[test]
-fn test_parse_format_invalid() {
-    use crates_docs::tools::docs::parse_format;
-    assert!(parse_format(Some("invalid")).is_err());
-    assert!(parse_format(Some("xml")).is_err());
-    assert!(parse_format(Some("")).is_err());
-}
 
 #[test]
 fn test_format_display() {
