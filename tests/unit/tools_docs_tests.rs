@@ -5,8 +5,14 @@ use crates_docs::tools::docs::{
     cache::{DocCache, DocCacheTtl},
     html::{clean_html, extract_documentation, extract_search_results, html_to_text},
 };
+use http::Extensions;
+use reqwest::{Request, Response, Url};
+use reqwest_middleware::{ClientBuilder, Middleware, Next};
 use serial_test::serial;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 struct EnvVarGuard {
     key: &'static str,
@@ -32,6 +38,52 @@ impl Drop for EnvVarGuard {
             std::env::remove_var(self.key);
         }
     }
+}
+
+#[derive(Clone)]
+/// Test middleware that redirects outgoing docs.rs requests to a wiremock
+/// server while keeping the original request path and query intact.
+struct RewriteDocsRsMiddleware {
+    target_base_url: Url,
+    request_count: Arc<AtomicUsize>,
+}
+
+#[async_trait::async_trait]
+impl Middleware for RewriteDocsRsMiddleware {
+    async fn handle(
+        &self,
+        mut req: Request,
+        extensions: &mut Extensions,
+        next: Next<'_>,
+    ) -> reqwest_middleware::Result<Response> {
+        self.request_count.fetch_add(1, Ordering::SeqCst);
+
+        let url = req.url_mut();
+        url.set_scheme(self.target_base_url.scheme())
+            .expect("scheme rewrite should succeed");
+        url.set_host(self.target_base_url.host_str())
+            .expect("host rewrite should succeed");
+        url.set_port(self.target_base_url.port())
+            .expect("port rewrite should succeed");
+
+        next.run(req, extensions).await
+    }
+}
+
+fn build_docs_rs_test_client(
+    target_base_url: &str,
+    request_count: Arc<AtomicUsize>,
+) -> Arc<reqwest_middleware::ClientWithMiddleware> {
+    let middleware = RewriteDocsRsMiddleware {
+        target_base_url: Url::parse(target_base_url).expect("mock server URL should parse"),
+        request_count,
+    };
+
+    Arc::new(
+        ClientBuilder::new(reqwest::Client::new())
+            .with(middleware)
+            .build(),
+    )
 }
 
 /// Test DocCacheTtl default values
@@ -95,15 +147,24 @@ async fn test_doc_cache_search_results() {
 
     // Test set and get search results
     doc_cache
-        .set_search_results("web framework", 10, "Search results".to_string())
+        .set_search_results(
+            "web framework",
+            10,
+            Some("relevance"),
+            "Search results".to_string(),
+        )
         .await
         .expect("set_search_results should succeed");
 
-    let result = doc_cache.get_search_results("web framework", 10).await;
+    let result = doc_cache
+        .get_search_results("web framework", 10, Some("relevance"))
+        .await;
     assert_eq!(result.as_deref().map(String::as_str), Some("Search results"));
 
     // Test different limit
-    let result = doc_cache.get_search_results("web framework", 20).await;
+    let result = doc_cache
+        .get_search_results("web framework", 20, Some("relevance"))
+        .await;
     assert_eq!(result, None);
 }
 
@@ -425,6 +486,132 @@ async fn test_lookup_crate_tool_execute_with_version() {
 }
 
 #[tokio::test]
+#[serial(docs_rs_env)]
+async fn test_lookup_crate_tool_reuses_single_upstream_fetch_across_formats() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+    let mock_html = r#"
+    <!DOCTYPE html>
+    <html>
+    <body>
+        <section id="main-content">
+            <h1>Serde</h1>
+            <p>Serialization framework for Rust</p>
+        </section>
+    </body>
+    </html>
+    "#;
+
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/serde/"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(mock_html))
+        .mount(&mock_server)
+        .await;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let request_count = Arc::new(AtomicUsize::new(0));
+
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        build_docs_rs_test_client(&mock_uri, request_count.clone()),
+    );
+
+    let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
+
+    let markdown_args = serde_json::json!({
+        "crate_name": "serde",
+        "format": "markdown"
+    });
+    let text_args = serde_json::json!({
+        "crate_name": "serde",
+        "format": "text"
+    });
+
+    let markdown_result = tool.execute(markdown_args).await;
+    assert!(markdown_result.is_ok());
+
+    let text_result = tool.execute(text_args).await;
+    assert!(text_result.is_ok());
+
+    assert_eq!(
+        request_count.load(Ordering::SeqCst),
+        1,
+        "expected a single upstream request"
+    );
+}
+
+#[tokio::test]
+#[serial(docs_rs_env)]
+async fn test_lookup_crate_tool_keeps_versioned_and_unversioned_cache_entries_distinct() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/serde/"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(
+                r#"<html><body><section id="main-content"><h1>Serde latest</h1></section></body></html>"#,
+            ),
+        )
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/serde/1.0.0/"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(
+                r#"<html><body><section id="main-content"><h1>Serde 1.0.0</h1></section></body></html>"#,
+            ),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let request_count = Arc::new(AtomicUsize::new(0));
+
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        build_docs_rs_test_client(&mock_uri, request_count.clone()),
+    );
+
+    let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
+
+    let latest_args = serde_json::json!({
+        "crate_name": "serde",
+        "format": "markdown"
+    });
+    let versioned_args = serde_json::json!({
+        "crate_name": "serde",
+        "version": "1.0.0",
+        "format": "text"
+    });
+
+    let latest_result = tool.execute(latest_args).await;
+    assert!(latest_result.is_ok());
+
+    let versioned_result = tool.execute(versioned_args).await;
+    assert!(versioned_result.is_ok());
+
+    assert_eq!(
+        request_count.load(Ordering::SeqCst),
+        2,
+        "expected separate upstream requests"
+    );
+}
+
+#[tokio::test]
 async fn test_lookup_crate_tool_invalid_params() {
     use crates_docs::tools::Tool;
 
@@ -642,6 +829,134 @@ async fn test_lookup_item_tool_execute_with_version() {
 
     let result = tool.execute(args).await;
     assert!(result.is_ok());
+}
+
+#[tokio::test]
+#[serial(docs_rs_env)]
+async fn test_lookup_item_tool_reuses_single_upstream_fetch_across_formats() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+    let mock_html = r#"
+    <html>
+    <body>
+        <h1>Serialize Trait</h1>
+        <p>Serialize data structure</p>
+    </body>
+    </html>
+    "#;
+
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/serde/"))
+        .and(matchers::query_param("search", "serde::Serialize"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(mock_html))
+        .mount(&mock_server)
+        .await;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let request_count = Arc::new(AtomicUsize::new(0));
+
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        build_docs_rs_test_client(&mock_uri, request_count.clone()),
+    );
+
+    let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
+
+    let markdown_args = serde_json::json!({
+        "crate_name": "serde",
+        "item_path": "serde::Serialize",
+        "format": "markdown"
+    });
+    let html_args = serde_json::json!({
+        "crate_name": "serde",
+        "item_path": "serde::Serialize",
+        "format": "html"
+    });
+
+    let markdown_result = tool.execute(markdown_args).await;
+    assert!(markdown_result.is_ok());
+
+    let html_result = tool.execute(html_args).await;
+    assert!(html_result.is_ok());
+
+    assert_eq!(
+        request_count.load(Ordering::SeqCst),
+        1,
+        "expected a single upstream request"
+    );
+}
+
+#[tokio::test]
+#[serial(docs_rs_env)]
+async fn test_lookup_item_tool_keeps_versioned_and_unversioned_cache_entries_distinct() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/serde/"))
+        .and(matchers::query_param("search", "serde::Serialize"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"<html><body><h1>Serialize latest</h1></body></html>"#),
+        )
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/serde/1.0.0/"))
+        .and(matchers::query_param("search", "serde::Serialize"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"<html><body><h1>Serialize 1.0.0</h1></body></html>"#),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let request_count = Arc::new(AtomicUsize::new(0));
+
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        build_docs_rs_test_client(&mock_uri, request_count.clone()),
+    );
+
+    let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
+
+    let latest_args = serde_json::json!({
+        "crate_name": "serde",
+        "item_path": "serde::Serialize",
+        "format": "markdown"
+    });
+    let versioned_args = serde_json::json!({
+        "crate_name": "serde",
+        "item_path": "serde::Serialize",
+        "version": "1.0.0",
+        "format": "text"
+    });
+
+    let latest_result = tool.execute(latest_args).await;
+    assert!(latest_result.is_ok());
+
+    let versioned_result = tool.execute(versioned_args).await;
+    assert!(versioned_result.is_ok());
+
+    assert_eq!(
+        request_count.load(Ordering::SeqCst),
+        2,
+        "expected separate upstream requests"
+    );
 }
 
 #[tokio::test]
@@ -876,6 +1191,95 @@ async fn test_search_crates_tool_invalid_sort() {
 
 #[tokio::test]
 #[serial(crates_io_env)]
+async fn test_search_crates_tool_invalid_format_preserves_detailed_message() {
+    use crates_docs::tools::Tool;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "query": "test",
+        "format": "xml"
+    });
+
+    let result = tool.execute(args).await;
+    let error = result.expect_err("invalid format should fail");
+    let error_message = error.to_string();
+
+    assert!(error_message.contains("Invalid format 'xml'"));
+    assert!(error_message.contains("markdown, text, html, json"));
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_search_crates_tool_uses_canonical_search_cache_key() {
+    use crates_docs::tools::Tool;
+    use wiremock::MockServer;
+
+    let mock_server = MockServer::start().await;
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_server.uri());
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    service
+        .doc_cache()
+        .set_search_results(
+            "serde",
+            10,
+            Some("relevance"),
+            serde_json::json!([
+                {
+                    "name": "serde",
+                    "description": "Serialization framework",
+                    "version": "1.0.0",
+                    "downloads": 1000000,
+                    "repository": "https://github.com/serde-rs/serde",
+                    "documentation": "https://docs.rs/serde"
+                }
+            ])
+            .to_string(),
+        )
+        .await
+        .expect("set_search_results should succeed");
+
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "query": "  SERDE  ",
+        "limit": 10,
+        "sort": "relevance",
+        "format": "json"
+    });
+
+    let result = tool.execute(args).await;
+    assert!(
+        result.is_ok(),
+        "expected canonical cache hit, got error: {:?}",
+        result.err()
+    );
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_limit_clamping() {
     use crates_docs::tools::Tool;
     use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
@@ -912,6 +1316,82 @@ async fn test_search_crates_tool_limit_clamping() {
 
     let result = tool.execute(args).await;
     assert!(result.is_ok());
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_search_crates_tool_cache_key_differs_by_sort() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+
+    // Setup mock to expect two different requests (different sort parameters)
+    // relevance sort request
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(r"/api/v1/crates.*sort=relevance.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"{"crates":[{"name":"reqwest","max_version":"1.0","downloads":1000}]}"#,
+        ))
+        .mount(&mock_server)
+        .await;
+
+    // downloads sort request
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(r"/api/v1/crates.*sort=downloads.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"{"crates":[{"name":"tokio","max_version":"2.0","downloads":2000}]}"#,
+        ))
+        .mount(&mock_server)
+        .await;
+
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    // First search with relevance sort
+    let args1 = serde_json::json!({
+        "query": "http client",
+        "sort": "relevance",
+        "format": "json"
+    });
+    let _result1 = tool
+        .execute(args1)
+        .await
+        .expect("First search should succeed");
+
+    // Second search with downloads sort - should hit different cache key or fetch again
+    let args2 = serde_json::json!({
+        "query": "http client",
+        "sort": "downloads",
+        "format": "json"
+    });
+    let _result2 = tool
+        .execute(args2)
+        .await
+        .expect("Second search should succeed");
+
+    // Both searches should succeed (execute returns Result<CallToolResult, CallToolError>)
+    // We already asserted success with .expect() above
+
+    // The key verification: mock server should have received requests for BOTH sort values
+    // If cache keys were the same, second request would use cache and mock would only see one request
+    // This test proves sort parameter is part of the cache key
+
+    // Verify mock received both requests (both sorts were called, not just one)
+    mock_server.verify().await;
 }
 
 // ============================================================================
@@ -1274,16 +1754,16 @@ async fn test_doc_cache_preserves_arc_on_get_search_results() {
 
     let search_results = "Search results content".to_string();
     doc_cache
-        .set_search_results("test query", 10, search_results.clone())
+        .set_search_results("test query", 10, Some("relevance"), search_results.clone())
         .await
         .expect("set_search_results should succeed");
 
     let from_doc_cache = doc_cache
-        .get_search_results("test query", 10)
+        .get_search_results("test query", 10, Some("relevance"))
         .await
         .expect("should get search results");
 
-    let key = CacheKeyGenerator::search_cache_key("test query", 10);
+    let key = CacheKeyGenerator::search_cache_key("test query", 10, Some("relevance"));
     let from_backend = cache
         .get(&key)
         .await
@@ -1330,49 +1810,6 @@ async fn test_doc_cache_preserves_arc_on_get_item_docs() {
 // ============================================================================
 // Format Parsing Tests
 // ============================================================================
-
-#[test]
-fn test_parse_format_none() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(None).unwrap(), Format::Markdown);
-}
-
-#[test]
-fn test_parse_format_markdown() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("markdown")).unwrap(), Format::Markdown);
-    assert_eq!(parse_format(Some("MARKDOWN")).unwrap(), Format::Markdown);
-    assert_eq!(parse_format(Some("Markdown")).unwrap(), Format::Markdown);
-}
-
-#[test]
-fn test_parse_format_text() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("text")).unwrap(), Format::Text);
-    assert_eq!(parse_format(Some("TEXT")).unwrap(), Format::Text);
-}
-
-#[test]
-fn test_parse_format_html() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("html")).unwrap(), Format::Html);
-    assert_eq!(parse_format(Some("HTML")).unwrap(), Format::Html);
-}
-
-#[test]
-fn test_parse_format_json() {
-    use crates_docs::tools::docs::{parse_format, Format};
-    assert_eq!(parse_format(Some("json")).unwrap(), Format::Json);
-    assert_eq!(parse_format(Some("JSON")).unwrap(), Format::Json);
-}
-
-#[test]
-fn test_parse_format_invalid() {
-    use crates_docs::tools::docs::parse_format;
-    assert!(parse_format(Some("invalid")).is_err());
-    assert!(parse_format(Some("xml")).is_err());
-    assert!(parse_format(Some("")).is_err());
-}
 
 #[test]
 fn test_format_display() {

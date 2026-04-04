@@ -11,14 +11,6 @@ use std::sync::LazyLock;
 /// Tags whose content should be completely removed during HTML cleaning
 const SKIP_TAGS: &[&str] = &["script", "style", "noscript", "iframe"];
 
-/// Tags that represent navigation/structure elements to remove
-const NAV_TAGS: &[&str] = &["nav", "header", "footer", "aside"];
-
-/// UI elements that don't contribute to documentation content
-/// Note: We don't include "details" here because docs.rs uses <details class="toggle top-doc">
-/// to wrap the main documentation content. We only remove "summary" tags but keep their content.
-const UI_TAGS: &[&str] = &["button", "summary"];
-
 /// Regex patterns for self-closing/void tags to remove
 static LINK_TAG_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<link[^>]*>").expect("hardcoded valid regex pattern"));
@@ -56,13 +48,45 @@ static BODY_SELECTOR: LazyLock<Selector> =
 static ALL_SELECTOR: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("*").expect("hardcoded valid selector"));
 
+/// Cached selectors for skip tags (script, style, noscript, iframe)
+static SCRIPT_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("script").expect("hardcoded valid selector"));
+static STYLE_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("style").expect("hardcoded valid selector"));
+static NOSCRIPT_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("noscript").expect("hardcoded valid selector"));
+static IFRAME_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("iframe").expect("hardcoded valid selector"));
+
+/// Cached selectors for nav tags (nav, header, footer, aside)
+static NAV_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("nav").expect("hardcoded valid selector"));
+static HEADER_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("header").expect("hardcoded valid selector"));
+static FOOTER_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("footer").expect("hardcoded valid selector"));
+static ASIDE_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("aside").expect("hardcoded valid selector"));
+
+/// Cached selectors for UI tags (button, summary)
+static BUTTON_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("button").expect("hardcoded valid selector"));
+static SUMMARY_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("summary").expect("hardcoded valid selector"));
+
+/// Cached selectors for main content extraction
+static MAIN_CONTENT_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("#main-content").expect("hardcoded valid selector"));
+static RUSTDOC_BODY_WRAPPER_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("#rustdoc_body_wrapper").expect("hardcoded valid selector"));
+
 /// Clean HTML by removing unwanted tags and their content
 ///
 /// Uses the `scraper` crate for robust HTML5 parsing, which handles
 /// malformed HTML better than manual parsing.
 ///
 /// This function performs a single-pass HTML parsing and removal of all
-/// unwanted elements (`SKIP_TAGS`, `NAV_TAGS`, `UI_TAGS`) to minimize parsing overhead.
+/// unwanted elements to minimize parsing overhead.
 #[must_use]
 pub fn clean_html(html: &str) -> String {
     let document = Html::parse_document(html);
@@ -71,50 +95,53 @@ pub fn clean_html(html: &str) -> String {
 
 /// Remove unwanted elements from HTML using scraper for parsing
 ///
-/// This function performs optimized single-pass removal of all unwanted elements:
-/// - `SKIP_TAGS`: script, style, noscript, iframe (removed with content)
-/// - `NAV_TAGS`: nav, header, footer, aside (removed with content)
-/// - `UI_TAGS`: button (removed), summary (tag removed, content preserved)
+/// This function performs optimized single-pass removal of all unwanted elements
+/// using cached selectors for better performance.
 ///
-/// Uses a single regex pass with alternation pattern for O(n) complexity instead of O(n²).
+/// Removes: script, style, noscript, iframe, nav, header, footer, aside, button
+/// Preserves summary content while removing the tag itself.
 #[inline]
 fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     // Collect all elements to process with their positions for efficient replacement
     let mut replacements: Vec<(String, Option<String>)> = Vec::new();
 
-    // Process SKIP_TAGS - remove completely
-    for tag in SKIP_TAGS {
-        if let Ok(selector) = Selector::parse(tag) {
-            for element in document.select(&selector) {
-                replacements.push((element.html(), None));
-            }
-        }
+    // Process script, style, noscript, iframe - remove completely (using cached selectors)
+    for element in document.select(&SCRIPT_SELECTOR) {
+        replacements.push((element.html(), None));
+    }
+    for element in document.select(&STYLE_SELECTOR) {
+        replacements.push((element.html(), None));
+    }
+    for element in document.select(&NOSCRIPT_SELECTOR) {
+        replacements.push((element.html(), None));
+    }
+    for element in document.select(&IFRAME_SELECTOR) {
+        replacements.push((element.html(), None));
     }
 
-    // Process NAV_TAGS - remove completely
-    for tag in NAV_TAGS {
-        if let Ok(selector) = Selector::parse(tag) {
-            for element in document.select(&selector) {
-                replacements.push((element.html(), None));
-            }
-        }
+    // Process nav, header, footer, aside - remove completely (using cached selectors)
+    for element in document.select(&NAV_SELECTOR) {
+        replacements.push((element.html(), None));
+    }
+    for element in document.select(&HEADER_SELECTOR) {
+        replacements.push((element.html(), None));
+    }
+    for element in document.select(&FOOTER_SELECTOR) {
+        replacements.push((element.html(), None));
+    }
+    for element in document.select(&ASIDE_SELECTOR) {
+        replacements.push((element.html(), None));
     }
 
-    // Process UI_TAGS - special handling for summary
-    for tag in UI_TAGS {
-        if let Ok(selector) = Selector::parse(tag) {
-            for element in document.select(&selector) {
-                let element_html = element.html();
-                if tag == &"summary" {
-                    // For summary tags, extract and keep the text content
-                    let text_content: String = element.text().collect();
-                    replacements.push((element_html, Some(text_content)));
-                } else {
-                    // For other UI tags (like button), remove completely
-                    replacements.push((element_html, None));
-                }
-            }
-        }
+    // Process button and summary - special handling for summary (using cached selectors)
+    for element in document.select(&BUTTON_SELECTOR) {
+        replacements.push((element.html(), None));
+    }
+    for element in document.select(&SUMMARY_SELECTOR) {
+        let element_html = element.html();
+        // For summary tags, extract and keep the text content
+        let text_content: String = element.text().collect();
+        replacements.push((element_html, Some(text_content)));
     }
 
     // If no replacements needed, just apply regex patterns
@@ -231,18 +258,14 @@ fn clean_markdown(markdown: &str) -> String {
 fn extract_main_content(html: &str) -> String {
     let document = Html::parse_document(html);
 
-    // Try to find main-content section (docs.rs structure)
-    if let Ok(selector) = Selector::parse("#main-content") {
-        if let Some(main_section) = document.select(&selector).next() {
-            return main_section.html();
-        }
+    // Try to find main-content section (docs.rs structure) - using cached selector
+    if let Some(main_section) = document.select(&MAIN_CONTENT_SELECTOR).next() {
+        return main_section.html();
     }
 
-    // Fallback: try rustdoc_body_wrapper
-    if let Ok(selector) = Selector::parse("#rustdoc_body_wrapper") {
-        if let Some(wrapper) = document.select(&selector).next() {
-            return wrapper.html();
-        }
+    // Fallback: try rustdoc_body_wrapper - using cached selector
+    if let Some(wrapper) = document.select(&RUSTDOC_BODY_WRAPPER_SELECTOR).next() {
+        return wrapper.html();
     }
 
     // Last resort: return original HTML
@@ -431,5 +454,154 @@ cargo install dioxus-cli
             cleaned.contains("[Anchor](#quick-start)"),
             "Should preserve anchor links"
         );
+    }
+
+    // ============================================================================
+    // Performance optimization tests
+    // ============================================================================
+
+    /// Test that `extract_documentation` handles complex HTML with main content
+    /// This test verifies the single-pass optimization doesn't break extraction
+    #[test]
+    fn test_extract_documentation_single_pass_optimization() {
+        let html = r#"
+<!DOCTYPE html>
+<html>
+<head><title>Test Crate</title></head>
+<body>
+    <nav>Navigation content</nav>
+    <section id="main-content">
+        <h1>Test Crate</h1>
+        <p>This is the main documentation.</p>
+        <script>console.log('test');</script>
+        <div class="docblock">
+            <p>Docblock content here.</p>
+        </div>
+    </section>
+    <footer>Footer content</footer>
+</body>
+</html>
+"#;
+        let docs = extract_documentation(html);
+
+        // Should extract main content
+        assert!(docs.contains("Test Crate"), "Should contain title");
+        assert!(
+            docs.contains("main documentation"),
+            "Should contain main content"
+        );
+        assert!(
+            docs.contains("Docblock content"),
+            "Should preserve docblock"
+        );
+
+        // Should remove unwanted elements
+        assert!(!docs.contains("Navigation content"), "Should remove nav");
+        assert!(!docs.contains("Footer content"), "Should remove footer");
+        assert!(!docs.contains("console.log"), "Should remove script");
+    }
+
+    /// Test that `extract_search_results` handles complex HTML correctly
+    /// This verifies the single-pass optimization for search results
+    #[test]
+    fn test_extract_search_results_single_pass_optimization() {
+        let html = r#"
+<!DOCTYPE html>
+<html>
+<body>
+    <section id="main-content">
+        <h1>serde::Serialize</h1>
+        <pre><code>pub trait Serialize { }</code></pre>
+        <p>Serialize trait documentation.</p>
+    </section>
+    <nav>Sidebar</nav>
+</body>
+</html>
+"#;
+        let result = extract_search_results(html, "serde::Serialize");
+
+        // Should extract search results correctly
+        assert!(result.contains("Search Results"));
+        assert!(result.contains("serde::Serialize"));
+        assert!(result.contains("Serialize trait"));
+
+        // Should remove navigation
+        assert!(!result.contains("Sidebar"));
+    }
+
+    /// Test that multiple skip tags are handled efficiently
+    #[test]
+    fn test_clean_html_multiple_skip_tags() {
+        let html = r"
+<html>
+<head>
+    <style>.test { color: red; }</style>
+    <script>var x = 1;</script>
+</head>
+<body>
+    <nav>Navigation</nav>
+    <article>
+        <h1>Title</h1>
+        <p>Content with <script>inline script</script> removed.</p>
+        <footer>Article footer</footer>
+    </article>
+    <footer>Page footer</footer>
+</body>
+</html>
+";
+        let cleaned = clean_html(html);
+
+        // Should preserve content
+        assert!(cleaned.contains("Title"));
+        assert!(cleaned.contains("Content"));
+
+        // Should remove all unwanted elements
+        assert!(!cleaned.contains("style"), "Should remove style tags");
+        assert!(!cleaned.contains("script"), "Should remove script tags");
+        assert!(!cleaned.contains("Navigation"), "Should remove nav");
+        assert!(!cleaned.contains("footer"), "Should remove footer");
+        assert!(!cleaned.contains(".test"), "Should remove CSS content");
+        assert!(!cleaned.contains("var x"), "Should remove JS content");
+    }
+
+    /// Test that cached selectors work correctly for all tag types
+    #[test]
+    fn test_cached_selectors_all_tag_types() {
+        // Test each tag type defined in constants
+        let test_cases = [
+            (
+                "<script>alert('test')</script><p>Content</p>",
+                "script",
+                "Content",
+            ),
+            ("<style>.x{}</style><p>Content</p>", "style", "Content"),
+            (
+                "<noscript>Enable JS</noscript><p>Content</p>",
+                "noscript",
+                "Content",
+            ),
+            (
+                "<iframe src=\"x\"></iframe><p>Content</p>",
+                "iframe",
+                "Content",
+            ),
+            ("<nav><a>Link</a></nav><p>Content</p>", "nav", "Content"),
+            ("<header>Head</header><p>Content</p>", "header", "Content"),
+            ("<footer>Foot</footer><p>Content</p>", "footer", "Content"),
+            ("<aside>Sidebar</aside><p>Content</p>", "aside", "Content"),
+            ("<button>Click</button><p>Content</p>", "button", "Content"),
+        ];
+
+        for (html, tag_to_remove, expected_content) in test_cases {
+            let cleaned = clean_html(html);
+            assert!(
+                !cleaned.contains(tag_to_remove),
+                "Should remove {tag_to_remove} tag"
+            );
+            assert!(
+                cleaned.contains(expected_content),
+                "Should preserve {expected_content}"
+            );
+        }
     }
 }

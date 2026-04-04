@@ -153,18 +153,54 @@ impl DocCache {
         Ok(())
     }
 
+    /// Get cached crate HTML
+    pub async fn get_crate_html(&self, crate_name: &str, version: Option<&str>) -> Option<String> {
+        let key = CacheKeyGenerator::crate_html_cache_key(crate_name, version);
+        let result = self.cache.get(&key).await;
+        if result.is_some() {
+            self.stats.record_hit();
+        } else {
+            self.stats.record_miss();
+        }
+        result.map(|arc| (*arc).clone())
+    }
+
+    /// Set crate HTML cache
+    ///
+    /// # Errors
+    ///
+    /// Returns error if cache operation fails
+    pub async fn set_crate_html(
+        &self,
+        crate_name: &str,
+        version: Option<&str>,
+        content: String,
+    ) -> crate::error::Result<()> {
+        let key = CacheKeyGenerator::crate_html_cache_key(crate_name, version);
+        let ttl = self.ttl.crate_docs_duration();
+        self.cache.set(key, content, Some(ttl)).await?;
+        self.stats.record_set();
+        Ok(())
+    }
+
     /// Get cached search results
     ///
     /// # Arguments
     ///
     /// * `query` - Search query
     /// * `limit` - Result count limit
+    /// * `sort` - Optional search sort order
     ///
     /// # Returns
     ///
     /// Returns search results if cache hit;otherwise returns `None`
-    pub async fn get_search_results(&self, query: &str, limit: u32) -> Option<Arc<String>> {
-        let key = CacheKeyGenerator::search_cache_key(query, limit);
+    pub async fn get_search_results(
+        &self,
+        query: &str,
+        limit: u32,
+        sort: Option<&str>,
+    ) -> Option<Arc<String>> {
+        let key = CacheKeyGenerator::search_cache_key(query, limit, sort);
         let result = self.cache.get(&key).await;
         if result.is_some() {
             self.stats.record_hit();
@@ -180,6 +216,7 @@ impl DocCache {
     ///
     /// * `query` - Search query
     /// * `limit` - Result count limit
+    /// * `sort` - Optional search sort order
     /// * `content` - search result content
     ///
     /// # Errors
@@ -189,9 +226,10 @@ impl DocCache {
         &self,
         query: &str,
         limit: u32,
+        sort: Option<&str>,
         content: String,
     ) -> crate::error::Result<()> {
-        let key = CacheKeyGenerator::search_cache_key(query, limit);
+        let key = CacheKeyGenerator::search_cache_key(query, limit, sort);
         let ttl = self.ttl.search_results_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
@@ -251,6 +289,42 @@ impl DocCache {
         Ok(())
     }
 
+    /// Get cached item HTML
+    pub async fn get_item_html(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+    ) -> Option<String> {
+        let key = CacheKeyGenerator::item_html_cache_key(crate_name, item_path, version);
+        let result = self.cache.get(&key).await;
+        if result.is_some() {
+            self.stats.record_hit();
+        } else {
+            self.stats.record_miss();
+        }
+        result.map(|arc| (*arc).clone())
+    }
+
+    /// Set item HTML cache
+    ///
+    /// # Errors
+    ///
+    /// Returns error if cache operation fails
+    pub async fn set_item_html(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+        content: String,
+    ) -> crate::error::Result<()> {
+        let key = CacheKeyGenerator::item_html_cache_key(crate_name, item_path, version);
+        let ttl = self.ttl.item_docs_duration();
+        self.cache.set(key, content, Some(ttl)).await?;
+        self.stats.record_set();
+        Ok(())
+    }
+
     /// Clear cache
     ///
     /// # Errors
@@ -301,10 +375,17 @@ mod tests {
 
         // Test search results cache
         doc_cache
-            .set_search_results("web framework", 10, "Search results".to_string())
+            .set_search_results(
+                "web framework",
+                10,
+                Some("relevance"),
+                "Search results".to_string(),
+            )
             .await
             .expect("set_search_results should succeed");
-        let search_cached = doc_cache.get_search_results("web framework", 10).await;
+        let search_cached = doc_cache
+            .get_search_results("web framework", 10, Some("relevance"))
+            .await;
         assert_eq!(search_cached.as_deref().map(String::as_str), Some("Search results"));
 
         // Test item docs cache

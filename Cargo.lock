@@ -566,6 +566,7 @@ dependencies = [
  "fastrand",
  "flate2",
  "html2md",
+ "http",
  "moka",
  "notify",
  "prometheus-client",
