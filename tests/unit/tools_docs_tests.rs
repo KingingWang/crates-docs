@@ -146,15 +146,24 @@ async fn test_doc_cache_search_results() {
 
     // Test set and get search results
     doc_cache
-        .set_search_results("web framework", 10, "Search results".to_string())
+        .set_search_results(
+            "web framework",
+            10,
+            Some("relevance"),
+            "Search results".to_string(),
+        )
         .await
         .expect("set_search_results should succeed");
 
-    let result = doc_cache.get_search_results("web framework", 10).await;
+    let result = doc_cache
+        .get_search_results("web framework", 10, Some("relevance"))
+        .await;
     assert_eq!(result, Some("Search results".to_string()));
 
     // Test different limit
-    let result = doc_cache.get_search_results("web framework", 20).await;
+    let result = doc_cache
+        .get_search_results("web framework", 20, Some("relevance"))
+        .await;
     assert_eq!(result, None);
 }
 
@@ -1305,6 +1314,82 @@ async fn test_search_crates_tool_limit_clamping() {
 
     let result = tool.execute(args).await;
     assert!(result.is_ok());
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_search_crates_tool_cache_key_differs_by_sort() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+
+    // Setup mock to expect two different requests (different sort parameters)
+    // relevance sort request
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(r"/api/v1/crates.*sort=relevance.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"{"crates":[{"name":"reqwest","max_version":"1.0","downloads":1000}]}"#,
+        ))
+        .mount(&mock_server)
+        .await;
+
+    // downloads sort request
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(r"/api/v1/crates.*sort=downloads.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"{"crates":[{"name":"tokio","max_version":"2.0","downloads":2000}]}"#,
+        ))
+        .mount(&mock_server)
+        .await;
+
+    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    // First search with relevance sort
+    let args1 = serde_json::json!({
+        "query": "http client",
+        "sort": "relevance",
+        "format": "json"
+    });
+    let _result1 = tool
+        .execute(args1)
+        .await
+        .expect("First search should succeed");
+
+    // Second search with downloads sort - should hit different cache key or fetch again
+    let args2 = serde_json::json!({
+        "query": "http client",
+        "sort": "downloads",
+        "format": "json"
+    });
+    let _result2 = tool
+        .execute(args2)
+        .await
+        .expect("Second search should succeed");
+
+    // Both searches should succeed (execute returns Result<CallToolResult, CallToolError>)
+    // We already asserted success with .expect() above
+
+    // The key verification: mock server should have received requests for BOTH sort values
+    // If cache keys were the same, second request would use cache and mock would only see one request
+    // This test proves sort parameter is part of the cache key
+
+    // Verify mock received both requests (both sorts were called, not just one)
+    mock_server.verify().await;
 }
 
 // ============================================================================

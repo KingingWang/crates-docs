@@ -81,10 +81,12 @@ impl CacheKeyGenerator {
     /// # Normalization rules
     ///
     /// - query: lowercase, trimmed (search is case-insensitive)
+    /// - sort: lowercase, trimmed
     #[must_use]
-    pub fn search_cache_key(query: &str, limit: u32) -> String {
+    pub fn search_cache_key(query: &str, limit: u32, sort: Option<&str>) -> String {
         let normalized_query = query.trim().to_lowercase();
-        format!("search:{normalized_query}:{limit}")
+        let normalized_sort = sort.unwrap_or("relevance").trim().to_lowercase();
+        format!("search:{normalized_query}:{normalized_sort}:{limit}")
     }
 
     /// Build item cache key with normalization
@@ -153,8 +155,12 @@ mod tests {
         );
 
         assert_eq!(
-            CacheKeyGenerator::search_cache_key("web framework", 10),
-            "search:web framework:10"
+            CacheKeyGenerator::search_cache_key("web framework", 10, None),
+            "search:web framework:relevance:10"
+        );
+        assert_eq!(
+            CacheKeyGenerator::search_cache_key("web framework", 10, Some("downloads")),
+            "search:web framework:downloads:10"
         );
 
         assert_eq!(
@@ -188,8 +194,8 @@ mod tests {
         );
 
         assert_eq!(
-            CacheKeyGenerator::search_cache_key("Web Framework", 10),
-            CacheKeyGenerator::search_cache_key("web framework", 10)
+            CacheKeyGenerator::search_cache_key("Web Framework", 10, Some("Relevance")),
+            CacheKeyGenerator::search_cache_key("web framework", 10, Some("relevance"))
         );
 
         assert_eq!(
@@ -206,8 +212,8 @@ mod tests {
         );
 
         assert_eq!(
-            CacheKeyGenerator::search_cache_key("  web framework  ", 10),
-            "search:web framework:10"
+            CacheKeyGenerator::search_cache_key("  web framework  ", 10, Some(" downloads ")),
+            "search:web framework:downloads:10"
         );
 
         assert_eq!(

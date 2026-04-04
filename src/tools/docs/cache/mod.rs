@@ -186,12 +186,18 @@ impl DocCache {
     ///
     /// * `query` - Search query
     /// * `limit` - Result count limit
+    /// * `sort` - Optional search sort order
     ///
     /// # Returns
     ///
     /// Returns search results if cache hit;otherwise returns `None`
-    pub async fn get_search_results(&self, query: &str, limit: u32) -> Option<String> {
-        let key = CacheKeyGenerator::search_cache_key(query, limit);
+    pub async fn get_search_results(
+        &self,
+        query: &str,
+        limit: u32,
+        sort: Option<&str>,
+    ) -> Option<String> {
+        let key = CacheKeyGenerator::search_cache_key(query, limit, sort);
         let result = self.cache.get(&key).await;
         if result.is_some() {
             self.stats.record_hit();
@@ -208,6 +214,7 @@ impl DocCache {
     ///
     /// * `query` - Search query
     /// * `limit` - Result count limit
+    /// * `sort` - Optional search sort order
     /// * `content` - search result content
     ///
     /// # Errors
@@ -217,9 +224,10 @@ impl DocCache {
         &self,
         query: &str,
         limit: u32,
+        sort: Option<&str>,
         content: String,
     ) -> crate::error::Result<()> {
-        let key = CacheKeyGenerator::search_cache_key(query, limit);
+        let key = CacheKeyGenerator::search_cache_key(query, limit, sort);
         let ttl = self.ttl.search_results_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
@@ -366,10 +374,17 @@ mod tests {
 
         // Test search results cache
         doc_cache
-            .set_search_results("web framework", 10, "Search results".to_string())
+            .set_search_results(
+                "web framework",
+                10,
+                Some("relevance"),
+                "Search results".to_string(),
+            )
             .await
             .expect("set_search_results should succeed");
-        let search_cached = doc_cache.get_search_results("web framework", 10).await;
+        let search_cached = doc_cache
+            .get_search_results("web framework", 10, Some("relevance"))
+            .await;
         assert_eq!(search_cached, Some("Search results".to_string()));
 
         // Test item docs cache
