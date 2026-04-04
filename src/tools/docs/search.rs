@@ -83,6 +83,32 @@ const VALID_SEARCH_SORTS: &[&str] = &[
     "new",
 ];
 
+/// Crates.io search response (typed deserialization)
+#[derive(Debug, Deserialize)]
+struct SearchCratesResponse {
+    crates: Vec<SearchCrateRecord>,
+}
+
+/// Individual crate record from crates.io search
+#[derive(Debug, Deserialize)]
+struct SearchCrateRecord {
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default = "default_max_version")]
+    max_version: String,
+    #[serde(default)]
+    downloads: u64,
+    #[serde(default)]
+    repository: Option<String>,
+    #[serde(default)]
+    documentation: Option<String>,
+}
+
+fn default_max_version() -> String {
+    "0.0.0".to_string()
+}
+
 /// Implementation of the search crates tool
 ///
 /// Handles the execution of crate searches on crates.io, including
@@ -120,16 +146,18 @@ impl SearchCratesToolImpl {
         limit: u32,
         sort: &str,
     ) -> std::result::Result<Vec<CrateInfo>, CallToolError> {
+        // Check cache using DocCache API
         if let Some(cached) = self
             .service
             .doc_cache()
-            .get_search_results(query, limit)
+            .get_search_results(query, limit, Some(sort))
             .await
         {
             return serde_json::from_str(&cached)
                 .map_err(|e| CallToolError::from_message(format!("Cache parsing failed: {e}")));
         }
 
+        // Build URL using helper function
         let url = super::build_crates_io_search_url(query, Some(sort), Some(limit as usize));
 
         let response = self
@@ -148,19 +176,21 @@ impl SearchCratesToolImpl {
             )));
         }
 
-        let json: serde_json::Value = response
+        // Use typed deserialization instead of serde_json::Value
+        let search_response: SearchCratesResponse = response
             .json()
             .await
             .map_err(|e| CallToolError::from_message(format!("JSON parsing failed: {e}")))?;
 
-        let crates = parse_crates_response(&json, limit as usize);
+        let crates = parse_crates_response(search_response, limit as usize);
 
         let cache_value = serde_json::to_string(&crates)
             .map_err(|e| CallToolError::from_message(format!("Serialization failed: {e}")))?;
 
+        // Set cache using DocCache API
         self.service
             .doc_cache()
-            .set_search_results(query, limit, cache_value)
+            .set_search_results(query, limit, Some(sort), cache_value)
             .await
             .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
 
@@ -186,41 +216,18 @@ struct CrateInfo {
 }
 
 #[inline]
-fn parse_crates_response(json: &serde_json::Value, limit: usize) -> Vec<CrateInfo> {
-    let Some(crates_array) = json.get("crates").and_then(|c| c.as_array()) else {
-        return Vec::new();
-    };
-
-    crates_array
-        .iter()
+fn parse_crates_response(response: SearchCratesResponse, limit: usize) -> Vec<CrateInfo> {
+    response
+        .crates
+        .into_iter()
         .take(limit)
-        .map(|crate_item| CrateInfo {
-            name: crate_item
-                .get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or("Unknown")
-                .to_string(),
-            description: crate_item
-                .get("description")
-                .and_then(|d| d.as_str())
-                .map(std::string::ToString::to_string),
-            version: crate_item
-                .get("max_version")
-                .and_then(|v| v.as_str())
-                .unwrap_or("0.0.0")
-                .to_string(),
-            downloads: crate_item
-                .get("downloads")
-                .and_then(serde_json::Value::as_u64)
-                .unwrap_or(0),
-            repository: crate_item
-                .get("repository")
-                .and_then(|r| r.as_str())
-                .map(std::string::ToString::to_string),
-            documentation: crate_item
-                .get("documentation")
-                .and_then(|d| d.as_str())
-                .map(std::string::ToString::to_string),
+        .map(|crate_record| CrateInfo {
+            name: crate_record.name,
+            description: crate_record.description,
+            version: crate_record.max_version,
+            downloads: crate_record.downloads,
+            repository: crate_record.repository,
+            documentation: crate_record.documentation,
         })
         .collect()
 }
