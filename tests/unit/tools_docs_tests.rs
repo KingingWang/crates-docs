@@ -1244,6 +1244,7 @@ async fn test_search_crates_tool_uses_canonical_search_cache_key() {
         .set_search_results(
             "serde",
             10,
+            Some("relevance"),
             serde_json::json!([
                 {
                     "name": "serde",
