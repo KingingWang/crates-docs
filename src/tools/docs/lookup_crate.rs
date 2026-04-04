@@ -88,12 +88,15 @@ impl LookupCrateToolImpl {
     }
 
     /// Get crate documentation (markdown format)
+    ///
+    /// Returns `Arc<String>` to preserve shared ownership on cache hits,
+    /// avoiding unnecessary cloning of large documentation strings.
     async fn fetch_crate_docs(
         &self,
         crate_name: &str,
         version: Option<&str>,
-    ) -> std::result::Result<String, CallToolError> {
-        // Try cache first
+    ) -> std::result::Result<Arc<String>, CallToolError> {
+        // Try cache first - returns Arc<String> directly without cloning
         if let Some(cached) = self
             .service
             .doc_cache()
@@ -107,13 +110,14 @@ impl LookupCrateToolImpl {
         let url = Self::build_url(crate_name, version);
         let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
 
-        // Extract documentation
-        let docs = html::extract_documentation(&html);
+        // Extract documentation into Arc<String> for shared ownership
+        let docs: Arc<String> = Arc::new(html::extract_documentation(&html));
 
-        // Cache result
+        // Cache result - clone the Arc's inner String for the cache
+        // This is necessary because the cache interface takes ownership of String
         self.service
             .doc_cache()
-            .set_crate_docs(crate_name, version, docs.clone())
+            .set_crate_docs(crate_name, version, (*docs).clone())
             .await
             .map_err(|e| {
                 CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
@@ -187,7 +191,8 @@ impl Tool for LookupCrateToolImpl {
             }
             super::Format::Markdown => {
                 self.fetch_crate_docs(&params.crate_name, params.version.as_deref())
-                    .await?
+                    .await
+                    .map(|arc| (*arc).clone())?
             }
         };
 

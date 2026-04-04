@@ -91,13 +91,16 @@ impl LookupItemToolImpl {
     }
 
     /// Get item documentation (markdown format)
+    ///
+    /// Returns `Arc<String>` to preserve shared ownership on cache hits,
+    /// avoiding unnecessary cloning of large documentation strings.
     async fn fetch_item_docs(
         &self,
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
-    ) -> std::result::Result<String, CallToolError> {
-        // Try cache first
+    ) -> std::result::Result<Arc<String>, CallToolError> {
+        // Try cache first - returns Arc<String> directly without cloning
         if let Some(cached) = self
             .service
             .doc_cache()
@@ -111,13 +114,13 @@ impl LookupItemToolImpl {
         let url = Self::build_search_url(crate_name, item_path, version);
         let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
 
-        // Extract search results
-        let docs = html::extract_search_results(&html, item_path);
+        // Extract search results into Arc<String> for shared ownership
+        let docs: Arc<String> = Arc::new(html::extract_search_results(&html, item_path));
 
-        // Cache result
+        // Cache result - clone the Arc's inner String for the cache
         self.service
             .doc_cache()
-            .set_item_docs(crate_name, item_path, version, docs.clone())
+            .set_item_docs(crate_name, item_path, version, (*docs).clone())
             .await
             .map_err(|e| {
                 CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
@@ -209,7 +212,8 @@ impl Tool for LookupItemToolImpl {
                     &params.item_path,
                     params.version.as_deref(),
                 )
-                .await?
+                .await
+                .map(|arc| (*arc).clone())?
             }
         };
 

@@ -78,7 +78,7 @@ async fn test_doc_cache_crate_docs() {
 
     // Test cache hit
     let result = doc_cache.get_crate_docs("serde", None).await;
-    assert_eq!(result, Some("Serde documentation".to_string()));
+    assert_eq!(result.as_deref().map(String::as_str), Some("Serde documentation"));
 
     // Test cache with version
     doc_cache
@@ -86,7 +86,7 @@ async fn test_doc_cache_crate_docs() {
         .await
         .expect("set_crate_docs should succeed");
     let result = doc_cache.get_crate_docs("tokio", Some("1.0.0")).await;
-    assert_eq!(result, Some("Tokio 1.0 docs".to_string()));
+    assert_eq!(result.as_deref().map(String::as_str), Some("Tokio 1.0 docs"));
 
     // Different versions should return different cached values
     let result = doc_cache.get_crate_docs("tokio", Some("1.1.0")).await;
@@ -122,7 +122,7 @@ async fn test_doc_cache_item_docs() {
     let result = doc_cache
         .get_item_docs("serde", "serde::Serialize", None)
         .await;
-    assert_eq!(result, Some("Serialize trait docs".to_string()));
+    assert_eq!(result.as_deref().map(String::as_str), Some("Serialize trait docs"));
 
     // Test cache with version
     doc_cache
@@ -137,7 +137,7 @@ async fn test_doc_cache_item_docs() {
     let result = doc_cache
         .get_item_docs("std", "std::collections::HashMap", Some("1.75.0"))
         .await;
-    assert_eq!(result, Some("HashMap docs".to_string()));
+    assert_eq!(result.as_deref().map(String::as_str), Some("HashMap docs"));
 }
 
 // ============================================================================
