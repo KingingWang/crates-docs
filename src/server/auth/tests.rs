@@ -144,8 +144,8 @@ fn test_auth_context() {
     assert!(ctx.is_authenticated());
 }
 
-#[test]
-fn test_token_store() {
+#[tokio::test]
+async fn test_token_store() {
     let store = TokenStore::new();
     let token = TokenInfo {
         access_token: "test_token".to_string(),
@@ -156,12 +156,20 @@ fn test_token_store() {
         user_email: None,
     };
 
-    store.store_token("key".to_string(), token.clone());
-    assert!(store.get_token("key").is_some());
-    assert!(store.get_token("nonexistent").is_none());
+    let res = store.store_token("key".to_string(), token.clone()).await;
+    assert!(res.is_ok());
 
-    store.remove_token("key");
-    assert!(store.get_token("key").is_none());
+    let get_res: Result<Option<TokenInfo>, _> = store.get_token("key").await;
+    assert!(get_res.unwrap().is_some());
+
+    let get_nonexistent: Result<Option<TokenInfo>, _> = store.get_token("nonexistent").await;
+    assert!(get_nonexistent.unwrap().is_none());
+
+    let rem = store.remove_token("key").await;
+    assert!(rem.is_ok());
+
+    let final_get: Result<Option<TokenInfo>, _> = store.get_token("key").await;
+    assert!(final_get.unwrap().is_none());
 }
 
 // ============================================================================
@@ -229,8 +237,8 @@ fn test_auth_manager_is_enabled_disabled() {
     assert!(!manager.is_enabled());
 }
 
-#[test]
-fn test_token_store_multiple_tokens() {
+#[tokio::test]
+async fn test_token_store_multiple_tokens() {
     let store = TokenStore::new();
 
     let token1 = TokenInfo {
@@ -251,16 +259,20 @@ fn test_token_store_multiple_tokens() {
         user_email: None,
     };
 
-    store.store_token("key1".to_string(), token1);
-    store.store_token("key2".to_string(), token2);
+    assert!(store.store_token("key1".to_string(), token1).await.is_ok());
+    assert!(store.store_token("key2".to_string(), token2).await.is_ok());
 
-    assert!(store.get_token("key1").is_some());
-    assert!(store.get_token("key2").is_some());
-    assert!(store.get_token("key3").is_none());
+    let g1: Result<Option<TokenInfo>, _> = store.get_token("key1").await;
+    let g2: Result<Option<TokenInfo>, _> = store.get_token("key2").await;
+    let g3: Result<Option<TokenInfo>, _> = store.get_token("key3").await;
+
+    assert!(g1.unwrap().is_some());
+    assert!(g2.unwrap().is_some());
+    assert!(g3.unwrap().is_none());
 }
 
-#[test]
-fn test_token_store_cleanup_removes_only_expired() {
+#[tokio::test]
+async fn test_token_store_cleanup_removes_only_expired() {
     let store = TokenStore::new();
 
     let now = chrono::Utc::now();
@@ -274,21 +286,27 @@ fn test_token_store_cleanup_removes_only_expired() {
             user_id: None,
             user_email: None,
         };
-        store.store_token(format!("key{i}"), token);
+        assert!(store.store_token(format!("key{i}"), token).await.is_ok());
     }
 
-    store.cleanup_expired();
+    assert!(store.cleanup_expired().await.is_ok());
 
     // All tokens should still be there since they're not expired (min expires_at is 1 hour from now)
-    assert!(store.get_token("key0").is_some());
-    assert!(store.get_token("key1").is_some());
-    assert!(store.get_token("key2").is_some());
-    assert!(store.get_token("key3").is_some());
-    assert!(store.get_token("key4").is_some());
+    let g0: Result<Option<TokenInfo>, _> = store.get_token("key0").await;
+    let g1: Result<Option<TokenInfo>, _> = store.get_token("key1").await;
+    let g2: Result<Option<TokenInfo>, _> = store.get_token("key2").await;
+    let g3: Result<Option<TokenInfo>, _> = store.get_token("key3").await;
+    let g4: Result<Option<TokenInfo>, _> = store.get_token("key4").await;
+
+    assert!(g0.unwrap().is_some());
+    assert!(g1.unwrap().is_some());
+    assert!(g2.unwrap().is_some());
+    assert!(g3.unwrap().is_some());
+    assert!(g4.unwrap().is_some());
 }
 
-#[test]
-fn test_token_store_with_refresh_token() {
+#[tokio::test]
+async fn test_token_store_with_refresh_token() {
     let store = TokenStore::new();
 
     let token = TokenInfo {
@@ -300,8 +318,12 @@ fn test_token_store_with_refresh_token() {
         user_email: Some("user@example.com".to_string()),
     };
 
-    store.store_token("session".to_string(), token.clone());
-    let retrieved = store.get_token("session").unwrap();
+    assert!(store
+        .store_token("session".to_string(), token.clone())
+        .await
+        .is_ok());
+    let get_res: Result<Option<TokenInfo>, _> = store.get_token("session").await;
+    let retrieved = get_res.as_ref().unwrap().as_ref().unwrap();
 
     assert_eq!(retrieved.access_token, "access_token");
     assert_eq!(retrieved.refresh_token, Some("refresh_token".to_string()));
