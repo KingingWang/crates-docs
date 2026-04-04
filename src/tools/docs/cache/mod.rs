@@ -386,7 +386,10 @@ mod tests {
         let search_cached = doc_cache
             .get_search_results("web framework", 10, Some("relevance"))
             .await;
-        assert_eq!(search_cached.as_deref().map(String::as_str), Some("Search results"));
+        assert_eq!(
+            search_cached.as_deref().map(String::as_str),
+            Some("Search results")
+        );
 
         // Test item docs cache
         doc_cache
@@ -401,7 +404,10 @@ mod tests {
         let item_cached = doc_cache
             .get_item_docs("serde", "serde::Serialize", Some("1.0"))
             .await;
-        assert_eq!(item_cached.as_deref().map(String::as_str), Some("Item docs"));
+        assert_eq!(
+            item_cached.as_deref().map(String::as_str),
+            Some("Item docs")
+        );
 
         // Test clear
         doc_cache.clear().await.expect("clear should succeed");

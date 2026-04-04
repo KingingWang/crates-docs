@@ -231,15 +231,14 @@ impl Tool for LookupItemToolImpl {
                     Some("JSON format is not supported by this tool".to_string()),
                 ))
             }
-            super::Format::Markdown => {
-                self.fetch_item_docs(
+            super::Format::Markdown => self
+                .fetch_item_docs(
                     &params.crate_name,
                     &params.item_path,
                     params.version.as_deref(),
                 )
                 .await
-                .map(|arc| (*arc).clone())?
-            }
+                .map(|arc| (*arc).clone())?,
         };
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![

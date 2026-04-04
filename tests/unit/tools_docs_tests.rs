@@ -131,7 +131,10 @@ async fn test_doc_cache_crate_docs() {
         .expect("set_crate_docs should succeed");
 
     let result = doc_cache.get_crate_docs("serde", Some("1.0.0")).await;
-    assert_eq!(result.as_deref().map(String::as_str), Some("Serde documentation"));
+    assert_eq!(
+        result.as_deref().map(String::as_str),
+        Some("Serde documentation")
+    );
 
     // Test get non-existent crate
     let result = doc_cache.get_crate_docs("nonexistent", None).await;
@@ -159,7 +162,10 @@ async fn test_doc_cache_search_results() {
     let result = doc_cache
         .get_search_results("web framework", 10, Some("relevance"))
         .await;
-    assert_eq!(result.as_deref().map(String::as_str), Some("Search results"));
+    assert_eq!(
+        result.as_deref().map(String::as_str),
+        Some("Search results")
+    );
 
     // Test different limit
     let result = doc_cache
@@ -189,7 +195,10 @@ async fn test_doc_cache_item_docs() {
     let result = doc_cache
         .get_item_docs("serde", "serde::Serialize", Some("1.0.0"))
         .await;
-    assert_eq!(result.as_deref().map(String::as_str), Some("Serialize trait docs"));
+    assert_eq!(
+        result.as_deref().map(String::as_str),
+        Some("Serialize trait docs")
+    );
 }
 
 /// Test HTML cleaning
@@ -1692,7 +1701,10 @@ async fn test_doc_cache_concurrent_access() {
                 .expect("set should succeed");
 
             let result = doc_cache_clone.get_crate_docs(&key, None).await;
-            assert_eq!(result.as_deref().map(String::as_str), Some(format!("docs_{}", i).as_str()));
+            assert_eq!(
+                result.as_deref().map(String::as_str),
+                Some(format!("docs_{}", i).as_str())
+            );
         });
         handles.push(handle);
     }
@@ -1731,10 +1743,7 @@ async fn test_doc_cache_preserves_arc_on_get_crate_docs() {
 
     // Get directly from backend cache - should return same Arc<String>
     let key = CacheKeyGenerator::crate_cache_key("test_crate", Some("1.0.0"));
-    let from_backend = cache
-        .get(&key)
-        .await
-        .expect("should get from backend");
+    let from_backend = cache.get(&key).await.expect("should get from backend");
 
     // Verify they point to the same allocation (no clone occurred)
     assert!(
@@ -1764,10 +1773,7 @@ async fn test_doc_cache_preserves_arc_on_get_search_results() {
         .expect("should get search results");
 
     let key = CacheKeyGenerator::search_cache_key("test query", 10, Some("relevance"));
-    let from_backend = cache
-        .get(&key)
-        .await
-        .expect("should get from backend");
+    let from_backend = cache.get(&key).await.expect("should get from backend");
 
     assert!(
         Arc::ptr_eq(&from_doc_cache, &from_backend),
@@ -1796,10 +1802,7 @@ async fn test_doc_cache_preserves_arc_on_get_item_docs() {
         .expect("should get item docs");
 
     let key = CacheKeyGenerator::item_cache_key("test_crate", "test::Item", Some("1.0.0"));
-    let from_backend = cache
-        .get(&key)
-        .await
-        .expect("should get from backend");
+    let from_backend = cache.get(&key).await.expect("should get from backend");
 
     assert!(
         Arc::ptr_eq(&from_doc_cache, &from_backend),

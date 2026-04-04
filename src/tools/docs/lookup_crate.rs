@@ -213,11 +213,10 @@ impl Tool for LookupCrateToolImpl {
                     Some("JSON format is not supported by this tool".to_string()),
                 ))
             }
-            super::Format::Markdown => {
-                self.fetch_crate_docs(&params.crate_name, params.version.as_deref())
-                    .await
-                    .map(|arc| (*arc).clone())?
-            }
+            super::Format::Markdown => self
+                .fetch_crate_docs(&params.crate_name, params.version.as_deref())
+                .await
+                .map(|arc| (*arc).clone())?,
         };
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
