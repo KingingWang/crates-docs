@@ -6,40 +6,30 @@ on:
   pull_request_review_comment:
     types: [created]
 
-env:
-  ALLOWED_USERS: "KingingWang"
-
 jobs:
   opencode:
     if: |
       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')) &&
-      contains(env.ALLOWED_USERS, github.event.comment.user.login)
+      github.event.comment.user.login == 'KingingWang'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: write
       pull-requests: write
       issues: write
-      discussions: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 1
           persist-credentials: true
           token: ${{ secrets.PAT_TOKEN }}
 
-      - name: Debug Token
-        run: |
-          echo "Token is set: ${{ secrets.PAT_TOKEN != '' }}"
-          echo "Token length: ${{ secrets.PAT_TOKEN != '' && 'set' || 'not set' }}"
-
       - name: Run OpenCode
-        uses: anomalyco/opencode/github@latest
+        uses: anomalyco/opencode/github@1f3a5b2c4d6e8f9a0b1c2d3e4f5a6b7c8d9e0f1a
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
           model: opencode/qwen3.6-plus-free
-          use_github_token: true
