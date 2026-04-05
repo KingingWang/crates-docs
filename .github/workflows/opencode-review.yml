@@ -24,7 +24,7 @@ jobs:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
-          model: ${{ secrets.OPENAI_MODEL }}
+          model: custom-openai/${{ secrets.OPENAI_MODEL }}
           use_github_token: true
           prompt: |
             Review this pull request:
