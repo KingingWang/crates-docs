@@ -29,7 +29,7 @@ jobs:
             }
           result-encoding: string
 
-      - uses: anomalyco/opencode/github@6314f09
+      - uses: anomalyco/opencode/github@6314f09c14fdd6a3ab8bedc4f7b7182647551d12
         if: steps.check.outputs.result == 'true'
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
