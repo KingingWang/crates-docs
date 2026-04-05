@@ -6,14 +6,11 @@ on:
   pull_request_review_comment:
     types: [created]
 
-env:
-  ALLOWED_USERS: ${{ vars.ALLOWED_USERS || '["KingingWang"]' }}
-
 jobs:
   opencode:
     if: |
       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')) &&
-      contains(fromJSON(env.ALLOWED_USERS), github.event.comment.user.login)
+      contains(fromJSON(vars.ALLOWED_USERS || '["KingingWang"]'), github.event.comment.user.login)
     runs-on: ubuntu-latest
     permissions:
       contents: write
