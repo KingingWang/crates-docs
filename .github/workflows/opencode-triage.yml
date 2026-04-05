@@ -35,12 +35,10 @@ jobs:
       - uses: anomalyco/opencode/github@latest
         if: steps.check.outputs.result == 'true'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
-          OPENAI_MODEL_NAME: ${{ secrets.OPENAI_MODEL_NAME }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
-          model: custom-openai/qwen3.5-27b
+          model: opencode/qwen3.6-plus-free
           use_github_token: true
           prompt: |
             Review this issue. If there's a clear fix or relevant docs:
