@@ -154,7 +154,14 @@ impl DocCache {
     }
 
     /// Get cached crate HTML
-    pub async fn get_crate_html(&self, crate_name: &str, version: Option<&str>) -> Option<String> {
+    ///
+    /// Returns `Arc<String>` to avoid unnecessary cloning on cache hits.
+    /// The caller can clone if an owned String is needed.
+    pub async fn get_crate_html(
+        &self,
+        crate_name: &str,
+        version: Option<&str>,
+    ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::crate_html_cache_key(crate_name, version);
         let result = self.cache.get(&key).await;
         if result.is_some() {
@@ -162,7 +169,7 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        result.map(|arc| (*arc).clone())
+        result
     }
 
     /// Set crate HTML cache
@@ -290,12 +297,15 @@ impl DocCache {
     }
 
     /// Get cached item HTML
+    ///
+    /// Returns `Arc<String>` to avoid unnecessary cloning on cache hits.
+    /// The caller can clone if an owned String is needed.
     pub async fn get_item_html(
         &self,
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
-    ) -> Option<String> {
+    ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::item_html_cache_key(crate_name, item_path, version);
         let result = self.cache.get(&key).await;
         if result.is_some() {
@@ -303,7 +313,7 @@ impl DocCache {
         } else {
             self.stats.record_miss();
         }
-        result.map(|arc| (*arc).clone())
+        result
     }
 
     /// Set item HTML cache
