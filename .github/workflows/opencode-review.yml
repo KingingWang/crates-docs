@@ -22,9 +22,10 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_MODEL_NAME: ${{ secrets.OPENAI_MODEL_NAME }}
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
-          model: custom-openai/${{ secrets.OPENAI_MODEL }}
+          model: custom-openai/qwen3.5-27b
           use_github_token: true
           prompt: |
             Review this pull request:
