@@ -27,7 +27,7 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Run OpenCode
-        uses: anomalyco/opencode/github@1f3a5b2c4d6e8f9a0b1c2d3e4f5a6b7c8d9e0f1a
+        uses: anomalyco/opencode/github@6314f09
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
