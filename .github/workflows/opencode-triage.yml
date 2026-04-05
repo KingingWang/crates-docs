@@ -1,0 +1,43 @@
+name: OpenCode Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Check account age
+        id: check
+        uses: actions/github-script@60c6fa915cff58877f620cda73b6c86f92fbf9ee # v7.0.2
+        with:
+          script: |
+            try {
+              const user = await github.rest.users.getByUsername({
+                username: context.payload.issue.user.login
+              });
+              const created = new Date(user.data.created_at);
+              const days = (Date.now() - created) / (1000 * 60 * 60 * 24);
+              return days >= 30 ? "true" : "false";
+            } catch (error) {
+              return "false";
+            }
+          result-encoding: string
+
+      - uses: anomalyco/opencode/github@6314f09c14fdd6a3ab8bedc4f7b7182647551d12 # v1.3.13
+        if: steps.check.outputs.result == 'true'
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        with:
+          model: opencode/qwen3.6-plus-free
+          use_github_token: true
+          prompt: |
+            Review this issue. If there's a clear fix or relevant docs:
+            - Provide documentation links
+            - Add error handling guidance for code examples
+            Otherwise, do not comment.
