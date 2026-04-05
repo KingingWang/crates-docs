@@ -102,7 +102,7 @@ impl LookupItemToolImpl {
             .get_item_html(crate_name, item_path, version)
             .await
         {
-            return Ok(cached);
+            return Ok(cached.as_ref().clone());
         }
 
         let url = Self::build_search_url(crate_name, item_path, version);

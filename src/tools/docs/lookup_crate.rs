@@ -98,7 +98,7 @@ impl LookupCrateToolImpl {
             .get_crate_html(crate_name, version)
             .await
         {
-            return Ok(cached);
+            return Ok(cached.as_ref().clone());
         }
 
         let url = Self::build_url(crate_name, version);
