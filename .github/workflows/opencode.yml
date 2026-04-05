@@ -6,31 +6,27 @@ on:
   pull_request_review_comment:
     types: [created]
 
-env:
-  ALLOWED_USERS: "KingingWang"
-
 jobs:
   opencode:
     if: |
       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')) &&
-      contains(env.ALLOWED_USERS, github.event.comment.user.login)
+      github.event.comment.user.login == 'KingingWang'
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: write
       pull-requests: write
       issues: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           fetch-depth: 1
           persist-credentials: true
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Run OpenCode
-        uses: anomalyco/opencode/github@latest
+        uses: anomalyco/opencode/github@6314f09c14fdd6a3ab8bedc4f7b7182647551d12 # v1.3.13
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
