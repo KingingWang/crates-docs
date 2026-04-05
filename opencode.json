@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "custom-openai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Custom OpenAI Provider",
+      "options": {
+        "baseURL": "${OPENAI_BASE_URL}"
+      },
+      "models": {
+        "${OPENAI_MODEL_NAME}": {
+          "name": "Custom Model"
+        }
+      }
+    }
+  }
+}
