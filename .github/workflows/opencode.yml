@@ -28,6 +28,12 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: true
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Debug Token
+        run: |
+          echo "Token is set: ${{ secrets.PAT_TOKEN != '' }}"
+          echo "Token length: ${{ secrets.PAT_TOKEN != '' && 'set' || 'not set' }}"
 
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
