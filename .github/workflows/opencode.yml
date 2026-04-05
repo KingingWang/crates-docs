@@ -6,11 +6,14 @@ on:
   pull_request_review_comment:
     types: [created]
 
+env:
+  ALLOWED_USERS: ${{ vars.ALLOWED_USERS || '["KingingWang"]' }}
+
 jobs:
   opencode:
     if: |
       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')) &&
-      github.event.comment.user.login == 'KingingWang'
+      contains(fromJSON(env.ALLOWED_USERS), github.event.comment.user.login)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,7 +25,7 @@ jobs:
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           fetch-depth: 1
-          persist-credentials: true
+          persist-credentials: false
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Run OpenCode
