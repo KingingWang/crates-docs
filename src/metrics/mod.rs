@@ -49,6 +49,12 @@ pub struct ServerMetrics {
     request_duration: Family<RequestLabels, Histogram>,
     /// Cache operation counter
     cache_counter: Family<CacheLabels, Counter>,
+    /// Cache hits gauge
+    cache_hits: Gauge<u64, AtomicU64>,
+    /// Cache misses gauge
+    cache_misses: Gauge<u64, AtomicU64>,
+    /// Cache sets gauge
+    cache_sets: Gauge<u64, AtomicU64>,
     /// Cache hit rate gauge
     cache_hit_rate: Gauge<f64, AtomicU64>,
     /// HTTP request counter
@@ -93,6 +99,30 @@ impl ServerMetrics {
             "mcp_cache_operations_total",
             "Total number of cache operations",
             cache_counter.clone(),
+        );
+
+        // Cache hits gauge (count of cache hits)
+        let cache_hits = Gauge::default();
+        registry.register(
+            "mcp_cache_hits",
+            "Number of cache hits (gauge)",
+            cache_hits.clone(),
+        );
+
+        // Cache misses gauge (count of cache misses)
+        let cache_misses = Gauge::default();
+        registry.register(
+            "mcp_cache_misses",
+            "Number of cache misses (gauge)",
+            cache_misses.clone(),
+        );
+
+        // Cache sets gauge (count of cache set operations)
+        let cache_sets = Gauge::default();
+        registry.register(
+            "mcp_cache_sets",
+            "Number of cache set operations (gauge)",
+            cache_sets.clone(),
         );
 
         // Cache hit rate gauge
@@ -141,6 +171,9 @@ impl ServerMetrics {
             request_counter,
             request_duration,
             cache_counter,
+            cache_hits,
+            cache_misses,
+            cache_sets,
             cache_hit_rate,
             http_counter,
             http_duration,
@@ -198,6 +231,24 @@ impl ServerMetrics {
             let rate = hits as f64 / total as f64;
             self.cache_hit_rate.set(rate);
         }
+    }
+
+    /// Update cache statistics gauges from provided counts
+    ///
+    /// # Arguments
+    ///
+    /// * `hits` - Total cache hits
+    /// * `misses` - Total cache misses
+    /// * `sets` - Total cache set operations
+    ///
+    /// # Note
+    ///
+    /// This method also updates the cache hit rate automatically.
+    pub fn update_cache_stats(&self, hits: u64, misses: u64, sets: u64) {
+        self.cache_hits.set(hits);
+        self.cache_misses.set(misses);
+        self.cache_sets.set(sets);
+        self.update_cache_hit_rate(hits, misses);
     }
 
     /// Record an HTTP request
