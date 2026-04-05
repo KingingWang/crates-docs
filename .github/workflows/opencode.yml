@@ -36,3 +36,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
           model: opencode/qwen3.6-plus-free
+          use_github_token: true

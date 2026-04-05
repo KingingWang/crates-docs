@@ -41,6 +41,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
           model: opencode/qwen3.6-plus-free
+          use_github_token: true
           prompt: |
             Review this issue. If there's a clear fix or relevant docs:
             - Provide documentation links

@@ -24,6 +24,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
           model: opencode/qwen3.6-plus-free
+          use_github_token: true
           prompt: |
             Review this pull request:
             - Check for code quality issues
