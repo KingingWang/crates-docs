@@ -114,6 +114,7 @@ impl DocCache {
     /// # Returns
     ///
     /// Returns document content if cache hit; otherwise returns `None`
+    #[tracing::instrument(skip(self), fields(crate = crate_name, version = version), level = "trace")]
     pub async fn get_crate_docs(
         &self,
         crate_name: &str,
@@ -121,10 +122,31 @@ impl DocCache {
     ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::crate_cache_key(crate_name, version);
         let result = self.cache.get(&key).await;
-        if result.is_some() {
+        let is_hit = result.is_some();
+        if is_hit {
             self.stats.record_hit();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get",
+                hit = true,
+                crate = crate_name
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache hit for crate docs");
+            });
         } else {
             self.stats.record_miss();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get",
+                hit = false,
+                crate = crate_name
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache miss for crate docs");
+            });
         }
         result
     }
@@ -140,6 +162,7 @@ impl DocCache {
     /// # Errors
     ///
     /// Returns error if cache operation fails
+    #[tracing::instrument(skip(self, content), fields(crate = crate_name, version = version), err, level = "trace")]
     pub async fn set_crate_docs(
         &self,
         crate_name: &str,
@@ -150,6 +173,7 @@ impl DocCache {
         let ttl = self.ttl.crate_docs_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
+        tracing::trace!(ttl_secs = ttl.as_secs(), "Crate docs cached");
         Ok(())
     }
 
@@ -157,6 +181,7 @@ impl DocCache {
     ///
     /// Returns `Arc<String>` to avoid unnecessary cloning on cache hits.
     /// The caller can clone if an owned String is needed.
+    #[tracing::instrument(skip(self), fields(crate = crate_name, version = version), level = "trace")]
     pub async fn get_crate_html(
         &self,
         crate_name: &str,
@@ -164,10 +189,31 @@ impl DocCache {
     ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::crate_html_cache_key(crate_name, version);
         let result = self.cache.get(&key).await;
-        if result.is_some() {
+        let is_hit = result.is_some();
+        if is_hit {
             self.stats.record_hit();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get_html",
+                hit = true,
+                crate = crate_name
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache hit for crate HTML");
+            });
         } else {
             self.stats.record_miss();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get_html",
+                hit = false,
+                crate = crate_name
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache miss for crate HTML");
+            });
         }
         result
     }
@@ -177,6 +223,7 @@ impl DocCache {
     /// # Errors
     ///
     /// Returns error if cache operation fails
+    #[tracing::instrument(skip(self, content), fields(crate = crate_name, version = version), err, level = "trace")]
     pub async fn set_crate_html(
         &self,
         crate_name: &str,
@@ -187,6 +234,7 @@ impl DocCache {
         let ttl = self.ttl.crate_docs_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
+        tracing::trace!(ttl_secs = ttl.as_secs(), "Crate HTML cached");
         Ok(())
     }
 
@@ -201,6 +249,7 @@ impl DocCache {
     /// # Returns
     ///
     /// Returns search results if cache hit;otherwise returns `None`
+    #[tracing::instrument(skip(self), fields(query, limit, sort), level = "trace")]
     pub async fn get_search_results(
         &self,
         query: &str,
@@ -209,10 +258,29 @@ impl DocCache {
     ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::search_cache_key(query, limit, sort);
         let result = self.cache.get(&key).await;
-        if result.is_some() {
+        let is_hit = result.is_some();
+        if is_hit {
             self.stats.record_hit();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get_search",
+                hit = true
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache hit for search results");
+            });
         } else {
             self.stats.record_miss();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get_search",
+                hit = false
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache miss for search results");
+            });
         }
         result
     }
@@ -229,6 +297,7 @@ impl DocCache {
     /// # Errors
     ///
     /// Returns error if cache operation fails
+    #[tracing::instrument(skip(self, content), fields(query, limit, sort), err, level = "trace")]
     pub async fn set_search_results(
         &self,
         query: &str,
@@ -240,6 +309,7 @@ impl DocCache {
         let ttl = self.ttl.search_results_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
+        tracing::trace!(ttl_secs = ttl.as_secs(), "Search results cached");
         Ok(())
     }
 
@@ -254,6 +324,7 @@ impl DocCache {
     /// # Returns
     ///
     /// Returns item docs if cache hit;otherwise returns `None`
+    #[tracing::instrument(skip(self), fields(crate = crate_name, item = item_path, version), level = "trace")]
     pub async fn get_item_docs(
         &self,
         crate_name: &str,
@@ -262,10 +333,21 @@ impl DocCache {
     ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::item_cache_key(crate_name, item_path, version);
         let result = self.cache.get(&key).await;
-        if result.is_some() {
+        let is_hit = result.is_some();
+        if is_hit {
             self.stats.record_hit();
+            tracing::span!(tracing::Level::TRACE, "cache", op = "get_item", hit = true).in_scope(
+                || {
+                    tracing::trace!("Cache hit for item docs");
+                },
+            );
         } else {
             self.stats.record_miss();
+            tracing::span!(tracing::Level::TRACE, "cache", op = "get_item", hit = false).in_scope(
+                || {
+                    tracing::trace!("Cache miss for item docs");
+                },
+            );
         }
         result
     }
@@ -282,6 +364,7 @@ impl DocCache {
     /// # Errors
     ///
     /// Returns error if cache operation fails
+    #[tracing::instrument(skip(self, content), fields(crate = crate_name, item = item_path, version), err, level = "trace")]
     pub async fn set_item_docs(
         &self,
         crate_name: &str,
@@ -293,6 +376,7 @@ impl DocCache {
         let ttl = self.ttl.item_docs_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
+        tracing::trace!(ttl_secs = ttl.as_secs(), "Item docs cached");
         Ok(())
     }
 
@@ -300,6 +384,7 @@ impl DocCache {
     ///
     /// Returns `Arc<String>` to avoid unnecessary cloning on cache hits.
     /// The caller can clone if an owned String is needed.
+    #[tracing::instrument(skip(self), fields(crate = crate_name, item = item_path, version), level = "trace")]
     pub async fn get_item_html(
         &self,
         crate_name: &str,
@@ -308,10 +393,29 @@ impl DocCache {
     ) -> Option<Arc<String>> {
         let key = CacheKeyGenerator::item_html_cache_key(crate_name, item_path, version);
         let result = self.cache.get(&key).await;
-        if result.is_some() {
+        let is_hit = result.is_some();
+        if is_hit {
             self.stats.record_hit();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get_item_html",
+                hit = true
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache hit for item HTML");
+            });
         } else {
             self.stats.record_miss();
+            tracing::span!(
+                tracing::Level::TRACE,
+                "cache",
+                op = "get_item_html",
+                hit = false
+            )
+            .in_scope(|| {
+                tracing::trace!("Cache miss for item HTML");
+            });
         }
         result
     }
@@ -321,6 +425,7 @@ impl DocCache {
     /// # Errors
     ///
     /// Returns error if cache operation fails
+    #[tracing::instrument(skip(self, content), fields(crate = crate_name, item = item_path, version), err, level = "trace")]
     pub async fn set_item_html(
         &self,
         crate_name: &str,
@@ -332,6 +437,7 @@ impl DocCache {
         let ttl = self.ttl.item_docs_duration();
         self.cache.set(key, content, Some(ttl)).await?;
         self.stats.record_set();
+        tracing::trace!(ttl_secs = ttl.as_secs(), "Item HTML cached");
         Ok(())
     }
 
@@ -340,7 +446,9 @@ impl DocCache {
     /// # Errors
     ///
     /// Returns error if cache operation fails
+    #[tracing::instrument(skip(self), err, level = "trace")]
     pub async fn clear(&self) -> crate::error::Result<()> {
+        tracing::trace!("Clearing all doc cache entries");
         self.cache.clear().await
     }
 

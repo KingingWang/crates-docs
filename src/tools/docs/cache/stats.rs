@@ -53,6 +53,24 @@ impl CacheStats {
         self.sets.load(Ordering::Relaxed)
     }
 
+    /// Increment and get current hits count (atomic operation)
+    #[must_use]
+    pub fn inc_hits(&self) -> u64 {
+        self.hits.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    /// Increment and get current misses count (atomic operation)
+    #[must_use]
+    pub fn inc_misses(&self) -> u64 {
+        self.misses.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
+    /// Increment and get current sets count (atomic operation)
+    #[must_use]
+    pub fn inc_sets(&self) -> u64 {
+        self.sets.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
     /// Get total requests (hits + misses)
     #[must_use]
     pub fn total_requests(&self) -> u64 {
@@ -68,6 +86,12 @@ impl CacheStats {
             return 0.0;
         }
         self.hits() as f64 / total as f64
+    }
+
+    /// Get all stats as a tuple (hits, misses, sets)
+    #[must_use]
+    pub fn as_tuple(&self) -> (u64, u64, u64) {
+        (self.hits(), self.misses(), self.sets())
     }
 
     /// Reset all statistics
