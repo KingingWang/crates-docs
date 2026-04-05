@@ -5,10 +5,10 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "Custom OpenAI Provider",
       "options": {
-        "baseURL": "${OPENAI_BASE_URL}"
+        "baseURL": "{env:OPENAI_BASE_URL}"
       },
       "models": {
-        "${OPENAI_MODEL_NAME}": {
+        "{env:OPENAI_MODEL_NAME}": {
           "name": "Custom Model"
         }
       }
