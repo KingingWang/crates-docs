@@ -1203,8 +1203,8 @@ fn test_performance_stats_new() {
 // ============================================================================
 
 /// Test TokenStore basic operations
-#[test]
-fn test_token_store_operations() {
+#[tokio::test]
+async fn test_token_store_operations() {
     use chrono::{Duration, Utc};
     use crates_docs::server::auth::{TokenInfo, TokenStore};
 
@@ -1219,22 +1219,26 @@ fn test_token_store_operations() {
     };
 
     // Store
-    store.store_token("user1".to_string(), token_info.clone());
+    assert!(store
+        .store_token("user1".to_string(), token_info.clone())
+        .await
+        .is_ok());
 
     // Retrieve
-    let retrieved = store.get_token("user1");
-    assert!(retrieved.is_some());
-    let retrieved = retrieved.unwrap();
-    assert_eq!(retrieved.access_token, "test_access_token");
+    let retrieved: Result<Option<TokenInfo>, _> = store.get_token("user1").await;
+    assert!(retrieved.as_ref().unwrap().as_ref().is_some());
+    let retrieved_value = retrieved.unwrap().unwrap();
+    assert_eq!(retrieved_value.access_token, "test_access_token");
 
     // Delete
-    store.remove_token("user1");
-    assert!(store.get_token("user1").is_none());
+    assert!(store.remove_token("user1").await.is_ok());
+    let deleted: Result<Option<TokenInfo>, _> = store.get_token("user1").await;
+    assert!(deleted.unwrap().is_none());
 }
 
 /// Test TokenStore expired token cleanup
-#[test]
-fn test_token_store_cleanup() {
+#[tokio::test]
+async fn test_token_store_cleanup() {
     use chrono::{Duration, Utc};
     use crates_docs::server::auth::{TokenInfo, TokenStore};
 
@@ -1249,7 +1253,10 @@ fn test_token_store_cleanup() {
         user_id: None,
         user_email: None,
     };
-    store.store_token("expired_user".to_string(), expired_token);
+    assert!(store
+        .store_token("expired_user".to_string(), expired_token)
+        .await
+        .is_ok());
 
     // Add a valid token
     let valid_token = TokenInfo {
@@ -1260,15 +1267,21 @@ fn test_token_store_cleanup() {
         user_id: None,
         user_email: None,
     };
-    store.store_token("valid_user".to_string(), valid_token);
+    assert!(store
+        .store_token("valid_user".to_string(), valid_token)
+        .await
+        .is_ok());
 
     // Cleanup expired tokens
-    store.cleanup_expired();
+    assert!(store.cleanup_expired().await.is_ok());
 
     // Expired token should be deleted
-    assert!(store.get_token("expired_user").is_none());
+    let expired: Result<Option<TokenInfo>, _> = store.get_token("expired_user").await;
+    assert!(expired.unwrap().is_none());
+
     // Valid token should be retained
-    assert!(store.get_token("valid_user").is_some());
+    let valid: Result<Option<TokenInfo>, _> = store.get_token("valid_user").await;
+    assert!(valid.unwrap().is_some());
 }
 
 // ============================================================================

@@ -33,7 +33,7 @@ mod tests;
 pub use config::ApiKeyConfig;
 pub use config::{AuthConfig, OAuthConfig};
 pub use manager::AuthManager;
-pub use token::{TokenInfo, TokenStore};
+pub use token::{TokenInfo, TokenStore, TokenStoreError, TokenStoreResult};
 #[cfg(feature = "api-key")]
 pub use types::GeneratedApiKey;
 pub use types::{AuthContext, AuthProvider, OAuthProvider};
