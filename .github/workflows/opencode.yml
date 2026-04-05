@@ -6,11 +6,14 @@ on:
   pull_request_review_comment:
     types: [created]
 
+env:
+  ALLOWED_USERS: "KingingWang"
+
 jobs:
   opencode:
     if: |
-      contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode')
+      (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')) &&
+      contains(env.ALLOWED_USERS, github.event.comment.user.login)
     runs-on: ubuntu-latest
     permissions:
       id-token: write
