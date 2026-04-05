@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Check account age
         id: check
-        uses: actions/github-script@60c6fa915cff58877f620cda73b6c86f92fbf9ee
+        uses: actions/github-script@v7
         with:
           script: |
             try {
@@ -29,7 +29,12 @@ jobs:
             }
           result-encoding: string
 
-      - uses: anomalyco/opencode/github@6314f09c14fdd6a3ab8bedc4f7b7182647551d12
+      - uses: actions/checkout@v6
+        if: steps.check.outputs.result == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: anomalyco/opencode/github@latest
         if: steps.check.outputs.result == 'true'
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
