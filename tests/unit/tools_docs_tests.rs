@@ -132,7 +132,7 @@ async fn test_doc_cache_crate_docs() {
 
     let result = doc_cache.get_crate_docs("serde", Some("1.0.0")).await;
     assert_eq!(
-        result.as_deref().map(String::as_str),
+        result.as_ref().map(|s| s.as_ref()),
         Some("Serde documentation")
     );
 
@@ -162,10 +162,7 @@ async fn test_doc_cache_search_results() {
     let result = doc_cache
         .get_search_results("web framework", 10, Some("relevance"))
         .await;
-    assert_eq!(
-        result.as_deref().map(String::as_str),
-        Some("Search results")
-    );
+    assert_eq!(result.as_ref().map(|s| s.as_ref()), Some("Search results"));
 
     // Test different limit
     let result = doc_cache
@@ -196,7 +193,7 @@ async fn test_doc_cache_item_docs() {
         .get_item_docs("serde", "serde::Serialize", Some("1.0.0"))
         .await;
     assert_eq!(
-        result.as_deref().map(String::as_str),
+        result.as_ref().map(|s| s.as_ref()),
         Some("Serialize trait docs")
     );
 }
@@ -1661,7 +1658,7 @@ async fn test_doc_cache_version_normalization() {
 
     // Should be accessible with normalized version
     let result = doc_cache.get_crate_docs("serde", Some("1.0.0")).await;
-    assert_eq!(result.as_deref().map(String::as_str), Some("docs"));
+    assert_eq!(result.as_ref().map(|s| s.as_ref()), Some("docs"));
 }
 
 #[tokio::test]
@@ -1677,7 +1674,7 @@ async fn test_doc_cache_case_insensitive_crate_name() {
 
     // Should be accessible with lowercase
     let result = doc_cache.get_crate_docs("serde", None).await;
-    assert_eq!(result.as_deref().map(String::as_str), Some("docs"));
+    assert_eq!(result.as_ref().map(|s| s.as_ref()), Some("docs"));
 }
 
 // ============================================================================
@@ -1703,7 +1700,7 @@ async fn test_doc_cache_concurrent_access() {
 
             let result = doc_cache_clone.get_crate_docs(&key, None).await;
             assert_eq!(
-                result.as_deref().map(String::as_str),
+                result.as_ref().map(|s| s.as_ref()),
                 Some(format!("docs_{}", i).as_str())
             );
         });

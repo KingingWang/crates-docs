@@ -9,7 +9,7 @@ use std::time::Duration;
 /// Cache entry with optional TTL
 #[derive(Clone, Debug)]
 struct CacheEntry {
-    value: Arc<String>,
+    value: Arc<str>,
     ttl: Option<Duration>,
 }
 
@@ -79,7 +79,7 @@ impl MemoryCache {
 #[async_trait::async_trait]
 impl super::Cache for MemoryCache {
     #[tracing::instrument(skip(self), level = "trace")]
-    async fn get(&self, key: &str) -> Option<Arc<String>> {
+    async fn get(&self, key: &str) -> Option<Arc<str>> {
         let result = self.cache.get(key).map(|entry| Arc::clone(&entry.value));
         if result.is_some() {
             tracing::trace!(cache_type = "memory", key = %key, "Cache hit");
@@ -97,7 +97,7 @@ impl super::Cache for MemoryCache {
         ttl: Option<Duration>,
     ) -> crate::error::Result<()> {
         let entry = CacheEntry {
-            value: Arc::new(value),
+            value: Arc::from(value.into_boxed_str()),
             ttl,
         };
         tracing::trace!(cache_type = "memory", key = %key, "Setting cache entry");

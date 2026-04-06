@@ -83,15 +83,14 @@ impl RedisCache {
 
 #[async_trait::async_trait]
 impl super::Cache for RedisCache {
-    async fn get(&self, key: &str) -> Option<Arc<String>> {
+    async fn get(&self, key: &str) -> Option<Arc<str>> {
         let mut conn = self.conn.clone();
         let full_key = self.build_key(key);
-        redis::cmd("GET")
+        let result: redis::RedisResult<Option<String>> = redis::cmd("GET")
             .arg(&full_key)
             .query_async(&mut conn)
-            .await
-            .ok()
-            .map(Arc::new)
+            .await;
+        result.ok().flatten().map(|s| Arc::from(s.into_boxed_str()))
     }
 
     #[allow(clippy::cast_possible_truncation)]

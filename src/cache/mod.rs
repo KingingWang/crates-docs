@@ -91,8 +91,8 @@ pub trait Cache: Send + Sync {
     ///
     /// # Returns
     ///
-    /// If key exists and not expired, returns `Arc<String>` to avoid cloning; otherwise returns `None`
-    async fn get(&self, key: &str) -> Option<Arc<String>>;
+    /// If key exists and not expired, returns `Arc<str>` to avoid cloning; otherwise returns `None`
+    async fn get(&self, key: &str) -> Option<Arc<str>>;
 
     /// Set cache value
     ///

@@ -98,7 +98,7 @@ impl LookupCrateToolImpl {
             .get_crate_html(crate_name, version)
             .await
         {
-            return Ok(cached.as_ref().clone());
+            return Ok(cached.to_string());
         }
 
         let url = Self::build_url(crate_name, version);
@@ -117,14 +117,14 @@ impl LookupCrateToolImpl {
 
     /// Get crate documentation (markdown format)
     ///
-    /// Returns `Arc<String>` to preserve shared ownership on cache hits,
+    /// Returns `Arc<str>` to preserve shared ownership on cache hits,
     /// avoiding unnecessary cloning of large documentation strings.
     async fn fetch_crate_docs(
         &self,
         crate_name: &str,
         version: Option<&str>,
-    ) -> std::result::Result<Arc<String>, CallToolError> {
-        // Try cache first - returns Arc<String> directly without cloning
+    ) -> std::result::Result<Arc<str>, CallToolError> {
+        // Try cache first - returns Arc<str> directly without cloning
         if let Some(cached) = self
             .service
             .doc_cache()
@@ -136,14 +136,13 @@ impl LookupCrateToolImpl {
 
         let html = self.fetch_crate_html(crate_name, version).await?;
 
-        // Extract documentation into Arc<String> for shared ownership
-        let docs: Arc<String> = Arc::new(html::extract_documentation(&html));
+        // Extract documentation into Arc<str> for shared ownership
+        let docs: Arc<str> = Arc::from(html::extract_documentation(&html).into_boxed_str());
 
-        // Cache result - clone the Arc's inner String for the cache
-        // This is necessary because the cache interface takes ownership of String
+        // Cache result - convert Arc<str> to String for the cache
         self.service
             .doc_cache()
-            .set_crate_docs(crate_name, version, (*docs).clone())
+            .set_crate_docs(crate_name, version, docs.to_string())
             .await
             .map_err(|e| {
                 CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
@@ -216,7 +215,7 @@ impl Tool for LookupCrateToolImpl {
             super::Format::Markdown => self
                 .fetch_crate_docs(&params.crate_name, params.version.as_deref())
                 .await
-                .map(|arc| (*arc).clone())?,
+                .map(|arc| arc.to_string())?,
         };
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
