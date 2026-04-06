@@ -3,31 +3,26 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-/// Normalize crate name to lowercase
-///
-/// Crate names are case-insensitive on crates.io, so we normalize
-/// to lowercase for consistent cache key generation.
-#[must_use]
-fn normalize_crate_name(name: &str) -> String {
-    name.trim().to_lowercase()
-}
-
-fn normalize_version(version: Option<&str>) -> Option<String> {
-    version.map(|v| v.trim().to_lowercase())
-}
-
+/// Check if a byte is a valid crate name character
+#[inline]
 fn is_valid_crate_name_char(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'-'
 }
 
+/// Check if a byte is a valid item path character
+#[inline]
 fn is_valid_item_path_char(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b':'
 }
 
+/// Check if crate name is valid (non-empty and all valid chars)
+#[inline]
 fn is_valid_crate_name(name: &str) -> bool {
     !name.is_empty() && name.bytes().all(is_valid_crate_name_char)
 }
 
+/// Check if item path is valid (non-empty and all valid chars)
+#[inline]
 fn is_valid_item_path(path: &str) -> bool {
     !path.is_empty() && path.bytes().all(is_valid_item_path_char)
 }
@@ -52,25 +47,26 @@ impl CacheKeyGenerator {
     ///
     /// # Normalization rules
     ///
-    /// - `crate_name`: lowercase (via `normalize_crate_name`)
+    /// - `crate_name`: lowercase, trimmed
     /// - `version`: lowercase, trimmed
     /// - Invalid characters in `crate_name` (non-alphanumeric, non-underscore, non-hyphen)
     ///   will result in a hashed key to prevent injection
     #[must_use]
     pub fn crate_cache_key(crate_name: &str, version: Option<&str>) -> String {
-        let normalized_name = normalize_crate_name(crate_name);
+        // Inline normalization to avoid intermediate allocations
+        let normalized_name = crate_name.trim().to_lowercase();
 
         if !is_valid_crate_name(&normalized_name) {
             let mut hasher = DefaultHasher::new();
             normalized_name.hash(&mut hasher);
             let hash = hasher.finish();
-            return match normalize_version(version) {
+            return match version.map(|v| v.trim().to_lowercase()) {
                 Some(normalized_ver) => format!("crate:hash:{hash}:{normalized_ver}"),
                 None => format!("crate:hash:{hash}"),
             };
         }
 
-        match normalize_version(version) {
+        match version.map(|v| v.trim().to_lowercase()) {
             Some(normalized_ver) => format!("crate:{normalized_name}:{normalized_ver}"),
             None => format!("crate:{normalized_name}"),
         }
@@ -93,12 +89,12 @@ impl CacheKeyGenerator {
     ///
     /// # Normalization rules
     ///
-    /// - `crate_name`: lowercase (via `normalize_crate_name`)
+    /// - `crate_name`: lowercase, trimmed
     /// - `item_path`: trimmed but case-sensitive (Rust paths are case-sensitive)
     /// - `version`: lowercase, trimmed
     #[must_use]
     pub fn item_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
-        let normalized_name = normalize_crate_name(crate_name);
+        let normalized_name = crate_name.trim().to_lowercase();
         let normalized_path = item_path.trim();
 
         if !is_valid_crate_name(&normalized_name) || !is_valid_item_path(normalized_path) {
@@ -106,7 +102,7 @@ impl CacheKeyGenerator {
             normalized_name.hash(&mut hasher);
             normalized_path.hash(&mut hasher);
             let hash = hasher.finish();
-            return match normalize_version(version) {
+            return match version.map(|v| v.trim().to_lowercase()) {
                 Some(normalized_ver) => {
                     format!("item:{normalized_name}:{normalized_ver}:hash:{hash}")
                 }
@@ -114,7 +110,7 @@ impl CacheKeyGenerator {
             };
         }
 
-        match normalize_version(version) {
+        match version.map(|v| v.trim().to_lowercase()) {
             Some(normalized_ver) => {
                 format!("item:{normalized_name}:{normalized_ver}:{normalized_path}")
             }
