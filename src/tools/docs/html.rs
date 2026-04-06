@@ -11,28 +11,7 @@ use std::sync::LazyLock;
 /// Tags whose content should be completely removed during HTML cleaning
 const SKIP_TAGS: &[&str] = &["script", "style", "noscript", "iframe"];
 
-/// Regex patterns for self-closing/void tags to remove
-#[expect(
-    dead_code,
-    reason = "Kept for API consistency; COMBINED_CLEANUP_REGEX is now used"
-)]
-static LINK_TAG_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"<link[^>]*>").expect("hardcoded valid regex pattern"));
-
-#[expect(
-    dead_code,
-    reason = "Kept for API consistency; COMBINED_CLEANUP_REGEX is now used"
-)]
-static META_TAG_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"<meta[^>]*>").expect("hardcoded valid regex pattern"));
-
-/// Regex to remove "Copy item path" and similar UI text
-#[expect(
-    dead_code,
-    reason = "Pattern is included in COMBINED_CLEANUP_REGEX for single-pass optimization"
-)]
-static COPY_PATH_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"Copy item path").expect("hardcoded valid regex pattern"));
+// Regex patterns for HTML cleanup (combined into COMBINED_CLEANUP_REGEX for efficiency)
 
 /// Regex to remove anchor links like [§](#xxx)
 static ANCHOR_LINK_REGEX: LazyLock<Regex> =
