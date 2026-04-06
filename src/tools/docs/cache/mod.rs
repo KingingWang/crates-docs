@@ -119,7 +119,7 @@ impl DocCache {
         &self,
         crate_name: &str,
         version: Option<&str>,
-    ) -> Option<Arc<String>> {
+    ) -> Option<Arc<str>> {
         let key = CacheKeyGenerator::crate_cache_key(crate_name, version);
         let result = self.cache.get(&key).await;
         let is_hit = result.is_some();
@@ -179,14 +179,14 @@ impl DocCache {
 
     /// Get cached crate HTML
     ///
-    /// Returns `Arc<String>` to avoid unnecessary cloning on cache hits.
+    /// Returns `Arc<str>` to avoid unnecessary cloning on cache hits.
     /// The caller can clone if an owned String is needed.
     #[tracing::instrument(skip(self), fields(crate = crate_name, version = version), level = "trace")]
     pub async fn get_crate_html(
         &self,
         crate_name: &str,
         version: Option<&str>,
-    ) -> Option<Arc<String>> {
+    ) -> Option<Arc<str>> {
         let key = CacheKeyGenerator::crate_html_cache_key(crate_name, version);
         let result = self.cache.get(&key).await;
         let is_hit = result.is_some();
@@ -255,7 +255,7 @@ impl DocCache {
         query: &str,
         limit: u32,
         sort: Option<&str>,
-    ) -> Option<Arc<String>> {
+    ) -> Option<Arc<str>> {
         let key = CacheKeyGenerator::search_cache_key(query, limit, sort);
         let result = self.cache.get(&key).await;
         let is_hit = result.is_some();
@@ -330,7 +330,7 @@ impl DocCache {
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
-    ) -> Option<Arc<String>> {
+    ) -> Option<Arc<str>> {
         let key = CacheKeyGenerator::item_cache_key(crate_name, item_path, version);
         let result = self.cache.get(&key).await;
         let is_hit = result.is_some();
@@ -382,7 +382,7 @@ impl DocCache {
 
     /// Get cached item HTML
     ///
-    /// Returns `Arc<String>` to avoid unnecessary cloning on cache hits.
+    /// Returns `Arc<str>` to avoid unnecessary cloning on cache hits.
     /// The caller can clone if an owned String is needed.
     #[tracing::instrument(skip(self), fields(crate = crate_name, item = item_path, version), level = "trace")]
     pub async fn get_item_html(
@@ -390,7 +390,7 @@ impl DocCache {
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
-    ) -> Option<Arc<String>> {
+    ) -> Option<Arc<str>> {
         let key = CacheKeyGenerator::item_html_cache_key(crate_name, item_path, version);
         let result = self.cache.get(&key).await;
         let is_hit = result.is_some();
@@ -489,7 +489,10 @@ mod tests {
             .await
             .expect("set_crate_docs should succeed");
         let cached = doc_cache.get_crate_docs("serde", Some("1.0")).await;
-        assert_eq!(cached.as_deref().map(String::as_str), Some("Test docs"));
+        assert_eq!(
+            cached.as_ref().map(std::convert::AsRef::as_ref),
+            Some("Test docs")
+        );
 
         // Test search results cache
         doc_cache
@@ -505,7 +508,7 @@ mod tests {
             .get_search_results("web framework", 10, Some("relevance"))
             .await;
         assert_eq!(
-            search_cached.as_deref().map(String::as_str),
+            search_cached.as_ref().map(std::convert::AsRef::as_ref),
             Some("Search results")
         );
 
@@ -523,7 +526,7 @@ mod tests {
             .get_item_docs("serde", "serde::Serialize", Some("1.0"))
             .await;
         assert_eq!(
-            item_cached.as_deref().map(String::as_str),
+            item_cached.as_ref().map(std::convert::AsRef::as_ref),
             Some("Item docs")
         );
 

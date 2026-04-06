@@ -206,7 +206,7 @@ async fn test_cache_key_formats() {
         let value = cache.get(key).await;
         assert!(value.is_some(), "Cache key {} failed", key);
         assert_eq!(
-            value.unwrap().as_str(),
+            value.unwrap().as_ref(),
             expected_value.as_str(),
             "Cache key {} value mismatch",
             key
@@ -278,7 +278,7 @@ async fn test_concurrent_cache_access() {
                 i
             );
             assert_eq!(
-                retrieved.unwrap().as_str(),
+                retrieved.unwrap().as_ref(),
                 value.as_str(),
                 "Concurrent access value mismatch for key {}",
                 i

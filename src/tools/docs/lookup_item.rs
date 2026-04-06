@@ -102,7 +102,7 @@ impl LookupItemToolImpl {
             .get_item_html(crate_name, item_path, version)
             .await
         {
-            return Ok(cached.as_ref().clone());
+            return Ok(cached.to_string());
         }
 
         let url = Self::build_search_url(crate_name, item_path, version);
@@ -121,15 +121,15 @@ impl LookupItemToolImpl {
 
     /// Get item documentation (markdown format)
     ///
-    /// Returns `Arc<String>` to preserve shared ownership on cache hits,
+    /// Returns `Arc<str>` to preserve shared ownership on cache hits,
     /// avoiding unnecessary cloning of large documentation strings.
     async fn fetch_item_docs(
         &self,
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
-    ) -> std::result::Result<Arc<String>, CallToolError> {
-        // Try cache first - returns Arc<String> directly without cloning
+    ) -> std::result::Result<Arc<str>, CallToolError> {
+        // Try cache first - returns Arc<str> directly without cloning
         if let Some(cached) = self
             .service
             .doc_cache()
@@ -141,13 +141,14 @@ impl LookupItemToolImpl {
 
         let html = self.fetch_item_html(crate_name, item_path, version).await?;
 
-        // Extract search results into Arc<String> for shared ownership
-        let docs: Arc<String> = Arc::new(html::extract_search_results(&html, item_path));
+        // Extract search results into Arc<str> for shared ownership
+        let docs: Arc<str> =
+            Arc::from(html::extract_search_results(&html, item_path).into_boxed_str());
 
-        // Cache result - clone the Arc's inner String for the cache
+        // Cache result - convert Arc<str> to String for the cache
         self.service
             .doc_cache()
-            .set_item_docs(crate_name, item_path, version, (*docs).clone())
+            .set_item_docs(crate_name, item_path, version, docs.to_string())
             .await
             .map_err(|e| {
                 CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
@@ -238,7 +239,7 @@ impl Tool for LookupItemToolImpl {
                     params.version.as_deref(),
                 )
                 .await
-                .map(|arc| (*arc).clone())?,
+                .map(|arc| arc.to_string())?,
         };
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
