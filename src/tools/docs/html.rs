@@ -11,8 +11,6 @@ use std::sync::LazyLock;
 /// Tags whose content should be completely removed during HTML cleaning
 const SKIP_TAGS: &[&str] = &["script", "style", "noscript", "iframe"];
 
-// Regex patterns for HTML cleanup (combined into COMBINED_CLEANUP_REGEX for efficiency)
-
 /// Regex to remove anchor links like [§](#xxx)
 static ANCHOR_LINK_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").expect("hardcoded valid regex pattern"));
