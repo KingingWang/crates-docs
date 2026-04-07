@@ -48,6 +48,7 @@ impl CacheKeyGenerator {
     /// # Normalization rules
     ///
     /// - `crate_name`: lowercase, trimmed
+    ///   (crate names are case-insensitive on crates.io)
     /// - `version`: lowercase, trimmed
     /// - Invalid characters in `crate_name` (non-alphanumeric, non-underscore, non-hyphen)
     ///   will result in a hashed key to prevent injection
@@ -55,19 +56,20 @@ impl CacheKeyGenerator {
     pub fn crate_cache_key(crate_name: &str, version: Option<&str>) -> String {
         // Inline normalization to avoid intermediate allocations
         let normalized_name = crate_name.trim().to_lowercase();
+        let normalized_ver = version.map(|v| v.trim().to_lowercase());
 
         if !is_valid_crate_name(&normalized_name) {
             let mut hasher = DefaultHasher::new();
             normalized_name.hash(&mut hasher);
             let hash = hasher.finish();
-            return match version.map(|v| v.trim().to_lowercase()) {
-                Some(normalized_ver) => format!("crate:hash:{hash}:{normalized_ver}"),
+            return match normalized_ver {
+                Some(ver) => format!("crate:hash:{hash}:{ver}"),
                 None => format!("crate:hash:{hash}"),
             };
         }
 
-        match version.map(|v| v.trim().to_lowercase()) {
-            Some(normalized_ver) => format!("crate:{normalized_name}:{normalized_ver}"),
+        match normalized_ver {
+            Some(ver) => format!("crate:{normalized_name}:{ver}"),
             None => format!("crate:{normalized_name}"),
         }
     }
@@ -90,29 +92,31 @@ impl CacheKeyGenerator {
     /// # Normalization rules
     ///
     /// - `crate_name`: lowercase, trimmed
+    ///   (crate names are case-insensitive on crates.io)
     /// - `item_path`: trimmed but case-sensitive (Rust paths are case-sensitive)
     /// - `version`: lowercase, trimmed
     #[must_use]
     pub fn item_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
         let normalized_name = crate_name.trim().to_lowercase();
         let normalized_path = item_path.trim();
+        let normalized_ver = version.map(|v| v.trim().to_lowercase());
 
         if !is_valid_crate_name(&normalized_name) || !is_valid_item_path(normalized_path) {
             let mut hasher = DefaultHasher::new();
             normalized_name.hash(&mut hasher);
             normalized_path.hash(&mut hasher);
             let hash = hasher.finish();
-            return match version.map(|v| v.trim().to_lowercase()) {
-                Some(normalized_ver) => {
-                    format!("item:{normalized_name}:{normalized_ver}:hash:{hash}")
+            return match normalized_ver {
+                Some(ver) => {
+                    format!("item:{normalized_name}:{ver}:hash:{hash}")
                 }
                 None => format!("item:{normalized_name}:hash:{hash}"),
             };
         }
 
-        match version.map(|v| v.trim().to_lowercase()) {
-            Some(normalized_ver) => {
-                format!("item:{normalized_name}:{normalized_ver}:{normalized_path}")
+        match normalized_ver {
+            Some(ver) => {
+                format!("item:{normalized_name}:{ver}:{normalized_path}")
             }
             None => format!("item:{normalized_name}:{normalized_path}"),
         }
