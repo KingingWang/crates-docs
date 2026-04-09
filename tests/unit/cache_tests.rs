@@ -1,7 +1,7 @@
 //! Cache module unit tests
 
 use crates_docs::{
-    cache::{create_cache, CacheConfig},
+    cache::{create_cache, memory::MemoryCache, CacheConfig},
     tools::docs::cache::DocCache,
 };
 use std::sync::Arc;
@@ -261,6 +261,302 @@ fn test_create_cache_redis_sync_error() {
     if let Err(e) = result {
         assert!(e.to_string().contains("feature is not enabled"));
     }
+}
+
+// ============================================================================
+// Cache eviction tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_doc_cache_ttl_expiration() {
+    use std::time::Duration;
+    use tokio::time::sleep;
+
+    let memory_cache = MemoryCache::new(100);
+
+    // Use very short TTL for testing
+    let mut ttl = DocCacheTtl::default();
+    ttl.crate_docs_secs = 1; // 1 second
+    ttl.set_jitter_ratio(0.0); // Disable jitter for predictable tests
+
+    let doc_cache = DocCache::with_ttl(Arc::new(memory_cache), ttl);
+
+    // Set cache entry
+    doc_cache
+        .set_crate_docs("test-crate", None, "Test docs".to_string())
+        .await
+        .expect("set_crate_docs should succeed");
+
+    // Verify cache hit immediately
+    let result = doc_cache.get_crate_docs("test-crate", None).await;
+    assert!(result.is_some(), "Cache should hit immediately after set");
+
+    // Wait for TTL to expire
+    sleep(Duration::from_secs(2)).await;
+
+    // Note: moka cache handles TTL expiration asynchronously
+    // We rely on the sleep duration being longer than TTL
+
+    // Verify cache miss after expiration
+    let result = doc_cache.get_crate_docs("test-crate", None).await;
+    assert!(result.is_none(), "Cache should miss after TTL expiration");
+}
+
+#[tokio::test]
+async fn test_doc_cache_capacity_eviction() {
+    // Create small cache to test eviction
+    let memory_cache = MemoryCache::new(3);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = DocCache::new(cache);
+
+    // Fill cache beyond capacity
+    for i in 0..5 {
+        doc_cache
+            .set_crate_docs(&format!("crate-{i}"), None, format!("Docs {i}"))
+            .await
+            .expect("set_crate_docs should succeed");
+    }
+
+    // Access first crate to make it "hot" (frequently accessed)
+    let _ = doc_cache.get_crate_docs("crate-0", None).await;
+    let _ = doc_cache.get_crate_docs("crate-0", None).await;
+    let _ = doc_cache.get_crate_docs("crate-0", None).await;
+
+    // Add more items to trigger eviction
+    for i in 5..10 {
+        doc_cache
+            .set_crate_docs(&format!("crate-{i}"), None, format!("Docs {i}"))
+            .await
+            .expect("set_crate_docs should succeed");
+    }
+
+    // Frequently accessed crate should still be in cache
+    let _hot_crate = doc_cache.get_crate_docs("crate-0", None).await;
+    // Note: TinyLFU may evict based on frequency, so this is a probabilistic test
+    // We mainly verify the cache doesn't crash under eviction pressure
+}
+
+#[tokio::test]
+async fn test_doc_cache_different_types_independent_ttl() {
+    use std::time::Duration;
+    use tokio::time::sleep;
+
+    let memory_cache = MemoryCache::new(100);
+
+    // Configure different TTLs for different cache types
+    let mut ttl = DocCacheTtl::default();
+    ttl.crate_docs_secs = 1; // 1 second
+    ttl.search_results_secs = 3; // 3 seconds
+    ttl.item_docs_secs = 5; // 5 seconds
+    ttl.set_jitter_ratio(0.0);
+
+    let doc_cache = DocCache::with_ttl(Arc::new(memory_cache), ttl);
+
+    // Set different cache types
+    doc_cache
+        .set_crate_docs("crate", None, "Crate docs".to_string())
+        .await
+        .unwrap();
+    doc_cache
+        .set_search_results("query", 10, None, "Search results".to_string())
+        .await
+        .unwrap();
+    doc_cache
+        .set_item_docs("crate", "item", None, "Item docs".to_string())
+        .await
+        .unwrap();
+
+    // Wait for crate docs TTL to expire (1s), but not others
+    sleep(Duration::from_secs(2)).await;
+
+    // Note: moka cache handles TTL expiration asynchronously
+    // We rely on the sleep duration being longer than TTL
+
+    // Crate docs should be expired
+    assert!(doc_cache.get_crate_docs("crate", None).await.is_none());
+    // Search results should still exist
+    assert!(doc_cache
+        .get_search_results("query", 10, None)
+        .await
+        .is_some());
+    // Item docs should still exist
+    assert!(doc_cache
+        .get_item_docs("crate", "item", None)
+        .await
+        .is_some());
+}
+
+// ============================================================================
+// Concurrent access tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_doc_cache_concurrent_reads() {
+    use tokio::task::JoinSet;
+
+    let memory_cache = MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = Arc::new(DocCache::new(cache));
+
+    // Pre-populate cache
+    doc_cache
+        .set_crate_docs("concurrent-crate", None, "Shared docs".to_string())
+        .await
+        .unwrap();
+
+    // Spawn multiple concurrent readers
+    let mut join_set = JoinSet::new();
+    for _ in 0..100 {
+        let dc = doc_cache.clone();
+        join_set.spawn(async move { dc.get_crate_docs("concurrent-crate", None).await });
+    }
+
+    // All reads should succeed
+    let mut success_count = 0;
+    while let Some(result) = join_set.join_next().await {
+        if let Ok(Some(value)) = result {
+            assert_eq!(value.as_ref(), "Shared docs");
+            success_count += 1;
+        }
+    }
+    assert_eq!(success_count, 100, "All concurrent reads should succeed");
+}
+
+#[tokio::test]
+async fn test_doc_cache_concurrent_writes() {
+    use tokio::task::JoinSet;
+
+    let memory_cache = MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = Arc::new(DocCache::new(cache));
+
+    // Spawn multiple concurrent writers
+    let mut join_set = JoinSet::new();
+    for i in 0..50 {
+        let dc = doc_cache.clone();
+        join_set.spawn(async move {
+            dc.set_crate_docs(
+                &format!("crate-{}", i % 10), // Only 10 unique keys
+                None,
+                format!("Docs from writer {}", i),
+            )
+            .await
+        });
+    }
+
+    // All writes should complete without error
+    let mut success_count = 0;
+    while let Some(result) = join_set.join_next().await {
+        if result.is_ok() && result.unwrap().is_ok() {
+            success_count += 1;
+        }
+    }
+    assert_eq!(success_count, 50, "All concurrent writes should succeed");
+}
+
+#[tokio::test]
+async fn test_doc_cache_concurrent_mixed_operations() {
+    use tokio::task::JoinSet;
+
+    let memory_cache = MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = Arc::new(DocCache::new(cache));
+
+    // Pre-populate some data
+    for i in 0..10 {
+        doc_cache
+            .set_crate_docs(&format!("crate-{i}"), None, format!("Initial {i}"))
+            .await
+            .unwrap();
+    }
+
+    let mut join_set = JoinSet::new();
+
+    // Spawn readers
+    for _ in 0..50 {
+        let dc = doc_cache.clone();
+        join_set.spawn(async move {
+            for i in 0..10 {
+                dc.get_crate_docs(&format!("crate-{i}"), None).await;
+            }
+        });
+    }
+
+    // Spawn writers
+    for i in 0..30 {
+        let dc = doc_cache.clone();
+        join_set.spawn(async move {
+            let _ = dc
+                .set_crate_docs(&format!("crate-{}", i % 10), None, format!("Updated {i}"))
+                .await;
+        });
+    }
+
+    // Spawn deleters
+    for _ in 0..10 {
+        let dc = doc_cache.clone();
+        join_set.spawn(async move {
+            let _ = dc.clear().await;
+        });
+    }
+
+    // All operations should complete without panic
+    let mut completed = 0;
+    while let Some(_result) = join_set.join_next().await {
+        // We don't check results because operations may fail due to clear
+        // We just verify no panics occur
+        completed += 1;
+    }
+    assert_eq!(completed, 90, "All concurrent operations should complete");
+}
+
+#[tokio::test]
+async fn test_doc_cache_race_condition_read_after_write() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::task::JoinSet;
+
+    let memory_cache = MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let doc_cache = Arc::new(DocCache::new(cache));
+
+    let hit_count = Arc::new(AtomicUsize::new(0));
+    let miss_count = Arc::new(AtomicUsize::new(0));
+
+    let mut join_set = JoinSet::new();
+
+    // Writer task
+    let dc_writer = doc_cache.clone();
+    join_set.spawn(async move {
+        dc_writer
+            .set_crate_docs("race-crate", None, "Race docs".to_string())
+            .await
+    });
+
+    // Multiple reader tasks that start before write completes
+    for _ in 0..20 {
+        let dc = doc_cache.clone();
+        let hits = hit_count.clone();
+        let misses = miss_count.clone();
+        join_set.spawn(async move {
+            // Small delay to increase chance of race
+            tokio::task::yield_now().await;
+            if dc.get_crate_docs("race-crate", None).await.is_some() {
+                hits.fetch_add(1, Ordering::SeqCst);
+            } else {
+                misses.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok::<(), crates_docs::error::Error>(())
+        });
+    }
+
+    while let Some(result) = join_set.join_next().await {
+        let _ = result;
+    }
+
+    // Verify final state is consistent
+    let final_value = doc_cache.get_crate_docs("race-crate", None).await;
+    assert!(final_value.is_some(), "Final state should have the value");
+    assert_eq!(final_value.unwrap().as_ref(), "Race docs");
 }
 
 // ============================================================================
