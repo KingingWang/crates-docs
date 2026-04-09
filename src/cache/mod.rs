@@ -142,6 +142,12 @@ pub trait Cache: Send + Sync {
     ///
     /// Returns `true` if key exists, otherwise `false`
     async fn exists(&self, key: &str) -> bool;
+
+    /// Convert to Any for downcasting (used in tests)
+    ///
+    /// This method allows downcasting the cache to its concrete type
+    /// for accessing test-only methods like `run_pending_tasks`.
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Cache configuration

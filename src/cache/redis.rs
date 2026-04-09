@@ -210,6 +210,10 @@ impl super::Cache for RedisCache {
             .unwrap_or(0)
             > 0
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[cfg(test)]

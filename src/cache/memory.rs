@@ -125,6 +125,10 @@ impl super::Cache for MemoryCache {
         tracing::trace!(cache_type = "memory", key = %key, exists = result, "Checking cache entry existence");
         result
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[cfg(test)]
