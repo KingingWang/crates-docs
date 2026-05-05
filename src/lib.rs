@@ -83,6 +83,7 @@ pub fn init_logging_with_config(config: &crate::config::LoggingConfig) -> Result
     macro_rules! fmt_layer {
         () => {
             fmt::layer()
+                .with_writer(std::io::stderr)
                 .with_target(true)
                 .with_thread_ids(true)
                 .with_thread_names(true)

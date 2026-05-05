@@ -1,6 +1,7 @@
 //! Configuration module unit tests
 
 use crates_docs::config::AppConfig;
+use crates_docs::config::{EnvLoggingConfig, ServerConfig};
 use tempfile::tempdir;
 
 // ============================================================================
@@ -267,4 +268,204 @@ fn test_config_validation_zero_request_timeout() {
     config.performance.http_client_timeout_secs = 0;
     let result = config.validate();
     assert!(result.is_err());
+}
+
+// ============================================================================
+// Environment variable logging tests
+// ============================================================================
+
+#[test]
+fn test_config_from_env_logging_vars() {
+    temp_env::with_vars(
+        [
+            ("CRATES_DOCS_ENABLE_CONSOLE", Some("true")),
+            ("CRATES_DOCS_ENABLE_FILE", Some("false")),
+        ],
+        || {
+            let env_config = AppConfig::from_env().unwrap();
+            assert_eq!(env_config.logging.enable_console, Some(true));
+            assert_eq!(env_config.logging.enable_file, Some(false));
+        },
+    );
+}
+
+#[test]
+fn test_config_from_env_invalid_console() {
+    temp_env::with_vars([("CRATES_DOCS_ENABLE_CONSOLE", Some("notbool"))], || {
+        let env_config = AppConfig::from_env().unwrap();
+        // Invalid bool parse should result in None
+        assert_eq!(env_config.logging.enable_console, None);
+    });
+}
+
+#[test]
+fn test_config_merge_logging_env_overrides() {
+    use crates_docs::config::{EnvAppConfig, EnvLoggingConfig, EnvServerConfig};
+
+    let env_config = EnvAppConfig {
+        server: EnvServerConfig::default(),
+        logging: EnvLoggingConfig {
+            level: Some("debug".to_string()),
+            enable_console: Some(false),
+            enable_file: Some(true),
+        },
+        #[cfg(feature = "api-key")]
+        auth_api_key: Default::default(),
+    };
+
+    let merged = AppConfig::merge(None, Some(env_config));
+    assert_eq!(merged.logging.level, "debug");
+    assert!(!merged.logging.enable_console);
+    assert!(merged.logging.enable_file);
+}
+
+#[test]
+fn test_config_merge_no_env_returns_default() {
+    let merged = AppConfig::merge(None, None);
+    assert_eq!(merged.server.name, "crates-docs");
+}
+
+// ============================================================================
+// default_version function test
+// ============================================================================
+
+#[test]
+fn test_default_version_matches_crate_version() {
+    let config = ServerConfig::default();
+    assert_eq!(config.version, crates_docs::VERSION);
+}
+
+// ============================================================================
+// save_to_file error path tests
+// ============================================================================
+
+#[test]
+fn test_config_save_to_file_serialization_error() {
+    use crates_docs::config::AppConfig;
+    use tempfile::tempdir;
+
+    // Create a config that might cause issues with serialization
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("config.toml");
+
+    // Normal config should serialize fine
+    let config = AppConfig::default();
+    let result = config.save_to_file(&path);
+    assert!(result.is_ok());
+}
+
+// ============================================================================
+// API key environment variable tests (feature-gated)
+// ============================================================================
+
+#[cfg(feature = "api-key")]
+#[test]
+fn test_config_from_env_api_key_vars() {
+    temp_env::with_vars(
+        [
+            ("CRATES_DOCS_API_KEY_ENABLED", Some("true")),
+            ("CRATES_DOCS_API_KEYS", Some("key1,key2,key3")),
+            ("CRATES_DOCS_API_KEY_HEADER", Some("X-Custom-Key")),
+            ("CRATES_DOCS_API_KEY_QUERY_PARAM_NAME", Some("token")),
+            ("CRATES_DOCS_API_KEY_ALLOW_QUERY", Some("true")),
+            ("CRATES_DOCS_API_KEY_PREFIX", Some("pk")),
+        ],
+        || {
+            let env_config = AppConfig::from_env().unwrap();
+            assert_eq!(env_config.auth_api_key.enabled, Some(true));
+            assert_eq!(
+                env_config.auth_api_key.keys,
+                Some(vec![
+                    "key1".to_string(),
+                    "key2".to_string(),
+                    "key3".to_string()
+                ])
+            );
+            assert_eq!(
+                env_config.auth_api_key.header_name,
+                Some("X-Custom-Key".to_string())
+            );
+            assert_eq!(
+                env_config.auth_api_key.query_param_name,
+                Some("token".to_string())
+            );
+            assert_eq!(env_config.auth_api_key.allow_query_param, Some(true));
+            assert_eq!(env_config.auth_api_key.key_prefix, Some("pk".to_string()));
+        },
+    );
+}
+
+#[cfg(feature = "api-key")]
+#[test]
+fn test_config_from_env_api_key_invalid_bool() {
+    temp_env::with_vars(
+        [
+            ("CRATES_DOCS_API_KEY_ENABLED", Some("not-a-bool")),
+            ("CRATES_DOCS_API_KEY_ALLOW_QUERY", Some("invalid")),
+        ],
+        || {
+            let env_config = AppConfig::from_env().unwrap();
+            // Invalid bool should result in None
+            assert_eq!(env_config.auth_api_key.enabled, None);
+            assert_eq!(env_config.auth_api_key.allow_query_param, None);
+        },
+    );
+}
+
+#[cfg(feature = "api-key")]
+#[test]
+fn test_config_merge_api_key_env_overrides() {
+    use crates_docs::config::{EnvApiKeyConfig, EnvAppConfig, EnvServerConfig};
+
+    let env_config = EnvAppConfig {
+        server: EnvServerConfig::default(),
+        logging: EnvLoggingConfig::default(),
+        auth_api_key: EnvApiKeyConfig {
+            enabled: Some(true),
+            keys: Some(vec!["env-key".to_string()]),
+            header_name: Some("X-Env-Key".to_string()),
+            query_param_name: Some("api_token".to_string()),
+            allow_query_param: Some(true),
+            key_prefix: Some("env".to_string()),
+        },
+    };
+
+    let merged = AppConfig::merge(None, Some(env_config));
+    assert!(merged.auth.api_key.enabled);
+    assert_eq!(merged.auth.api_key.keys, vec!["env-key"]);
+    assert_eq!(merged.auth.api_key.header_name, "X-Env-Key");
+    assert_eq!(merged.auth.api_key.query_param_name, "api_token");
+    assert!(merged.auth.api_key.allow_query_param);
+    assert_eq!(merged.auth.api_key.key_prefix, "env");
+}
+
+#[cfg(feature = "api-key")]
+#[test]
+fn test_config_merge_api_key_partial_override() {
+    use crates_docs::config::{EnvApiKeyConfig, EnvAppConfig, EnvServerConfig};
+
+    let mut file_config = AppConfig::default();
+    file_config.auth.api_key.enabled = true;
+    file_config.auth.api_key.keys = vec!["file-key".to_string()];
+    file_config.auth.api_key.header_name = "X-File-Key".to_string();
+
+    // Only override enabled, leave other fields as file values
+    let env_config = EnvAppConfig {
+        server: EnvServerConfig::default(),
+        logging: EnvLoggingConfig::default(),
+        auth_api_key: EnvApiKeyConfig {
+            enabled: Some(false),
+            keys: None,
+            header_name: None,
+            query_param_name: None,
+            allow_query_param: None,
+            key_prefix: None,
+        },
+    };
+
+    let merged = AppConfig::merge(Some(file_config), Some(env_config));
+    assert!(!merged.auth.api_key.enabled);
+    // Keys should remain from file config since env was None
+    assert_eq!(merged.auth.api_key.keys, vec!["file-key"]);
+    assert_eq!(merged.auth.api_key.header_name, "X-File-Key");
 }

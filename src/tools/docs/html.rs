@@ -140,7 +140,7 @@ fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
 
     // Sort by length descending (longer first) to avoid partial replacements
     // This ensures we replace parent elements before children
-    replacements.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    replacements.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
     // Build result using string slices for O(n) total complexity
     let mut result = original_html.to_string();

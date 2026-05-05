@@ -10,6 +10,56 @@ use crates_docs::tools::{create_default_registry, ToolRegistry};
 use std::sync::Arc;
 
 // ============================================================================
+// ToolRegistry method tests
+// ============================================================================
+
+#[test]
+fn test_tool_registry_has_tool() {
+    let service = Arc::new(DocService::default());
+    let registry = create_default_registry(&service);
+
+    // Test existing tools
+    assert!(registry.has_tool("lookup_crate"));
+    assert!(registry.has_tool("lookup_item"));
+    assert!(registry.has_tool("search_crates"));
+    assert!(registry.has_tool("health_check"));
+
+    // Test non-existing tool
+    assert!(!registry.has_tool("nonexistent_tool"));
+}
+
+#[test]
+fn test_tool_registry_len() {
+    let service = Arc::new(DocService::default());
+    let registry = create_default_registry(&service);
+    assert_eq!(registry.len(), 4);
+
+    // Empty registry
+    let empty_registry = ToolRegistry::new();
+    assert_eq!(empty_registry.len(), 0);
+
+    // Single tool
+    let single_registry = ToolRegistry::new().register(HealthCheckToolImpl::new());
+    assert_eq!(single_registry.len(), 1);
+}
+
+#[test]
+fn test_tool_registry_is_empty() {
+    // Empty registry
+    let empty_registry = ToolRegistry::new();
+    assert!(empty_registry.is_empty());
+
+    // Registry with tools
+    let service = Arc::new(DocService::default());
+    let registry = create_default_registry(&service);
+    assert!(!registry.is_empty());
+
+    // Single tool registry
+    let single_registry = ToolRegistry::new().register(HealthCheckToolImpl::new());
+    assert!(!single_registry.is_empty());
+}
+
+// ============================================================================
 // Tool parameter tests
 // ============================================================================
 

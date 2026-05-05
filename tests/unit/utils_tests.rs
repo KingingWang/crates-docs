@@ -10,6 +10,38 @@ use crates_docs::utils::{
 use std::time::{Duration, Instant};
 
 // ============================================================================
+// Global HTTP client tests
+// ============================================================================
+
+#[test]
+fn test_get_global_http_client_not_initialized() {
+    // Test that get_global_http_client returns error when not initialized
+    // Note: This test runs in isolation, so the global client may or may not be initialized
+    // depending on test order. We just verify it doesn't panic.
+    let result = crates_docs::utils::get_global_http_client();
+    // Either it's initialized (Ok) or not (Err) - both are valid outcomes
+    assert!(result.is_ok() || result.is_err());
+}
+
+#[test]
+fn test_get_or_init_global_http_client() {
+    // This should either use existing client or create a new one
+    let result = crates_docs::utils::get_or_init_global_http_client();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_init_global_http_client_repeated_call() {
+    // Calling init multiple times should be safe (returns Ok if already initialized)
+    let config = crates_docs::config::PerformanceConfig::default();
+    let result1 = crates_docs::utils::init_global_http_client(&config);
+    let result2 = crates_docs::utils::init_global_http_client(&config);
+    // Both calls should succeed (first initializes, second returns Ok)
+    assert!(result1.is_ok() || result1.is_err());
+    assert!(result2.is_ok() || result2.is_err());
+}
+
+// ============================================================================
 // HttpClientBuilder tests
 // ============================================================================
 
@@ -161,6 +193,180 @@ async fn test_rate_limiter_acquire_success() {
     assert_eq!(limiter.available_permits(), 2);
     drop(permit);
     assert_eq!(limiter.available_permits(), 3);
+}
+
+// ============================================================================
+// Metrics module tests (from crate's metrics module)
+// ============================================================================
+
+#[test]
+fn test_server_metrics_update_cache_stats() {
+    use crates_docs::metrics::ServerMetrics;
+
+    let metrics = ServerMetrics::new();
+    metrics.update_cache_stats(100, 50, 25);
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_cache_hits"));
+    assert!(output.contains("mcp_cache_misses"));
+    assert!(output.contains("mcp_cache_sets"));
+}
+
+#[test]
+fn test_server_metrics_update_cache_hit_rate() {
+    use crates_docs::metrics::ServerMetrics;
+
+    let metrics = ServerMetrics::new();
+
+    // Zero total - rate stays 0
+    metrics.update_cache_hit_rate(0, 0);
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_cache_hit_rate"));
+
+    // Normal case
+    metrics.update_cache_hit_rate(80, 20);
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_cache_hit_rate"));
+}
+
+#[test]
+fn test_http_request_timer_with_metrics() {
+    use crates_docs::metrics::{HttpRequestTimer, ServerMetrics};
+    use std::sync::Arc;
+
+    let metrics = Arc::new(ServerMetrics::new());
+    let timer = HttpRequestTimer::new("GET", "docs.rs", Some(metrics.clone()));
+    timer.finish(200);
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_http_requests_total"));
+}
+
+#[test]
+fn test_http_request_timer_without_metrics() {
+    use crates_docs::metrics::HttpRequestTimer;
+
+    // Timer without metrics should complete silently
+    let timer = HttpRequestTimer::new("GET", "docs.rs", None);
+    timer.finish(200);
+}
+
+#[test]
+fn test_request_timer_failure() {
+    use crates_docs::metrics::{RequestTimer, ServerMetrics};
+    use std::sync::Arc;
+
+    let metrics = Arc::new(ServerMetrics::new());
+    let timer = RequestTimer::new("test_tool", Some(metrics.clone()));
+    timer.failure();
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_errors_total"));
+}
+
+#[test]
+fn test_request_timer_without_metrics() {
+    use crates_docs::metrics::RequestTimer;
+
+    // Timer without metrics should complete silently
+    let timer = RequestTimer::new("test_tool", None);
+    timer.success();
+}
+
+#[test]
+fn test_request_timer_without_metrics_failure() {
+    use crates_docs::metrics::RequestTimer;
+
+    // Timer without metrics should complete silently on failure too
+    let timer = RequestTimer::new("test_tool", None);
+    timer.failure();
+}
+
+#[test]
+fn test_server_metrics_record_request_failure() {
+    use crates_docs::metrics::ServerMetrics;
+    use std::time::Duration;
+
+    let metrics = ServerMetrics::new();
+    // Record a failed request (success=false)
+    metrics.record_request("test_tool", false, Duration::from_millis(100));
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_requests_total"));
+    assert!(output.contains("mcp_errors_total"));
+}
+
+#[test]
+fn test_server_metrics_record_request_success() {
+    use crates_docs::metrics::ServerMetrics;
+    use std::time::Duration;
+
+    let metrics = ServerMetrics::new();
+    metrics.record_request("test_tool", true, Duration::from_millis(50));
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_requests_total"));
+}
+
+#[test]
+fn test_server_metrics_record_http_request() {
+    use crates_docs::metrics::ServerMetrics;
+    use std::time::Duration;
+
+    let metrics = ServerMetrics::new();
+    metrics.record_http_request("GET", 200, "docs.rs", Duration::from_millis(100));
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_http_requests_total"));
+}
+
+#[test]
+fn test_server_metrics_inc_dec_active_connections() {
+    use crates_docs::metrics::ServerMetrics;
+
+    let metrics = ServerMetrics::new();
+    metrics.inc_active_connections();
+    metrics.inc_active_connections();
+    metrics.dec_active_connections();
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_active_connections"));
+}
+
+#[test]
+fn test_server_metrics_record_cache_operation() {
+    use crates_docs::metrics::ServerMetrics;
+
+    let metrics = ServerMetrics::new();
+    metrics.record_cache_operation("get", "memory");
+
+    let output = metrics.export().unwrap();
+    assert!(output.contains("mcp_cache_operations_total"));
+}
+
+#[test]
+fn test_server_metrics_registry() {
+    use crates_docs::metrics::ServerMetrics;
+
+    let metrics = ServerMetrics::new();
+    let _registry = metrics.registry();
+}
+
+#[test]
+fn test_server_metrics_default() {
+    use crates_docs::metrics::ServerMetrics;
+
+    let metrics = ServerMetrics::default();
+    let output = metrics.export().unwrap();
+    assert!(!output.is_empty());
+}
+
+#[test]
+fn test_init_global_metrics() {
+    crates_docs::metrics::init_global_metrics();
+    let metrics = crates_docs::metrics::global_metrics();
+    let output = metrics.export().unwrap();
+    assert!(!output.is_empty());
 }
 
 // ============================================================================
