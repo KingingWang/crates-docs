@@ -367,3 +367,104 @@ fn test_apply_jitter_different_base_values() {
         }
     }
 }
+
+// ============================================================================
+// DocCacheTtl::with_jitter and from_cache_config None branches
+// ============================================================================
+
+#[test]
+fn test_doc_cache_ttl_with_jitter() {
+    let ttl = DocCacheTtl::with_jitter(7200, 600, 3600, 0.2);
+    assert_eq!(ttl.crate_docs_secs, 7200);
+    assert_eq!(ttl.search_results_secs, 600);
+    assert_eq!(ttl.item_docs_secs, 3600);
+    assert!((ttl.jitter_ratio() - 0.2).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_doc_cache_ttl_with_jitter_clamped() {
+    let ttl = DocCacheTtl::with_jitter(3600, 300, 1800, 1.5);
+    assert!((ttl.jitter_ratio() - 1.0).abs() < f64::EPSILON);
+
+    let ttl = DocCacheTtl::with_jitter(3600, 300, 1800, -0.5);
+    assert!(ttl.jitter_ratio().abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_doc_cache_ttl_from_cache_config_none_defaults() {
+    let config = CacheConfig {
+        cache_type: "memory".to_string(),
+        memory_size: Some(1000),
+        redis_url: None,
+        key_prefix: String::new(),
+        default_ttl: None,
+        crate_docs_ttl_secs: None,
+        item_docs_ttl_secs: None,
+        search_results_ttl_secs: None,
+    };
+    let ttl = DocCacheTtl::from_cache_config(&config);
+    assert_eq!(ttl.crate_docs_secs, 3600);
+    assert_eq!(ttl.search_results_secs, 300);
+    assert_eq!(ttl.item_docs_secs, 1800);
+}
+
+// ============================================================================
+// CacheStats inc methods and as_tuple
+// ============================================================================
+
+#[test]
+fn test_cache_stats_inc_methods() {
+    use crates_docs::tools::docs::cache::CacheStats;
+
+    let stats = CacheStats::new();
+    assert_eq!(stats.inc_hits(), 1);
+    assert_eq!(stats.inc_hits(), 2);
+    assert_eq!(stats.inc_misses(), 1);
+    assert_eq!(stats.inc_misses(), 2);
+    assert_eq!(stats.inc_sets(), 1);
+    assert_eq!(stats.inc_sets(), 2);
+
+    assert_eq!(stats.hits(), 2);
+    assert_eq!(stats.misses(), 2);
+    assert_eq!(stats.sets(), 2);
+}
+
+#[test]
+fn test_cache_stats_as_tuple() {
+    use crates_docs::tools::docs::cache::CacheStats;
+
+    let stats = CacheStats::new();
+    stats.record_hit();
+    stats.record_miss();
+    stats.record_set();
+
+    let (hits, misses, sets) = stats.as_tuple();
+    assert_eq!(hits, 1);
+    assert_eq!(misses, 1);
+    assert_eq!(sets, 1);
+}
+
+// ============================================================================
+// CacheKeyGenerator invalid item path hash branch
+// ============================================================================
+
+#[test]
+fn test_item_cache_key_invalid_path_with_version() {
+    use crates_docs::tools::docs::cache::CacheKeyGenerator;
+
+    // Invalid item path (contains newline) with version should hash
+    let key = CacheKeyGenerator::item_cache_key("serde", "invalid\npath", Some("1.0"));
+    assert!(key.contains("hash:"));
+    assert!(key.contains(":1.0:")); // version should be present
+}
+
+#[test]
+fn test_item_cache_key_invalid_path_no_version() {
+    use crates_docs::tools::docs::cache::CacheKeyGenerator;
+
+    // Invalid item path without version should hash without version
+    let key = CacheKeyGenerator::item_cache_key("serde", "invalid\npath", None);
+    assert!(key.contains("hash:"));
+    // Should not have version in the key format
+    assert!(!key.contains(":1.0"));
+}

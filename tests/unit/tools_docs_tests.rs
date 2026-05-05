@@ -1601,6 +1601,14 @@ fn test_html_to_text_with_code_block() {
     assert!(text.contains("fn main"));
 }
 
+#[test]
+fn test_html_to_text_no_body_fallback() {
+    // HTML without body tag - should use ALL_SELECTOR fallback
+    let html = r#"<html><div>Content without body</div></html>"#;
+    let text = html_to_text(html);
+    assert!(text.contains("Content without body"));
+}
+
 // ============================================================================
 // TTL jitter tests
 // ============================================================================

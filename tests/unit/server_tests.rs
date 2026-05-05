@@ -3,6 +3,76 @@
 use crates_docs::{AppConfig, CratesDocsServer};
 
 // ============================================================================
+// ToolExecutionResult tests (via server::handler module)
+// ============================================================================
+
+#[test]
+fn test_tool_execution_result_into_call_tool_result_ok() {
+    use crates_docs::server::handler::ToolExecutionResult;
+    use rust_mcp_sdk::schema::CallToolResult;
+
+    let ok_result = CallToolResult::text_content(vec![]);
+    let ter = ToolExecutionResult {
+        tool_name: "test_tool".to_string(),
+        duration: std::time::Duration::from_millis(100),
+        success: true,
+        result: Ok(ok_result),
+    };
+
+    let result = ter.into_call_tool_result();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_tool_execution_result_into_call_tool_result_err() {
+    use crates_docs::server::handler::ToolExecutionResult;
+    use rust_mcp_sdk::schema::CallToolError;
+
+    let err_result = CallToolError::from_message("test error message");
+    let ter = ToolExecutionResult {
+        tool_name: "test_tool".to_string(),
+        duration: std::time::Duration::from_millis(100),
+        success: false,
+        result: Err(err_result),
+    };
+
+    let result = ter.into_call_tool_result();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_tool_execution_result_into_result_from_server_ok() {
+    use crates_docs::server::handler::ToolExecutionResult;
+    use rust_mcp_sdk::schema::{CallToolResult, ResultFromServer};
+
+    let ok_result = CallToolResult::text_content(vec![]);
+    let ter = ToolExecutionResult {
+        tool_name: "test_tool".to_string(),
+        duration: std::time::Duration::from_millis(100),
+        success: true,
+        result: Ok(ok_result),
+    };
+
+    let _result: ResultFromServer = ter.into_result_from_server();
+}
+
+#[test]
+fn test_tool_execution_result_into_result_from_server_err() {
+    use crates_docs::server::handler::ToolExecutionResult;
+    use rust_mcp_sdk::schema::{CallToolError, ResultFromServer};
+
+    let err_result = CallToolError::from_message("test error message");
+    let ter = ToolExecutionResult {
+        tool_name: "test_tool".to_string(),
+        duration: std::time::Duration::from_millis(100),
+        success: false,
+        result: Err(err_result),
+    };
+
+    let _result: ResultFromServer = ter.into_result_from_server();
+}
+
+// ============================================================================
 // ServerConfig tests
 // ============================================================================
 
