@@ -1,7 +1,7 @@
 //! Configuration module unit tests
 
 use crates_docs::config::AppConfig;
-use crates_docs::config::{EnvLoggingConfig, EnvServerConfig, LoggingConfig, ServerConfig};
+use crates_docs::config::{EnvLoggingConfig, ServerConfig};
 use tempfile::tempdir;
 
 // ============================================================================
