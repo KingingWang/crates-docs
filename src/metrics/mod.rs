@@ -379,17 +379,14 @@ pub fn init_global_metrics() {
     GLOBAL_METRICS.get_or_init(|| Arc::new(ServerMetrics::new()));
 }
 
-/// Get global metrics
+/// Get the global metrics instance, if it has been initialized.
 ///
-/// # Panics
-///
-/// Panics if global metrics have not been initialized
+/// Returns `None` when [`init_global_metrics`] has not been called yet, so
+/// callers can degrade gracefully instead of panicking on an uninitialized
+/// process (e.g. a CLI subcommand or test that never starts the server).
 #[must_use]
-pub fn global_metrics() -> Arc<ServerMetrics> {
-    GLOBAL_METRICS
-        .get()
-        .cloned()
-        .expect("Global metrics not initialized")
+pub fn global_metrics() -> Option<Arc<ServerMetrics>> {
+    GLOBAL_METRICS.get().cloned()
 }
 
 #[cfg(test)]

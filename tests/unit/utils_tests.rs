@@ -364,7 +364,8 @@ fn test_server_metrics_default() {
 #[test]
 fn test_init_global_metrics() {
     crates_docs::metrics::init_global_metrics();
-    let metrics = crates_docs::metrics::global_metrics();
+    let metrics =
+        crates_docs::metrics::global_metrics().expect("metrics should be initialized above");
     let output = metrics.export().unwrap();
     assert!(!output.is_empty());
 }
