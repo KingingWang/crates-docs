@@ -76,6 +76,84 @@ pub fn parse_format(format_str: Option<&str>) -> Result<Format, CallToolError> {
     }
 }
 
+/// Validate a crate name supplied by a tool caller.
+///
+/// Crate names on crates.io are restricted to ASCII alphanumerics plus `_` and
+/// `-`. Rejecting anything else early provides a clear error and prevents
+/// malformed values (path separators, `..`, whitespace, control characters)
+/// from being interpolated into docs.rs URLs.
+///
+/// # Errors
+///
+/// Returns a `CallToolError` describing the first problem found.
+pub fn validate_crate_name(crate_name: &str) -> Result<(), CallToolError> {
+    let name = crate_name.trim();
+    if name.is_empty() {
+        return Err(CallToolError::invalid_arguments(
+            "crate_name",
+            Some("crate_name must not be empty".to_string()),
+        ));
+    }
+    if name.len() > 64 {
+        return Err(CallToolError::invalid_arguments(
+            "crate_name",
+            Some("crate_name is too long (max 64 characters)".to_string()),
+        ));
+    }
+    if !name
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    {
+        return Err(CallToolError::invalid_arguments(
+            "crate_name",
+            Some(format!(
+                "Invalid crate_name '{crate_name}'. Only ASCII letters, digits, '_' and '-' are allowed"
+            )),
+        ));
+    }
+    Ok(())
+}
+
+/// Validate an optional version string supplied by a tool caller.
+///
+/// Accepts concrete versions and identifiers such as `latest` while rejecting
+/// path-traversal sequences and characters that could escape the docs.rs path.
+///
+/// # Errors
+///
+/// Returns a `CallToolError` describing the first problem found.
+pub fn validate_version(version: Option<&str>) -> Result<(), CallToolError> {
+    let Some(raw) = version else {
+        return Ok(());
+    };
+    let ver = raw.trim();
+    if ver.is_empty() {
+        return Err(CallToolError::invalid_arguments(
+            "version",
+            Some("version must not be empty when provided".to_string()),
+        ));
+    }
+    if ver.len() > 64 {
+        return Err(CallToolError::invalid_arguments(
+            "version",
+            Some("version is too long (max 64 characters)".to_string()),
+        ));
+    }
+    if ver.contains("..")
+        || !ver
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+' | b'_' | b'~'))
+    {
+        return Err(CallToolError::invalid_arguments(
+            "version",
+            Some(format!(
+                "Invalid version '{raw}'. Only ASCII letters, digits and '.', '-', '+', '_', '~' are allowed"
+            )),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(not(test))]
 const DOCS_RS_BASE_URL: &str = "https://docs.rs";
 
@@ -389,6 +467,45 @@ pub use cache::DocCacheTtl;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_validate_crate_name_accepts_valid() {
+        assert!(validate_crate_name("serde").is_ok());
+        assert!(validate_crate_name("serde_json").is_ok());
+        assert!(validate_crate_name("tracing-subscriber").is_ok());
+        assert!(validate_crate_name("  tokio  ").is_ok());
+    }
+
+    #[test]
+    fn test_validate_crate_name_rejects_invalid() {
+        assert!(validate_crate_name("").is_err());
+        assert!(validate_crate_name("   ").is_err());
+        assert!(validate_crate_name("../etc/passwd").is_err());
+        assert!(validate_crate_name("foo/bar").is_err());
+        assert!(validate_crate_name("foo bar").is_err());
+        assert!(validate_crate_name("foo;rm").is_err());
+        assert!(validate_crate_name(&"a".repeat(65)).is_err());
+    }
+
+    #[test]
+    fn test_validate_version_accepts_valid() {
+        assert!(validate_version(None).is_ok());
+        assert!(validate_version(Some("1.0.0")).is_ok());
+        assert!(validate_version(Some("1.0.0-rc.1")).is_ok());
+        assert!(validate_version(Some("1.0.0+build.5")).is_ok());
+        assert!(validate_version(Some("latest")).is_ok());
+        assert!(validate_version(Some("  1.2.3  ")).is_ok());
+    }
+
+    #[test]
+    fn test_validate_version_rejects_invalid() {
+        assert!(validate_version(Some("")).is_err());
+        assert!(validate_version(Some("../../1.0")).is_err());
+        assert!(validate_version(Some("1.0/2.0")).is_err());
+        assert!(validate_version(Some("1.0 0")).is_err());
+        assert!(validate_version(Some("..")).is_err());
+        assert!(validate_version(Some(&"1".repeat(65))).is_err());
+    }
 
     #[test]
     fn test_doc_service_default() {
