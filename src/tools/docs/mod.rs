@@ -323,6 +323,51 @@ pub fn build_docs_item_url_candidates(
     candidates
 }
 
+/// Build the docs.rs `all.html` index URL for a crate.
+///
+/// rustdoc emits an `all.html` page listing every item in the crate (including
+/// re-exports) with hrefs relative to the crate root module. It is used to
+/// resolve items that have no stub page at the path implied by their name.
+#[must_use]
+pub fn build_docs_all_items_url(crate_name: &str, version: Option<&str>) -> String {
+    let base_url = docs_rs_base_url();
+    let ver = version.unwrap_or("latest");
+    let krate = crate_name.replace('-', "_");
+    format!("{base_url}/{crate_name}/{ver}/{krate}/all.html")
+}
+
+/// Resolve an item page URL from a crate's `all.html` index by item name.
+///
+/// Returns the absolute docs.rs URL of the first item whose rustdoc file name is
+/// `{kind}.{item_name}.html` (for any item kind). This resolves re-exported
+/// items such as `tokio::spawn` (actually defined at `tokio::task::spawn`),
+/// which have no stub page at the crate root. Returns `None` if no match is
+/// found or the name is empty.
+#[must_use]
+pub fn find_item_url_in_all_html(
+    crate_name: &str,
+    version: Option<&str>,
+    all_html: &str,
+    item_name: &str,
+) -> Option<String> {
+    let item_name = item_name.trim();
+    if item_name.is_empty() {
+        return None;
+    }
+    let kinds = "struct|trait|enum|fn|type|macro|constant|derive|union|primitive";
+    let pattern = format!(
+        "href=\"((?:[^\"]*/)?(?:{kinds})\\.{}\\.html)\"",
+        regex::escape(item_name)
+    );
+    let re = regex::Regex::new(&pattern).ok()?;
+    let href = re.captures(all_html)?.get(1)?.as_str();
+
+    let base_url = docs_rs_base_url();
+    let ver = version.unwrap_or("latest");
+    let krate = crate_name.replace('-', "_");
+    Some(format!("{base_url}/{crate_name}/{ver}/{krate}/{href}"))
+}
+
 /// Build crates.io API search URL
 #[must_use]
 pub fn build_crates_io_search_url(query: &str, sort: Option<&str>, limit: Option<usize>) -> String {
@@ -701,6 +746,45 @@ mod tests {
     #[test]
     fn test_item_url_candidates_empty_path() {
         assert!(build_docs_item_url_candidates("serde", None, "   ").is_empty());
+    }
+
+    #[test]
+    fn test_all_items_url() {
+        assert_eq!(
+            build_docs_all_items_url("tokio", None),
+            "https://docs.rs/tokio/latest/tokio/all.html"
+        );
+        assert_eq!(
+            build_docs_all_items_url("foo-bar", Some("1.2.3")),
+            "https://docs.rs/foo-bar/1.2.3/foo_bar/all.html"
+        );
+    }
+
+    #[test]
+    fn test_find_item_url_in_all_html_reexport() {
+        let html = r#"<a href="task/fn.spawn.html">task::spawn</a>"#;
+        let url = find_item_url_in_all_html("tokio", None, html, "spawn");
+        assert_eq!(
+            url.as_deref(),
+            Some("https://docs.rs/tokio/latest/tokio/task/fn.spawn.html")
+        );
+    }
+
+    #[test]
+    fn test_find_item_url_in_all_html_root_struct() {
+        let html = r#"<a href="struct.Builder.html">Builder</a>"#;
+        let url = find_item_url_in_all_html("foo", Some("0.1.0"), html, "Builder");
+        assert_eq!(
+            url.as_deref(),
+            Some("https://docs.rs/foo/0.1.0/foo/struct.Builder.html")
+        );
+    }
+
+    #[test]
+    fn test_find_item_url_in_all_html_no_match() {
+        let html = r#"<a href="struct.Other.html">Other</a>"#;
+        assert!(find_item_url_in_all_html("foo", None, html, "spawn").is_none());
+        assert!(find_item_url_in_all_html("foo", None, html, "").is_none());
     }
 
     #[test]

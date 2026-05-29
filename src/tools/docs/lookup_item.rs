@@ -145,6 +145,33 @@ impl LookupItemToolImpl {
             }
         }
 
+        // Re-export fallback: consult the crate's `all.html` index to resolve
+        // items that have no stub page at the path implied by their name
+        // (e.g. `tokio::spawn`, actually defined at `tokio::task::spawn`).
+        let item_name = item_path.rsplit("::").next().unwrap_or(item_path).trim();
+        if !item_name.is_empty() {
+            let all_url = super::build_docs_all_items_url(crate_name, version);
+            // Bind each fallible await to a `let` so the `?` temporary is dropped
+            // at the statement boundary and not held across the next await
+            // (which would make the future non-`Send`).
+            let all_html = self
+                .service
+                .fetch_html_optional(&all_url, Some(TOOL_NAME))
+                .await?;
+            let item_url = all_html.as_deref().and_then(|html| {
+                super::find_item_url_in_all_html(crate_name, version, html, item_name)
+            });
+            if let Some(item_url) = item_url {
+                let resolved = self
+                    .service
+                    .fetch_html_optional(&item_url, Some(TOOL_NAME))
+                    .await?;
+                if let Some(html) = resolved {
+                    return Ok(html);
+                }
+            }
+        }
+
         // Fallback: the crate page (legacy `?search=` behaviour).
         let url = Self::build_search_url(crate_name, item_path, version);
         self.service.fetch_html(&url, Some(TOOL_NAME)).await
