@@ -180,6 +180,30 @@ pub fn validate_search_query(query: &str) -> Result<(), CallToolError> {
     Ok(())
 }
 
+/// Summarize a non-success HTTP response from docs.rs into a concise,
+/// actionable error string.
+///
+/// docs.rs returns a full HTML error page (often several KB) for failures such
+/// as 404. Dumping that entire page into the tool error is noisy and unhelpful,
+/// so this collapses it to the status plus a short hint. HTML bodies are never
+/// echoed back; only short plain-text bodies are included as a snippet.
+fn summarize_http_status(status: reqwest::StatusCode, body: &str) -> String {
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return "HTTP 404 Not Found - the requested crate, version, or item does not exist on docs.rs. Verify the crate name, version, and item path.".to_string();
+    }
+
+    let trimmed = body.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    let looks_like_html =
+        trimmed.starts_with('<') || lower.contains("<!doctype") || lower.contains("<html");
+    if trimmed.is_empty() || looks_like_html {
+        format!("HTTP {status}")
+    } else {
+        let snippet: String = trimmed.chars().take(200).collect();
+        format!("HTTP {status} - {snippet}")
+    }
+}
+
 #[cfg(not(test))]
 const DOCS_RS_BASE_URL: &str = "https://docs.rs";
 
@@ -410,13 +434,8 @@ impl DocService {
             })?;
             let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
             return Err(CallToolError::from_message(format!(
-                "{prefix}Failed to get documentation: HTTP {} - {}",
-                status,
-                if error_body.is_empty() {
-                    "No error details"
-                } else {
-                    &error_body
-                }
+                "{prefix}Failed to get documentation: {}",
+                summarize_http_status(status, &error_body)
             )));
         }
 
@@ -546,6 +565,40 @@ mod tests {
         assert!(validate_search_query("").is_err());
         assert!(validate_search_query("   ").is_err());
         assert!(validate_search_query(&"a".repeat(201)).is_err());
+    }
+
+    #[test]
+    fn test_summarize_http_status_not_found() {
+        let msg = summarize_http_status(
+            reqwest::StatusCode::NOT_FOUND,
+            "<!DOCTYPE html><html><body>The requested crate does not exist</body></html>",
+        );
+        assert!(msg.contains("HTTP 404 Not Found"));
+        assert!(msg.contains("does not exist on docs.rs"));
+        // The full HTML body must never be echoed back.
+        assert!(!msg.contains("<html"));
+        assert!(!msg.contains("<!DOCTYPE"));
+    }
+
+    #[test]
+    fn test_summarize_http_status_hides_html_body() {
+        let msg = summarize_http_status(
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            "<html><body>boom</body></html>",
+        );
+        assert_eq!(msg, "HTTP 500 Internal Server Error");
+    }
+
+    #[test]
+    fn test_summarize_http_status_includes_short_plain_body() {
+        let msg = summarize_http_status(reqwest::StatusCode::BAD_GATEWAY, "upstream timeout");
+        assert_eq!(msg, "HTTP 502 Bad Gateway - upstream timeout");
+    }
+
+    #[test]
+    fn test_summarize_http_status_empty_body() {
+        let msg = summarize_http_status(reqwest::StatusCode::SERVICE_UNAVAILABLE, "   ");
+        assert_eq!(msg, "HTTP 503 Service Unavailable");
     }
 
     #[test]
