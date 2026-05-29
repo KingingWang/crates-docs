@@ -19,10 +19,38 @@ static ANCHOR_LINK_REGEX: LazyLock<Regex> =
 static SOURCE_LINK_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[Source\]\([^)]*\)").expect("hardcoded valid regex pattern"));
 
+/// Regex to remove rustdoc `[src]`/`[[src]]` source links (older rustdoc).
+static SRC_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\[\[?src\]?\]\([^)]*\)").expect("hardcoded valid regex pattern")
+});
+
+/// Regex to remove rustdoc collapse-toggle links of the form
+/// `[ [-] ](javascript:void(0))` (the marker may be `-`, `+` or U+2212).
+///
+/// The toggle text contains a nested `[...]`, so this is matched explicitly to
+/// avoid greedily spanning adjacent links.
+static JS_TOGGLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\[\s*\[[-+\x{2212}]\]\s*\]\(javascript:[^\n)]*\)\)?")
+        .expect("hardcoded valid regex pattern")
+});
+
+/// Regex to remove plain `[text](javascript:...)` links emitted by older
+/// rustdoc. Link text must not contain `]` so it cannot span adjacent links.
+static JS_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\[[^\]\n]*\]\(javascript:[^\n)]*\)\)?")
+        .expect("hardcoded valid regex pattern")
+});
+
+/// Regex to convert empty-target links `[text]()` to plain `text`.
+static EMPTY_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\[([^\]]*)\]\(\)").expect("hardcoded valid regex pattern")
+});
+
 /// Regex to remove relative documentation links like [de](de/index.html) or [forward\_to\_deserialize\_any](macro.xxx.html)
 /// Matches: [text](relative_path.html) where `relative_path` starts with letter and ends with .html
 static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[[^\]]*\]\([a-zA-Z./][^)]*\.html\)").expect("hardcoded valid regex pattern")
+    Regex::new(r"\[[^\]]*\]\([a-zA-Z./][^)]*\.html(?:#[^)]*)?\)")
+        .expect("hardcoded valid regex pattern")
 });
 
 /// Regex to collapse three or more newlines to two newlines
@@ -277,9 +305,16 @@ pub fn extract_documentation(html: &str) -> String {
 fn clean_markdown(markdown: &str) -> String {
     // Use Cow to avoid allocations when no replacements are needed
     // Chain replacements to process in a single traversal
-    let result = SOURCE_LINK_REGEX.replace_all(markdown, Cow::Borrowed(""));
+    // Remove UI/source/javascript links first, then relative and section
+    // anchors. Empty- and fragment-only links are downgraded to their text so
+    // useful labels (e.g. headings) survive.
+    let result = JS_TOGGLE_REGEX.replace_all(markdown, Cow::Borrowed(""));
+    let result = JS_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = SOURCE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = SRC_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = EMPTY_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = MULTIPLE_NEWLINES_REGEX.replace_all(&result, Cow::Borrowed("\n\n"));
     result.trim().to_string()
 }
@@ -521,6 +556,26 @@ mod tests {
             !re.is_match("[External](https://example.com)"),
             "Should not match external URLs"
         ); // External URL
+    }
+
+    #[test]
+    fn test_clean_markdown_removes_old_rustdoc_artifacts() {
+        // The minus sign below is U+2212 as emitted by older rustdoc toggles.
+        let md = concat!(
+            "Crate [serde]() [ [\u{2212}] ](javascript:void(0)) ",
+            "[[src]](../src/serde/lib.rs.html#9-267)\n\nReal content ",
+            "[External](https://serde.rs/)."
+        );
+        let out = clean_markdown(md);
+        assert!(!out.contains("javascript:"), "js link leaked: {out}");
+        assert!(!out.contains("src/serde/lib.rs.html"), "src link leaked: {out}");
+        assert!(!out.contains("[[src]]"), "src label leaked: {out}");
+        assert!(!out.contains("]()"), "empty link leaked: {out}");
+        // Useful text is preserved (empty link label downgraded to text).
+        assert!(out.contains("serde"));
+        assert!(out.contains("Real content"));
+        // External non-.html links are preserved.
+        assert!(out.contains("https://serde.rs/"));
     }
 
     #[test]
