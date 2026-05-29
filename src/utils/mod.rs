@@ -238,6 +238,7 @@ impl HttpClientBuilder {
         let mut builder = Client::builder()
             .timeout(self.timeout)
             .connect_timeout(self.connect_timeout)
+            .read_timeout(self.read_timeout)
             .pool_max_idle_per_host(self.pool_max_idle_per_host)
             .pool_idle_timeout(self.pool_idle_timeout)
             .user_agent(&self.user_agent);
@@ -275,6 +276,7 @@ impl HttpClientBuilder {
         let mut builder = Client::builder()
             .timeout(self.timeout)
             .connect_timeout(self.connect_timeout)
+            .read_timeout(self.read_timeout)
             .pool_max_idle_per_host(self.pool_max_idle_per_host)
             .pool_idle_timeout(self.pool_idle_timeout)
             .user_agent(&self.user_agent);

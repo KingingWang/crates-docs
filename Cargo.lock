@@ -572,6 +572,7 @@ dependencies = [
  "flate2",
  "html2md",
  "http",
+ "libc",
  "moka",
  "notify",
  "prometheus-client",

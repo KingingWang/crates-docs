@@ -429,9 +429,14 @@ pub fn find_item_url_in_all_html(
     let re = regex::Regex::new(&pattern).ok()?;
     let href = re.captures(all_html)?.get(1)?.as_str();
 
+    let krate = crate_name.replace('-', "_");
+    if is_rust_std_crate(crate_name) {
+        // std/core/alloc docs live on doc.rust-lang.org, not docs.rs; the
+        // all.html index there links relative to the crate root.
+        return Some(format!("https://doc.rust-lang.org/{krate}/{href}"));
+    }
     let base_url = docs_rs_base_url();
     let ver = version.unwrap_or("latest");
-    let krate = crate_name.replace('-', "_");
     Some(format!("{base_url}/{crate_name}/{ver}/{krate}/{href}"))
 }
 
@@ -921,6 +926,24 @@ mod tests {
         assert_eq!(
             url.as_deref(),
             Some("https://docs.rs/foo/0.1.0/foo/struct.Builder.html")
+        );
+    }
+
+    #[test]
+    fn test_find_item_url_in_all_html_std_routes_to_rust_lang() {
+        // std/core/alloc re-export fallbacks must target doc.rust-lang.org,
+        // not docs.rs (which always 404s for the standard library).
+        let html = r#"<a href="task/fn.spawn.html">task::spawn</a>"#;
+        let url = find_item_url_in_all_html("std", None, html, "spawn");
+        assert_eq!(
+            url.as_deref(),
+            Some("https://doc.rust-lang.org/std/task/fn.spawn.html")
+        );
+        let core_html = r#"<a href="future/trait.Future.html">Future</a>"#;
+        let core_url = find_item_url_in_all_html("core", Some("1.0.0"), core_html, "Future");
+        assert_eq!(
+            core_url.as_deref(),
+            Some("https://doc.rust-lang.org/core/future/trait.Future.html")
         );
     }
 

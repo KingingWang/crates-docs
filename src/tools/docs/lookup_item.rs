@@ -310,6 +310,10 @@ impl Tool for LookupItemToolImpl {
         super::validate_item_path(&params.item_path)?;
         // Normalise surrounding whitespace so it does not leak into headings or
         // candidate URL construction.
+        params.crate_name = params.crate_name.trim().to_string();
+        if let Some(version) = params.version.as_mut() {
+            *version = version.trim().to_string();
+        }
         params.item_path = params.item_path.trim().to_string();
 
         // Propagate the detailed parse error (e.g. "Invalid format 'xml'. Expected

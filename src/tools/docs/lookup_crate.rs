@@ -185,7 +185,7 @@ impl Tool for LookupCrateToolImpl {
         rust_mcp_sdk::schema::CallToolResult,
         rust_mcp_sdk::schema::CallToolError,
     > {
-        let params: LookupCrateTool = serde_json::from_value(arguments).map_err(|e| {
+        let mut params: LookupCrateTool = serde_json::from_value(arguments).map_err(|e| {
             rust_mcp_sdk::schema::CallToolError::invalid_arguments(
                 "lookup_crate",
                 Some(format!("Parameter parsing failed: {e}")),
@@ -197,6 +197,12 @@ impl Tool for LookupCrateToolImpl {
         // get actionable feedback.
         super::validate_crate_name(&params.crate_name)?;
         super::validate_version(params.version.as_deref())?;
+        // Normalise surrounding whitespace so it does not leak into headings or
+        // candidate URL construction (a padded name would otherwise 404).
+        params.crate_name = params.crate_name.trim().to_string();
+        if let Some(version) = params.version.as_mut() {
+            *version = version.trim().to_string();
+        }
 
         let format = super::parse_format(params.format.as_deref())?;
         let content = match format {
