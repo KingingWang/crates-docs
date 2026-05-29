@@ -36,11 +36,18 @@ impl CacheKeyGenerator {
     /// This key stores the fetched docs.rs HTML artifact shared across
     /// markdown, text, and html responses for the same crate lookup.
     ///
-    /// Key format: `crate:{name}:html` or `crate:{name}:{version}:html`
+    /// Key format: `htmlraw:crate:{name}` or `htmlraw:crate:{name}:{version}`
+    ///
+    /// The `htmlraw:` namespace prefix keeps raw HTML artifacts in a separate
+    /// keyspace from rendered documentation keys (`crate:...`). Without it, a
+    /// rendered lookup for version literal `"html"` (e.g.
+    /// `crate_cache_key("serde", Some("html"))` => `crate:serde:html`) would
+    /// collide with the HTML artifact key for `crate_html_cache_key("serde",
+    /// None)`, cross-contaminating rendered text and raw HTML.
     #[must_use]
     pub fn crate_html_cache_key(crate_name: &str, version: Option<&str>) -> String {
         let base_key = Self::crate_cache_key(crate_name, version);
-        format!("{base_key}:html")
+        format!("htmlraw:{base_key}")
     }
 
     /// Build crate cache key with normalization
@@ -127,11 +134,12 @@ impl CacheKeyGenerator {
     /// This key stores the fetched docs.rs search-result HTML artifact shared
     /// across markdown, text, and html responses for the same item lookup.
     ///
-    /// Key format: `item:{crate}:{path}:html` or `item:{crate}:{version}:{path}:html`
+    /// Key format: `htmlraw:item:{crate}:{path}` (see [`Self::crate_html_cache_key`]
+    /// for why the `htmlraw:` namespace is used to avoid collisions).
     #[must_use]
     pub fn item_html_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
         let base_key = Self::item_cache_key(crate_name, item_path, version);
-        format!("{base_key}:html")
+        format!("htmlraw:{base_key}")
     }
 }
 
@@ -151,7 +159,7 @@ mod tests {
         );
         assert_eq!(
             CacheKeyGenerator::crate_html_cache_key("serde", Some("1.0")),
-            "crate:serde:1.0:html"
+            "htmlraw:crate:serde:1.0"
         );
 
         assert_eq!(
@@ -173,7 +181,7 @@ mod tests {
         );
         assert_eq!(
             CacheKeyGenerator::item_html_cache_key("serde", "Serialize", Some("1.0")),
-            "item:serde:1.0:Serialize:html"
+            "htmlraw:item:serde:1.0:Serialize"
         );
     }
 
@@ -220,6 +228,21 @@ mod tests {
             CacheKeyGenerator::item_cache_key("serde", "  Serialize  ", None),
             "item:serde:Serialize"
         );
+    }
+
+    #[test]
+    fn test_html_artifact_keys_do_not_collide_with_rendered_keys() {
+        // A rendered lookup for the (pathological) version literal "html" must
+        // not collide with the raw HTML artifact keyspace.
+        let rendered = CacheKeyGenerator::crate_cache_key("serde", Some("html"));
+        let artifact = CacheKeyGenerator::crate_html_cache_key("serde", None);
+        assert_ne!(rendered, artifact);
+        assert_eq!(rendered, "crate:serde:html");
+        assert_eq!(artifact, "htmlraw:crate:serde");
+
+        let rendered_item = CacheKeyGenerator::item_cache_key("serde", "Serialize", Some("html"));
+        let artifact_item = CacheKeyGenerator::item_html_cache_key("serde", "Serialize", None);
+        assert_ne!(rendered_item, artifact_item);
     }
 
     #[test]
