@@ -217,7 +217,10 @@ impl Tool for LookupCrateToolImpl {
             super::Format::Json => {
                 return Err(rust_mcp_sdk::schema::CallToolError::invalid_arguments(
                     "lookup_crate",
-                    Some("JSON format is not supported by this tool".to_string()),
+                    Some(
+                        "Invalid format 'json'. This tool supports: markdown, text, html"
+                            .to_string(),
+                    ),
                 ))
             }
             super::Format::Markdown => self
