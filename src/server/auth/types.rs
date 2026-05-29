@@ -1,9 +1,10 @@
 //! Authentication types
 
 /// OAuth provider type
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Default)]
 pub enum OAuthProvider {
     /// Custom OAuth provider
+    #[default]
     Custom,
     /// GitHub OAuth
     GitHub,

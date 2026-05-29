@@ -110,9 +110,11 @@ const DEFAULT_MAX_FILES: usize = 10;
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct AppConfig {
     /// Server configuration
+    #[serde(default)]
     pub server: ServerConfig,
 
     /// Cache configuration
+    #[serde(default)]
     pub cache: CacheConfig,
 
     /// Authentication configuration (OAuth and API Key)
@@ -124,9 +126,11 @@ pub struct AppConfig {
     pub oauth: OAuthConfig,
 
     /// Logging configuration
+    #[serde(default)]
     pub logging: LoggingConfig,
 
     /// Performance configuration
+    #[serde(default)]
     pub performance: PerformanceConfig,
 }
 
@@ -141,6 +145,7 @@ pub struct AppConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
     /// Server name
+    #[serde(default = "default_server_name")]
     pub name: String,
 
     /// Server version
@@ -148,6 +153,7 @@ pub struct ServerConfig {
     pub version: String,
 
     /// Server description
+    #[serde(default = "default_server_description")]
     pub description: Option<String>,
 
     /// Server icons
@@ -155,37 +161,48 @@ pub struct ServerConfig {
     pub icons: Vec<Icon>,
 
     /// Website URL
+    #[serde(default = "default_server_website_url")]
     pub website_url: Option<String>,
 
     /// Host address
+    #[serde(default = "default_server_host")]
     pub host: String,
 
     /// Port
+    #[serde(default = "default_server_port")]
     pub port: u16,
 
     /// Transport mode
+    #[serde(default = "default_server_transport_mode")]
     pub transport_mode: String,
 
     /// Enable SSE support
+    #[serde(default = "default_server_enable_sse")]
     pub enable_sse: bool,
 
     /// Enable OAuth authentication
+    #[serde(default = "default_server_enable_oauth")]
     pub enable_oauth: bool,
 
     /// Maximum concurrent connections
+    #[serde(default = "default_server_max_connections")]
     pub max_connections: usize,
 
     /// Request timeout (seconds)
+    #[serde(default = "default_server_request_timeout_secs")]
     pub request_timeout_secs: u64,
 
     /// Response timeout (seconds)
+    #[serde(default = "default_server_response_timeout_secs")]
     pub response_timeout_secs: u64,
 
     /// Allowed hosts for CORS (e.g., `["localhost", "127.0.0.1"]`)
+    #[serde(default = "default_server_allowed_hosts")]
     pub allowed_hosts: Vec<String>,
 
     /// Allowed origins for CORS (e.g., `["http://localhost:*"]`)
     /// Use `"*"` only in development, specify exact origins in production
+    #[serde(default = "default_server_allowed_origins")]
     pub allowed_origins: Vec<String>,
 }
 
@@ -212,6 +229,141 @@ fn default_icons() -> Vec<Icon> {
     ]
 }
 
+// --- Per-field default helpers (single source of truth: the struct Default impls) ---
+fn default_server_name() -> String {
+    ServerConfig::default().name
+}
+
+fn default_server_description() -> Option<String> {
+    ServerConfig::default().description
+}
+
+fn default_server_website_url() -> Option<String> {
+    ServerConfig::default().website_url
+}
+
+fn default_server_host() -> String {
+    ServerConfig::default().host
+}
+
+fn default_server_port() -> u16 {
+    ServerConfig::default().port
+}
+
+fn default_server_transport_mode() -> String {
+    ServerConfig::default().transport_mode
+}
+
+fn default_server_enable_sse() -> bool {
+    ServerConfig::default().enable_sse
+}
+
+fn default_server_enable_oauth() -> bool {
+    ServerConfig::default().enable_oauth
+}
+
+fn default_server_max_connections() -> usize {
+    ServerConfig::default().max_connections
+}
+
+fn default_server_request_timeout_secs() -> u64 {
+    ServerConfig::default().request_timeout_secs
+}
+
+fn default_server_response_timeout_secs() -> u64 {
+    ServerConfig::default().response_timeout_secs
+}
+
+fn default_server_allowed_hosts() -> Vec<String> {
+    ServerConfig::default().allowed_hosts
+}
+
+fn default_server_allowed_origins() -> Vec<String> {
+    ServerConfig::default().allowed_origins
+}
+fn default_logging_level() -> String {
+    LoggingConfig::default().level
+}
+
+fn default_logging_file_path() -> Option<String> {
+    LoggingConfig::default().file_path
+}
+
+fn default_logging_enable_console() -> bool {
+    LoggingConfig::default().enable_console
+}
+
+fn default_logging_enable_file() -> bool {
+    LoggingConfig::default().enable_file
+}
+
+fn default_logging_max_file_size_mb() -> u64 {
+    LoggingConfig::default().max_file_size_mb
+}
+
+fn default_logging_max_files() -> usize {
+    LoggingConfig::default().max_files
+}
+fn default_perf_http_client_pool_size() -> usize {
+    PerformanceConfig::default().http_client_pool_size
+}
+
+fn default_perf_http_client_pool_idle_timeout_secs() -> u64 {
+    PerformanceConfig::default().http_client_pool_idle_timeout_secs
+}
+
+fn default_perf_http_client_connect_timeout_secs() -> u64 {
+    PerformanceConfig::default().http_client_connect_timeout_secs
+}
+
+fn default_perf_http_client_timeout_secs() -> u64 {
+    PerformanceConfig::default().http_client_timeout_secs
+}
+
+fn default_perf_http_client_read_timeout_secs() -> u64 {
+    PerformanceConfig::default().http_client_read_timeout_secs
+}
+
+fn default_perf_http_client_max_retries() -> u32 {
+    PerformanceConfig::default().http_client_max_retries
+}
+
+fn default_perf_http_client_retry_initial_delay_ms() -> u64 {
+    PerformanceConfig::default().http_client_retry_initial_delay_ms
+}
+
+fn default_perf_http_client_retry_max_delay_ms() -> u64 {
+    PerformanceConfig::default().http_client_retry_max_delay_ms
+}
+
+fn default_perf_cache_max_size() -> usize {
+    PerformanceConfig::default().cache_max_size
+}
+
+fn default_perf_cache_default_ttl_secs() -> u64 {
+    PerformanceConfig::default().cache_default_ttl_secs
+}
+
+fn default_perf_rate_limit_per_second() -> u32 {
+    PerformanceConfig::default().rate_limit_per_second
+}
+
+fn default_perf_concurrent_request_limit() -> usize {
+    PerformanceConfig::default().concurrent_request_limit
+}
+
+fn default_perf_enable_response_compression() -> bool {
+    PerformanceConfig::default().enable_response_compression
+}
+
+fn default_perf_enable_metrics() -> bool {
+    PerformanceConfig::default().enable_metrics
+}
+
+fn default_perf_metrics_port() -> u16 {
+    PerformanceConfig::default().metrics_port
+}
+
 /// Logging configuration
 ///
 /// # Hot Reload Support
@@ -230,21 +382,27 @@ fn default_icons() -> Vec<Icon> {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LoggingConfig {
     /// Log level
+    #[serde(default = "default_logging_level")]
     pub level: String,
 
     /// Log file path
+    #[serde(default = "default_logging_file_path")]
     pub file_path: Option<String>,
 
     /// Whether to enable console logging
+    #[serde(default = "default_logging_enable_console")]
     pub enable_console: bool,
 
     /// Whether to enable file logging
+    #[serde(default = "default_logging_enable_file")]
     pub enable_file: bool,
 
     /// Maximum log file size (MB)
+    #[serde(default = "default_logging_max_file_size_mb")]
     pub max_file_size_mb: u64,
 
     /// Number of log files to retain
+    #[serde(default = "default_logging_max_files")]
     pub max_files: usize,
 }
 
@@ -272,48 +430,63 @@ pub struct LoggingConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PerformanceConfig {
     /// HTTP client connection pool size
+    #[serde(default = "default_perf_http_client_pool_size")]
     pub http_client_pool_size: usize,
 
     /// HTTP client pool idle timeout (seconds)
+    #[serde(default = "default_perf_http_client_pool_idle_timeout_secs")]
     pub http_client_pool_idle_timeout_secs: u64,
 
     /// HTTP client connection timeout (seconds)
+    #[serde(default = "default_perf_http_client_connect_timeout_secs")]
     pub http_client_connect_timeout_secs: u64,
 
     /// HTTP client request timeout (seconds)
+    #[serde(default = "default_perf_http_client_timeout_secs")]
     pub http_client_timeout_secs: u64,
 
     /// HTTP client read timeout (seconds)
+    #[serde(default = "default_perf_http_client_read_timeout_secs")]
     pub http_client_read_timeout_secs: u64,
 
     /// HTTP client max retry attempts
+    #[serde(default = "default_perf_http_client_max_retries")]
     pub http_client_max_retries: u32,
 
     /// HTTP client retry initial delay (milliseconds)
+    #[serde(default = "default_perf_http_client_retry_initial_delay_ms")]
     pub http_client_retry_initial_delay_ms: u64,
 
     /// HTTP client retry max delay (milliseconds)
+    #[serde(default = "default_perf_http_client_retry_max_delay_ms")]
     pub http_client_retry_max_delay_ms: u64,
 
     /// Maximum cache size (number of entries)
+    #[serde(default = "default_perf_cache_max_size")]
     pub cache_max_size: usize,
 
     /// Default cache TTL (seconds)
+    #[serde(default = "default_perf_cache_default_ttl_secs")]
     pub cache_default_ttl_secs: u64,
 
     /// Request rate limit (requests per second)
+    #[serde(default = "default_perf_rate_limit_per_second")]
     pub rate_limit_per_second: u32,
 
     /// Concurrent request limit
+    #[serde(default = "default_perf_concurrent_request_limit")]
     pub concurrent_request_limit: usize,
 
     /// Enable response compression
+    #[serde(default = "default_perf_enable_response_compression")]
     pub enable_response_compression: bool,
 
     /// Enable Prometheus metrics
+    #[serde(default = "default_perf_enable_metrics")]
     pub enable_metrics: bool,
 
     /// Metrics endpoint port (0 = use server port)
+    #[serde(default = "default_perf_metrics_port")]
     pub metrics_port: u16,
 }
 

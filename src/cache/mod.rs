@@ -187,12 +187,15 @@ pub trait Cache: Send + Sync {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct CacheConfig {
     /// Cache type: `memory` or `redis`
+    #[serde(default = "default_cache_cache_type")]
     pub cache_type: String,
 
     /// Memory cache size(number of entries)
+    #[serde(default)]
     pub memory_size: Option<usize>,
 
     /// Redis connection URL
+    #[serde(default)]
     pub redis_url: Option<String>,
 
     /// Redis cache key prefix (used to isolate caches of different services)
@@ -200,6 +203,7 @@ pub struct CacheConfig {
     pub key_prefix: String,
 
     /// Default TTL (seconds)
+    #[serde(default)]
     pub default_ttl: Option<u64>,
 
     /// Crate document cache TTL (seconds)
@@ -253,6 +257,11 @@ impl Default for CacheConfig {
         }
     }
 }
+
+fn default_cache_cache_type() -> String {
+    CacheConfig::default().cache_type
+}
+
 
 /// Create cache instance
 ///

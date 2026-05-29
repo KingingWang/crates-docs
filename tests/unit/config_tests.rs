@@ -469,3 +469,54 @@ fn test_config_merge_api_key_partial_override() {
     assert_eq!(merged.auth.api_key.keys, vec!["file-key"]);
     assert_eq!(merged.auth.api_key.header_name, "X-File-Key");
 }
+
+// ============================================================================
+// Partial configuration parsing (regression: BUG7 - missing field errors)
+// ============================================================================
+
+#[test]
+fn test_parse_only_auth_api_key_section() {
+    // Providing only [auth.api_key] must not fail with "missing field".
+    let toml_str = r#"
+[auth.api_key]
+enabled = true
+keys = ["$argon2id$v=19$m=47104,t=1,p=1$c2FsdA$hash1"]
+"#;
+    let config: AppConfig = toml::from_str(toml_str).expect("partial config should parse");
+    assert!(config.auth.api_key.enabled);
+    assert_eq!(config.auth.api_key.keys.len(), 1);
+    // Untouched sections fall back to defaults.
+    assert_eq!(config.server.name, ServerConfig::default().name);
+    assert_eq!(config.server.port, ServerConfig::default().port);
+}
+
+#[test]
+fn test_parse_only_server_port() {
+    // A user changing just the port should not need to restate every field.
+    let toml_str = r#"
+[server]
+port = 9999
+"#;
+    let config: AppConfig = toml::from_str(toml_str).expect("partial server should parse");
+    assert_eq!(config.server.port, 9999);
+    assert_eq!(config.server.host, ServerConfig::default().host);
+    assert_eq!(config.server.name, ServerConfig::default().name);
+}
+
+#[test]
+fn test_parse_empty_config_uses_defaults() {
+    let config: AppConfig = toml::from_str("").expect("empty config should parse");
+    assert_eq!(config.server.port, ServerConfig::default().port);
+    assert!(!config.auth.api_key.enabled);
+}
+
+#[test]
+fn test_parse_only_logging_level() {
+    let toml_str = r#"
+[logging]
+level = "debug"
+"#;
+    let config: AppConfig = toml::from_str(toml_str).expect("partial logging should parse");
+    assert_eq!(config.logging.level, "debug");
+    assert!(config.logging.enable_console);
+}
