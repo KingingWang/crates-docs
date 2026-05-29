@@ -21,7 +21,7 @@ pub enum Commands {
         port: Option<u16>,
 
         /// Enable OAuth authentication
-        #[arg(long)]
+        #[arg(long, num_args = 0..=1, default_missing_value = "true")]
         enable_oauth: Option<bool>,
 
         /// OAuth client ID
@@ -37,7 +37,7 @@ pub enum Commands {
         oauth_redirect_uri: Option<String>,
 
         /// Enable API Key authentication
-        #[arg(long)]
+        #[arg(long, num_args = 0..=1, default_missing_value = "true")]
         enable_api_key: Option<bool>,
 
         /// API Key(s) for authentication (comma-separated for multiple keys)
@@ -49,7 +49,7 @@ pub enum Commands {
         api_key_header: Option<String>,
 
         /// Allow API Key in query parameter
-        #[arg(long)]
+        #[arg(long, num_args = 0..=1, default_missing_value = "true")]
         api_key_query_param: Option<bool>,
     },
 

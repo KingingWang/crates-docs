@@ -81,8 +81,14 @@ fn start_config_reloader(config_path: &std::path::Path, server: &CratesDocsServe
                             for change_desc in changes {
                                 tracing::info!(" - {}", change_desc);
                             }
-                            tracing::warn!("Configuration has been reloaded. Some changes may require server restart.");
-                            tracing::warn!("API key changes: New keys are now active. Removed keys are revoked immediately.");
+                            tracing::warn!(
+                                "Detected configuration changes are NOT applied to the already-running server. \
+                                 Restart the server for these changes to take effect."
+                            );
+                            tracing::warn!(
+                                "Security note: API key and OAuth changes (including key removals) do NOT take \
+                                 effect until the server is restarted."
+                            );
                         }
                     }
                 }
