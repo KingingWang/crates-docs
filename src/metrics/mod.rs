@@ -376,7 +376,7 @@ static GLOBAL_METRICS: OnceLock<Arc<ServerMetrics>> = OnceLock::new();
 
 /// Initialize global metrics
 pub fn init_global_metrics() {
-    let _ = GLOBAL_METRICS.set(Arc::new(ServerMetrics::new()));
+    GLOBAL_METRICS.get_or_init(|| Arc::new(ServerMetrics::new()));
 }
 
 /// Get global metrics

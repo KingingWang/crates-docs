@@ -108,7 +108,20 @@ impl super::Cache for RedisCache {
             .arg(&full_key)
             .query_async(&mut conn)
             .await;
-        result.ok().flatten().map(|s| Arc::from(s.into_boxed_str()))
+        match result {
+            Ok(value) => value.map(|s| Arc::from(s.into_boxed_str())),
+            Err(e) => {
+                // Distinguish a backend failure from a genuine cache miss: a
+                // silent miss would let a Redis outage degrade latency with no
+                // observability. Log and fall back to treating it as a miss.
+                tracing::warn!(
+                    key = %key,
+                    error = %e,
+                    "Redis GET failed; treating as cache miss"
+                );
+                None
+            }
+        }
     }
 
     async fn set(
@@ -233,12 +246,21 @@ impl super::Cache for RedisCache {
     async fn exists(&self, key: &str) -> bool {
         let mut conn = self.conn.clone();
         let full_key = self.build_key(key);
-        redis::cmd("EXISTS")
+        let result: redis::RedisResult<i64> = redis::cmd("EXISTS")
             .arg(&full_key)
             .query_async(&mut conn)
-            .await
-            .unwrap_or(0)
-            > 0
+            .await;
+        match result {
+            Ok(count) => count > 0,
+            Err(e) => {
+                tracing::warn!(
+                    key = %key,
+                    error = %e,
+                    "Redis EXISTS failed; treating as not present"
+                );
+                false
+            }
+        }
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
