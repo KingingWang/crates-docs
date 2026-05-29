@@ -237,9 +237,28 @@ pub fn crates_io_base_url() -> String {
 pub fn crates_io_base_url() -> String {
     CRATES_IO_BASE_URL.to_string()
 }
+/// Standard distribution crates documented on doc.rust-lang.org.
+///
+/// The `std`, `core`, `alloc`, `proc_macro`, and `test` crates are not
+/// published to docs.rs; their rustdoc lives on doc.rust-lang.org using the
+/// same item-page layout but without a version path segment. Item and index
+/// (`all.html`) URLs must target that host or every lookup 404s and silently
+/// falls back to the crate overview.
+#[must_use]
+pub fn is_rust_std_crate(crate_name: &str) -> bool {
+    matches!(
+        crate_name,
+        "std" | "core" | "alloc" | "proc_macro" | "proc-macro" | "test"
+    )
+}
+
 /// Build docs.rs URL for crate documentation
 #[must_use]
 pub fn build_docs_url(crate_name: &str, version: Option<&str>) -> String {
+    if is_rust_std_crate(crate_name) {
+        let krate = crate_name.replace('-', "_");
+        return format!("https://doc.rust-lang.org/{krate}/");
+    }
     let base_url = docs_rs_base_url();
     match version {
         Some(ver) => format!("{base_url}/{crate_name}/{ver}/"),
@@ -275,8 +294,6 @@ pub fn build_docs_item_url_candidates(
     version: Option<&str>,
     item_path: &str,
 ) -> Vec<String> {
-    let base_url = docs_rs_base_url();
-    let ver = version.unwrap_or("latest");
     let krate = crate_name.replace('-', "_");
 
     let segments: Vec<&str> = item_path
@@ -295,7 +312,13 @@ pub fn build_docs_item_url_candidates(
         mods
     };
 
-    let mut prefix = format!("{base_url}/{crate_name}/{ver}/{krate}/");
+    let mut prefix = if is_rust_std_crate(crate_name) {
+        format!("https://doc.rust-lang.org/{krate}/")
+    } else {
+        let base_url = docs_rs_base_url();
+        let ver = version.unwrap_or("latest");
+        format!("{base_url}/{crate_name}/{ver}/{krate}/")
+    };
     for m in mods {
         prefix.push_str(m);
         prefix.push('/');
@@ -330,9 +353,12 @@ pub fn build_docs_item_url_candidates(
 /// resolve items that have no stub page at the path implied by their name.
 #[must_use]
 pub fn build_docs_all_items_url(crate_name: &str, version: Option<&str>) -> String {
+    let krate = crate_name.replace('-', "_");
+    if is_rust_std_crate(crate_name) {
+        return format!("https://doc.rust-lang.org/{krate}/all.html");
+    }
     let base_url = docs_rs_base_url();
     let ver = version.unwrap_or("latest");
-    let krate = crate_name.replace('-', "_");
     format!("{base_url}/{crate_name}/{ver}/{krate}/all.html")
 }
 
@@ -757,6 +783,39 @@ mod tests {
         assert_eq!(
             build_docs_all_items_url("foo-bar", Some("1.2.3")),
             "https://docs.rs/foo-bar/1.2.3/foo_bar/all.html"
+        );
+    }
+
+    #[test]
+    fn test_is_rust_std_crate() {
+        for c in ["std", "core", "alloc", "proc_macro", "proc-macro", "test"] {
+            assert!(is_rust_std_crate(c), "{c} should be a std crate");
+        }
+        for c in ["serde", "tokio", "anyhow", "stdweb"] {
+            assert!(!is_rust_std_crate(c), "{c} should not be a std crate");
+        }
+    }
+
+    #[test]
+    fn test_std_crate_uses_rust_lang_host() {
+        // Crate page, item candidates, and all.html for std crates must target
+        // doc.rust-lang.org (they are not published to docs.rs).
+        assert_eq!(
+            build_docs_url("std", None),
+            "https://doc.rust-lang.org/std/"
+        );
+        assert_eq!(
+            build_docs_all_items_url("core", None),
+            "https://doc.rust-lang.org/core/all.html"
+        );
+        let c = build_docs_item_url_candidates("std", None, "collections::HashMap");
+        assert!(
+            c.iter().all(|u| u.starts_with("https://doc.rust-lang.org/std/collections/")),
+            "candidates not on rust-lang host: {c:?}"
+        );
+        assert!(
+            c.contains(&"https://doc.rust-lang.org/std/collections/struct.HashMap.html".to_string()),
+            "missing HashMap struct candidate: {c:?}"
         );
     }
 
