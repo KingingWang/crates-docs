@@ -664,18 +664,18 @@ enable_response_compression = true      # 启用响应压缩
 enable_metrics = true                   # 启用 Prometheus 指标
 metrics_port = 0                        # 指标端口（0 表示使用服务器端口）
 
-# OAuth 配置（可选）
-[oauth]
+# OAuth 配置（可选），推荐使用 [auth.oauth]
+[auth.oauth]
 enabled = false                         # 启用 OAuth
 client_id = ""                          # OAuth 客户端 ID
 client_secret = ""                      # OAuth 客户端密钥
-authorize_url = ""                      # 授权 URL
-token_url = ""                          # Token URL
-redirect_url = ""                       # 回调 URL
+authorization_endpoint = ""             # 授权端点 URL
+token_endpoint = ""                     # Token 端点 URL
+redirect_uri = ""                       # 回调 URI
 scopes = []                             # OAuth 作用域
 
-# API Key 认证配置（可选）
-[api_key]
+# API Key 认证配置（可选），必须使用 [auth.api_key]
+[auth.api_key]
 enabled = false                         # 启用 API Key 认证
 keys = []                               # API Key 哈希列表（Argon2 PHC 格式），不要存明文 key
 header_name = "X-API-Key"               # API Key 请求头名称
@@ -819,6 +819,11 @@ export CRATES_DOCS_RATE_LIMIT_PER_SECOND="100"
 > - 只保存生成结果中的 **hash**
 > - 明文 key 只展示一次，之后请存入你的密钥管理系统
 > - 不要把明文 key 直接写入 `config.toml`、Docker Compose 或环境变量示例中
+
+> ⚠️ **重要安全限制**：当前版本的 API Key / OAuth 认证**尚未在 HTTP/SSE 传输层强制执行**。
+> 也就是说，即使在配置中启用了认证，HTTP/SSE 端点仍然是**未鉴权**的。请勿将本服务直接暴露在不可信网络中；
+> 应通过 `allowed_hosts`/`allowed_origins`、反向代理进行访问控制，或使用 stdio 模式运行。
+> 服务启动时若检测到已配置但未强制执行的认证，会打印明显的告警日志。
 
 ### 生成配置文件
 

@@ -162,6 +162,32 @@ impl HyperServerConfig {
     }
 }
 
+/// Emit a prominent warning when authentication is configured but cannot be
+/// enforced on the HTTP/SSE transport.
+///
+/// The in-tree `auth_middleware` is not wired into the SDK's Hyper request
+/// pipeline, so API key / OAuth settings do NOT protect HTTP endpoints today.
+/// Failing silently here would give operators a dangerous false sense of
+/// security, so we log a loud warning instead.
+fn warn_if_auth_configured_but_unenforced(server_config: &crate::config::AppConfig) {
+    let mut configured = Vec::new();
+
+    #[cfg(feature = "api-key")]
+    if server_config.auth.api_key.enabled {
+        configured.push("API key");
+    }
+    if server_config.auth.oauth.enabled || server_config.oauth.enabled {
+        configured.push("OAuth");
+    }
+
+    if !configured.is_empty() {
+        tracing::warn!(
+            "{auth} authentication is enabled in configuration but is NOT enforced on the HTTP/SSE transport: requests to this server are currently unauthenticated. Do not expose this server on an untrusted network. Restrict access via allowed_hosts/allowed_origins, a reverse proxy, or run in stdio mode.",
+            auth = configured.join(" + ")
+        );
+    }
+}
+
 /// Run a Hyper-based MCP server with the given configuration.
 ///
 /// This function handles HTTP, SSE, and Hybrid servers based on the configuration.
@@ -201,6 +227,8 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
         server_config.server.host,
         server_config.server.port
     );
+
+    warn_if_auth_configured_but_unenforced(server_config);
 
     // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
