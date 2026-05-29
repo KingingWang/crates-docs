@@ -281,7 +281,26 @@ impl LookupItemToolImpl {
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
         let html = self.fetch_item_html(crate_name, item_path, version).await?;
-        Ok(html::extract_documentation_html(&html))
+        let body = html::extract_documentation_html(&html);
+        // Mirror the markdown/text fallback note so all three formats are
+        // consistent. Detect the crate-overview fallback via the extracted
+        // text (a body that begins with "Crate " means the dedicated item
+        // page could not be resolved).
+        if html::extract_documentation_as_text(&html)
+            .trim_start()
+            .starts_with("Crate ")
+        {
+            // item_path is validated to [A-Za-z0-9_:-]; escape defensively
+            // anyway since this is an HTML context.
+            let safe_path = item_path
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;");
+            return Ok(format!(
+                "<p><em>No dedicated documentation page was found for '{safe_path}'; showing the crate overview instead. It may be a method, associated item, or trait method, or it may not exist.</em></p>\n{body}"
+            ));
+        }
+        Ok(body)
     }
 }
 

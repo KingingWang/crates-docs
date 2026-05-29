@@ -843,6 +843,54 @@ async fn test_lookup_item_tool_execute_html_format() {
     assert!(result.is_ok());
 }
 
+/// When the dedicated item page cannot be resolved and the crate overview is
+/// returned, the HTML format must include the same fallback note that the
+/// markdown and text formats already provide.
+#[tokio::test]
+#[serial(docs_rs_env)]
+async fn test_lookup_item_tool_html_format_includes_fallback_note() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+    // A crate-overview page: extracted text begins with "Crate ".
+    let mock_html = r#"
+    <html><body><h1>Crate serde</h1><p>Serialization framework</p></body></html>
+    "#;
+
+    Mock::given(matchers::method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(mock_html))
+        .mount(&mock_server)
+        .await;
+
+    let _guard = EnvVarGuard::new("CRATES_DOCS_DOCS_RS_URL", &mock_uri);
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+    let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "crate_name": "serde",
+        "item_path": "serde::DoesNotExist",
+        "format": "html"
+    });
+
+    let result = tool.execute(args).await.expect("execute should succeed");
+    let rendered = serde_json::to_string(&result).expect("serialize result");
+    assert!(
+        rendered.contains("No dedicated documentation page was found"),
+        "HTML fallback note missing: {rendered}"
+    );
+}
+
 #[tokio::test]
 #[serial(docs_rs_env)]
 async fn test_lookup_item_tool_execute_with_version() {
