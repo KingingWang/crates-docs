@@ -342,8 +342,12 @@ impl ApiKeyConfig {
         let legacy_manager = self.legacy_manager().ok();
         let provided_key = SecureString::from(key.to_string());
 
-        self.keys.iter().any(|stored| {
-            if Self::looks_like_legacy_hash(stored) {
+        // Evaluate every stored key without short-circuiting so that lookup
+        // time does not depend on which key (if any) matches. `iter().any()`
+        // would return as soon as the first match is found, leaking a timing
+        // side-channel about key position; fold-with-OR always visits all keys.
+        self.keys.iter().fold(false, |found, stored| {
+            let matched = if Self::looks_like_legacy_hash(stored) {
                 if let Some(legacy_manager) = &legacy_manager {
                     let stored_hash = stored.trim_start_matches("legacy:");
                     matches!(
@@ -361,7 +365,8 @@ impl ApiKeyConfig {
                 }
             } else {
                 Self::verify_plaintext_fallback(key, stored)
-            }
+            };
+            found | matched
         })
     }
 

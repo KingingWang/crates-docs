@@ -226,7 +226,7 @@ impl ServerMetrics {
     /// Update cache hit rate
     #[allow(clippy::cast_precision_loss)]
     pub fn update_cache_hit_rate(&self, hits: u64, misses: u64) {
-        let total = hits + misses;
+        let total = hits.saturating_add(misses);
         if total > 0 {
             let rate = hits as f64 / total as f64;
             self.cache_hit_rate.set(rate);

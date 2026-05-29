@@ -74,7 +74,7 @@ impl CacheStats {
     /// Get total requests (hits + misses)
     #[must_use]
     pub fn total_requests(&self) -> u64 {
-        self.hits() + self.misses()
+        self.hits().saturating_add(self.misses())
     }
 
     /// Calculate hit rate (0.0 to 1.0)

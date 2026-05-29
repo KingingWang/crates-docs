@@ -27,6 +27,23 @@ fn is_valid_item_path(path: &str) -> bool {
     !path.is_empty() && path.bytes().all(is_valid_item_path_char)
 }
 
+/// Reversibly escape `:` and `%` in a free-form cache-key segment.
+///
+/// Cache keys are colon-delimited. Free-form segments such as the search query
+/// or sort string may themselves contain `:`, which would otherwise let two
+/// distinct (query, sort, limit) inputs map to the same key (for example
+/// `query="a", sort="b:c"` and `query="a:b", sort="c"` both yield
+/// `search:a:b:c:{limit}`). Percent-encoding `%` first and then `:` keeps the
+/// mapping injective while leaving colon-free inputs unchanged.
+#[inline]
+fn escape_key_segment(segment: &str) -> String {
+    if segment.contains('%') || segment.contains(':') {
+        segment.replace('%', "%25").replace(':', "%3a")
+    } else {
+        segment.to_string()
+    }
+}
+
 /// Cache key generator for document cache
 pub struct CacheKeyGenerator;
 
@@ -89,8 +106,9 @@ impl CacheKeyGenerator {
     /// - sort: lowercase, trimmed
     #[must_use]
     pub fn search_cache_key(query: &str, limit: u32, sort: Option<&str>) -> String {
-        let normalized_query = query.trim().to_lowercase();
-        let normalized_sort = sort.unwrap_or("relevance").trim().to_lowercase();
+        let normalized_query = escape_key_segment(&query.trim().to_lowercase());
+        let normalized_sort =
+            escape_key_segment(&sort.unwrap_or("relevance").trim().to_lowercase());
         format!("search:{normalized_query}:{normalized_sort}:{limit}")
     }
 
@@ -273,6 +291,26 @@ mod tests {
 
         let valid_key_underscore = CacheKeyGenerator::crate_cache_key("my_crate", None);
         assert_eq!(valid_key_underscore, "crate:my_crate");
+    }
+
+    #[test]
+    fn test_search_cache_key_no_colon_collision() {
+        // Two distinct (query, sort) inputs that previously collapsed to the
+        // same colon-delimited key must now produce distinct keys.
+        let a = CacheKeyGenerator::search_cache_key("a", 5, Some("b:c"));
+        let b = CacheKeyGenerator::search_cache_key("a:b", 5, Some("c"));
+        assert_ne!(a, b);
+
+        // Colon-free inputs stay human-readable and unescaped.
+        assert_eq!(
+            CacheKeyGenerator::search_cache_key("web framework", 10, Some("downloads")),
+            "search:web framework:downloads:10"
+        );
+
+        // A literal percent in the query must not be confused with an escape.
+        let pct = CacheKeyGenerator::search_cache_key("100%", 10, None);
+        let escaped = CacheKeyGenerator::search_cache_key("100%3a", 10, None);
+        assert_ne!(pct, escaped);
     }
 
     #[test]
