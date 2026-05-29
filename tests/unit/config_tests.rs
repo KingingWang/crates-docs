@@ -520,3 +520,35 @@ level = "debug"
     assert_eq!(config.logging.level, "debug");
     assert!(config.logging.enable_console);
 }
+
+// ============================================================================
+// Cache configuration validation (regression: BUG5)
+// ============================================================================
+
+#[test]
+fn test_config_validation_memory_size_zero_rejected() {
+    let mut config = AppConfig::default();
+    config.cache.cache_type = "memory".to_string();
+    config.cache.memory_size = Some(0);
+    let result = config.validate();
+    assert!(result.is_err(), "memory_size=0 must be rejected");
+    let msg = result.unwrap_err().to_string();
+    assert!(msg.contains("memory_size"), "error should mention memory_size: {msg}");
+}
+
+#[test]
+fn test_config_validation_memory_size_none_ok() {
+    let mut config = AppConfig::default();
+    config.cache.cache_type = "memory".to_string();
+    config.cache.memory_size = None;
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn test_config_validation_invalid_cache_type_rejected() {
+    let mut config = AppConfig::default();
+    config.cache.cache_type = "bogus".to_string();
+    let result = config.validate();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("cache"));
+}

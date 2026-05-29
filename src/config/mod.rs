@@ -767,6 +767,29 @@ impl AppConfig {
             return Err(crate::error::Error::config("cache_max_size", "cannot be 0"));
         }
 
+        // Validate cache configuration.
+        //
+        // Note: the live in-memory cache is sized from `cache.memory_size`
+        // (see `create_cache`), NOT `performance.cache_max_size`. A
+        // `memory_size` of 0 builds a zero-capacity cache that evicts every
+        // entry immediately, silently disabling caching, so reject it here.
+        let valid_cache_types = ["memory", "redis"];
+        if !valid_cache_types.contains(&self.cache.cache_type.as_str()) {
+            return Err(crate::error::Error::config(
+                "cache.cache_type",
+                format!(
+                    "Invalid cache type: {}, valid values: {:?}",
+                    self.cache.cache_type, valid_cache_types
+                ),
+            ));
+        }
+        if self.cache.cache_type == "memory" && self.cache.memory_size == Some(0) {
+            return Err(crate::error::Error::config(
+                "cache.memory_size",
+                "cannot be 0 (this would disable the cache); omit it to use the default",
+            ));
+        }
+
         // Validate OAuth configuration
         if self.server.enable_oauth {
             self.oauth.validate()?;
