@@ -46,6 +46,12 @@ static EMPTY_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\[([^\]]*)\]\(\)").expect("hardcoded valid regex pattern")
 });
 
+/// Regex to drop no-op fragment-only toggle links like `[i](#)` or `[s](#)`
+/// (a bare `#` target navigates nowhere). Real in-page anchors such as
+/// `[Quick start](#quick-start)` keep a fragment id and are preserved.
+static FRAGMENT_TOGGLE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[[^\]]*\]\(#\)").expect("hardcoded valid regex pattern"));
+
 /// Regex to remove relative documentation links like [de](de/index.html) or [forward\_to\_deserialize\_any](macro.xxx.html)
 /// Matches: [text](relative_path.html) where `relative_path` starts with letter and ends with .html
 static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -331,6 +337,7 @@ fn clean_markdown(markdown: &str) -> String {
     let result = SRC_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = FRAGMENT_TOGGLE_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = EMPTY_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = MULTIPLE_NEWLINES_REGEX.replace_all(&result, Cow::Borrowed("\n\n"));
     result.trim().to_string()
@@ -595,8 +602,8 @@ mod tests {
         // The minus sign below is U+2212 as emitted by older rustdoc toggles.
         let md = concat!(
             "Crate [serde]() [ [\u{2212}] ](javascript:void(0)) ",
-            "[[src]](../src/serde/lib.rs.html#9-267)\n\nReal content ",
-            "[External](https://serde.rs/)."
+            "[[src]](../src/serde/lib.rs.html#9-267) [\u{24d8}](#)\n\nReal content ",
+            "[External](https://serde.rs/) [Quick start](#quick-start)."
         );
         let out = clean_markdown(md);
         assert!(!out.contains("javascript:"), "js link leaked: {out}");
@@ -608,6 +615,9 @@ mod tests {
         assert!(out.contains("Real content"));
         // External non-.html links are preserved.
         assert!(out.contains("https://serde.rs/"));
+        // No-op fragment-only toggles are removed, real anchors preserved.
+        assert!(!out.contains("(#)"), "fragment toggle leaked: {out}");
+        assert!(out.contains("#quick-start"), "real anchor dropped: {out}");
     }
 
     #[test]
