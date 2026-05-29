@@ -66,6 +66,17 @@ static FRAGMENT_TOGGLE_REGEX: LazyLock<Regex> =
 static STRAY_COLON_LINE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?m)^[ \t]*:{2,}[ \t]*$").expect("hardcoded valid regex pattern"));
 
+/// Regex to drop orphan separator lines that contain only a middot (`·`).
+///
+/// rustdoc's `out-of-band` heading row renders `<source> · [-]` (a source link,
+/// a middot separator, and a collapse toggle). Once the source link and toggle
+/// are stripped, a lone `·` remains on its own line; it carries no information.
+/// Inline middots inside prose are unaffected because those lines have other
+/// characters.
+static STRAY_MIDDOT_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?m)^[ \t]*\u{00b7}[ \t]*$").expect("hardcoded valid regex pattern")
+});
+
 /// Regex to rewrite relative documentation links to their link text.
 ///
 /// Matches `[text](relative_path.html)` where `relative_path` begins with a
@@ -382,6 +393,7 @@ fn clean_markdown(markdown: &str) -> String {
     });
     let result = EMPTY_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = STRAY_COLON_LINE_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = STRAY_MIDDOT_LINE_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = MULTIPLE_NEWLINES_REGEX.replace_all(&result, Cow::Borrowed("\n\n"));
     result.trim().to_string()
 }
@@ -745,6 +757,20 @@ mod tests {
         assert!(out.contains("Crate serde"), "crate name dropped: {out}");
         assert!(!out.contains("(#)"), "fragment link syntax leaked: {out}");
         assert!(!out.contains("ⓘ"), "symbol toggle leaked: {out}");
+    }
+
+    #[test]
+    fn test_clean_markdown_removes_stray_middot_line() {
+        // rustdoc out-of-band row leaves a lone middot after the source link
+        // and collapse toggle are stripped.
+        let md = "Crate serde\n==========\n\n\u{00b7}\n\nSerde is a framework.";
+        let out = clean_markdown(md);
+        assert!(!out.contains("\n\u{00b7}\n"), "stray middot line leaked: {out:?}");
+        assert!(out.contains("Crate serde"), "heading dropped: {out}");
+        assert!(out.contains("Serde is a framework."), "body dropped: {out}");
+        // Inline middots in prose are preserved.
+        let inline = clean_markdown("a \u{00b7} b");
+        assert!(inline.contains("\u{00b7}"), "inline middot wrongly dropped: {inline}");
     }
 
     #[test]
