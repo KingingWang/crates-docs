@@ -217,6 +217,20 @@ pub fn validate_item_path(item_path: &str) -> Result<(), CallToolError> {
             )),
         ));
     }
+    // Rust paths use '::' as the separator; a lone ':' (e.g. `serde:Serialize`)
+    // or an empty segment (e.g. `serde::`) would otherwise pass the byte check
+    // above and then silently fall back to the crate overview after a 404.
+    if path
+        .split("::")
+        .any(|segment| segment.is_empty() || segment.contains(':'))
+    {
+        return Err(CallToolError::invalid_arguments(
+            "item_path",
+            Some(format!(
+                "Invalid item_path '{item_path}'. Path segments must be separated by '::'"
+            )),
+        ));
+    }
     Ok(())
 }
 
@@ -794,6 +808,11 @@ mod tests {
         assert!(validate_item_path("foo;rm").is_err());
         assert!(validate_item_path("foo.bar").is_err());
         assert!(validate_item_path(&"a".repeat(257)).is_err());
+        // Single-colon separators and empty path segments are malformed.
+        assert!(validate_item_path("serde:Serialize").is_err());
+        assert!(validate_item_path("serde::").is_err());
+        assert!(validate_item_path("::Serialize").is_err());
+        assert!(validate_item_path("std:::vec").is_err());
     }
 
     #[test]

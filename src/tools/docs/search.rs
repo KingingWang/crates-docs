@@ -179,9 +179,23 @@ impl SearchCratesToolImpl {
             .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
 
         if !response.status().is_success() {
+            // Surface crates.io diagnostics (e.g. rate-limit explanations) from
+            // the response body instead of returning a bare status code. HTML
+            // error pages are suppressed to avoid dumping noise.
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            let trimmed = body.trim();
+            let detail = if trimmed.is_empty()
+                || trimmed.starts_with('<')
+                || trimmed.to_ascii_lowercase().contains("<html")
+            {
+                String::new()
+            } else {
+                let snippet: String = trimmed.chars().take(200).collect();
+                format!(" - {snippet}")
+            };
             return Err(CallToolError::from_message(format!(
-                "Search failed, status code: {}",
-                response.status()
+                "crates.io search failed: HTTP {status}{detail}"
             )));
         }
 
