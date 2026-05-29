@@ -461,6 +461,28 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_documentation_html_returns_clean_main_content() {
+        let html = concat!(
+            "<!DOCTYPE html><html><head><link rel=\"search\" href=\"/opensearch.xml\">",
+            "<script>var x=1;</script></head><body><nav>Nav</nav>",
+            "<section id=\"main-content\"><h1>Crate foo</h1><p>Body text.</p>",
+            "<a class=\"src\" href=\"../src/foo.rs.html\">Source</a></section>",
+            "<footer>Footer</footer></body></html>"
+        );
+        let out = extract_documentation_html(html);
+        // Documentation body is preserved as HTML.
+        assert!(out.contains("Body text."), "missing body: {out}");
+        assert!(out.contains("<h1>") || out.contains("Crate foo"));
+        // Page chrome and noise are gone.
+        assert!(!out.contains("<!DOCTYPE"), "doctype leaked: {out}");
+        assert!(!out.contains("opensearch"), "head link leaked: {out}");
+        assert!(!out.contains("<script"), "script leaked: {out}");
+        assert!(!out.contains("Nav"), "nav leaked: {out}");
+        assert!(!out.contains("Footer"), "footer leaked: {out}");
+        assert!(!out.contains("Source"), "src link leaked: {out}");
+    }
+
+    #[test]
     fn test_clean_html_removes_script() {
         let html = "<html><script>var x = 1;</script><body>Hello</body></html>";
         let cleaned = clean_html(html);
