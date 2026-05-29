@@ -332,6 +332,7 @@ pub fn build_docs_item_url_candidates(
         "fn",
         "type",
         "macro",
+        "attr",
         "constant",
         "derive",
         "union",
@@ -380,7 +381,7 @@ pub fn find_item_url_in_all_html(
     if item_name.is_empty() {
         return None;
     }
-    let kinds = "struct|trait|enum|fn|type|macro|constant|derive|union|primitive";
+    let kinds = "struct|trait|enum|fn|type|macro|attr|constant|derive|union|primitive";
     let pattern = format!(
         "href=\"((?:[^\"]*/)?(?:{kinds})\\.{}\\.html)\"",
         regex::escape(item_name)
@@ -741,6 +742,17 @@ mod tests {
         assert!(validate_search_query("").is_err());
         assert!(validate_search_query("   ").is_err());
         assert!(validate_search_query(&"a".repeat(201)).is_err());
+    }
+
+    #[test]
+    fn test_item_url_candidates_include_attr_macro() {
+        // Attribute proc-macros (e.g. async-trait's #[async_trait]) live at
+        // attr.<name>.html and must be among the probed candidates.
+        let c = build_docs_item_url_candidates("async-trait", None, "async_trait");
+        assert!(
+            c.iter().any(|u| u.ends_with("/async_trait/attr.async_trait.html")),
+            "missing attr candidate: {c:?}"
+        );
     }
 
     #[test]
