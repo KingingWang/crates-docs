@@ -140,6 +140,25 @@ static SRC_ANCHOR_HTML_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         .expect("hardcoded valid regex pattern")
 });
 
+/// Regex to remove `<script>`, `<style>`, `<noscript>` and `<iframe>` elements
+/// (including their contents) from raw HTML *before* parsing.
+///
+/// The DOM-based pass in [`remove_unwanted_elements`] re-serializes each node
+/// via `ElementRef::html()` and string-replaces it in the original markup. That
+/// match is fragile: html5ever normalizes attribute whitespace and quoting, so
+/// markup like `<script  defer >` is serialized as `<script defer>` and the
+/// replacement silently misses, leaking executable/style content into the
+/// `html` output format. Stripping these tags with a tolerant regex first
+/// guarantees they are removed regardless of the original formatting. (Back-
+/// references are unsupported by the `regex` crate, so each tag is listed
+/// explicitly rather than captured once.)
+static DANGEROUS_ELEMENT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?is)<script\b[^>]*>.*?</script\s*>|<style\b[^>]*>.*?</style\s*>|<noscript\b[^>]*>.*?</noscript\s*>|<iframe\b[^>]*>.*?</iframe\s*>|<iframe\b[^>]*/>",
+    )
+    .expect("hardcoded valid regex pattern")
+});
+
 /// Cached selectors for main content extraction
 static MAIN_CONTENT_SELECTOR: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("#main-content").expect("hardcoded valid selector"));
@@ -158,6 +177,9 @@ pub fn clean_html(html: &str) -> String {
     // Strip source-code anchors from the raw HTML first so their "Source" label
     // cannot survive as plain text when nested inside preserved <summary> nodes.
     let html = SRC_ANCHOR_HTML_REGEX.replace_all(html, "");
+    // Guarantee removal of executable/style/embedded content regardless of how
+    // the source markup was formatted (see DANGEROUS_ELEMENT_REGEX docs).
+    let html = DANGEROUS_ELEMENT_REGEX.replace_all(&html, "");
     let document = Html::parse_document(&html);
     remove_unwanted_elements(&document, &html)
 }
@@ -557,6 +579,35 @@ mod tests {
         assert!(!md.contains("Expand description"));
         assert!(md.contains("MyCrate"));
         assert!(md.contains("Hello world."));
+    }
+
+    #[test]
+    fn test_clean_html_removes_dangerous_elements_with_irregular_whitespace() {
+        // html5ever normalizes `<script  defer >` to `<script defer>`, which
+        // defeats the DOM serialize+string-replace pass. The regex pre-strip
+        // must still remove these so no executable/style/embedded content leaks
+        // into the html output format.
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<script  defer >alert('xss')</script>",
+            "<STYLE type=\"text/css\" >.evil{color:red}</STYLE>",
+            "<noscript >NoScriptContent</noscript>",
+            "<iframe  src=\"http://evil.example\"></iframe>",
+            "<p>Safe documentation.</p>",
+            "</section></body></html>"
+        );
+        let cleaned = clean_html(html);
+        assert!(!cleaned.contains("alert"), "script leaked: {cleaned}");
+        assert!(!cleaned.contains(".evil"), "style leaked: {cleaned}");
+        assert!(
+            !cleaned.contains("NoScriptContent"),
+            "noscript leaked: {cleaned}"
+        );
+        assert!(
+            !cleaned.contains("evil.example"),
+            "iframe leaked: {cleaned}"
+        );
+        assert!(cleaned.contains("Safe documentation."));
     }
 
     #[test]
