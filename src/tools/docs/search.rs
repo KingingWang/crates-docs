@@ -333,6 +333,7 @@ impl Tool for SearchCratesToolImpl {
         // network requests. This avoids wasted crates.io calls on invalid input
         // and keeps input-validation errors deterministic regardless of network
         // availability.
+        super::validate_search_query(&params.query)?;
         // Clamp to the documented range [1, 100]. A lower bound of 0 (or a
         // value above 100) would otherwise silently produce an empty/odd
         // result set and a `per_page=0` upstream request.

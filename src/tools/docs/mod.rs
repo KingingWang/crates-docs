@@ -154,6 +154,32 @@ pub fn validate_version(version: Option<&str>) -> Result<(), CallToolError> {
     Ok(())
 }
 
+/// Validate a search query supplied by a tool caller.
+///
+/// Rejects empty/whitespace-only queries (which would otherwise trigger an
+/// unfiltered crates.io request returning arbitrary crates) and overly long
+/// queries that cannot represent a meaningful search.
+///
+/// # Errors
+///
+/// Returns a `CallToolError` describing the first problem found.
+pub fn validate_search_query(query: &str) -> Result<(), CallToolError> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Err(CallToolError::invalid_arguments(
+            "query",
+            Some("query must not be empty".to_string()),
+        ));
+    }
+    if trimmed.len() > 200 {
+        return Err(CallToolError::invalid_arguments(
+            "query",
+            Some("query is too long (max 200 characters)".to_string()),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(not(test))]
 const DOCS_RS_BASE_URL: &str = "https://docs.rs";
 
@@ -505,6 +531,21 @@ mod tests {
         assert!(validate_version(Some("1.0 0")).is_err());
         assert!(validate_version(Some("..")).is_err());
         assert!(validate_version(Some(&"1".repeat(65))).is_err());
+    }
+
+    #[test]
+    fn test_validate_search_query_accepts_valid() {
+        assert!(validate_search_query("serde").is_ok());
+        assert!(validate_search_query("web framework").is_ok());
+        assert!(validate_search_query("  tokio  ").is_ok());
+        assert!(validate_search_query(&"a".repeat(200)).is_ok());
+    }
+
+    #[test]
+    fn test_validate_search_query_rejects_invalid() {
+        assert!(validate_search_query("").is_err());
+        assert!(validate_search_query("   ").is_err());
+        assert!(validate_search_query(&"a".repeat(201)).is_err());
     }
 
     #[test]
