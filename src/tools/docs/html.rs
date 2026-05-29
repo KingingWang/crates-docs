@@ -167,12 +167,15 @@ fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
 /// - `<link[^>]*>` - Link tags
 /// - `<meta[^>]*>` - Meta tags
 /// - `Copy item path` - UI copy path text
+/// - `</?details[^>]*>` - rustdoc collapsible toggle wrappers (html2md leaves
+///   these as raw tags); children are preserved
+/// - `Expand description` / `Expand attributes` - docs.rs toggle labels
 /// - `\[\§\]\([^)]*\)` - Anchor links like [§](#xxx)
 /// - `\[(?:Source|de|en|fr|ja)\]\([^)]*\)` - Source/language badges
 /// - `\[[^\]]*\]\([a-zA-Z][^)]*\.html\)` - Relative documentation links
 static COMBINED_CLEANUP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?:<link[^>]*>|<meta[^>]*>|Copy item path|\[§\]\([^)]*\)|\[Source\]\([^)]*\)|\[[^\]]*\]\([a-zA-Z][^)]*\.html\))",
+        r"(?:<link[^>]*>|<meta[^>]*>|</?details[^>]*>|Copy item path|Expand description|Expand attributes|\[§\]\([^)]*\)|\[Source\]\([^)]*\)|\[[^\]]*\]\([a-zA-Z][^)]*\.html\))",
     )
     .expect("hardcoded valid regex pattern")
 });
@@ -347,6 +350,28 @@ mod tests {
         assert!(!cleaned.contains("script"));
         assert!(!cleaned.contains("var x"));
         assert!(cleaned.contains("Hello"));
+    }
+
+    #[test]
+    fn test_clean_html_strips_details_toggle_wrappers() {
+        let html = r#"<html><body><section id="main-content"><details class="toggle top-doc" open=""><summary>Expand description</summary><h2>MyCrate</h2><p>Useful docs.</p></details></section></body></html>"#;
+        let cleaned = clean_html(html);
+        assert!(!cleaned.contains("<details"));
+        assert!(!cleaned.contains("</details>"));
+        assert!(!cleaned.contains("Expand description"));
+        // Inner content must be preserved.
+        assert!(cleaned.contains("MyCrate"));
+        assert!(cleaned.contains("Useful docs."));
+    }
+
+    #[test]
+    fn test_extract_documentation_has_no_details_markup() {
+        let html = r#"<html><body><section id="main-content"><details class="toggle top-doc" open=""><summary>Expand description</summary><h2>MyCrate</h2><p>Hello world.</p></details></section></body></html>"#;
+        let md = extract_documentation(html);
+        assert!(!md.contains("<details"));
+        assert!(!md.contains("Expand description"));
+        assert!(md.contains("MyCrate"));
+        assert!(md.contains("Hello world."));
     }
 
     #[test]
