@@ -233,6 +233,55 @@ impl HealthCheckToolImpl {
             uptime: self.start_time.elapsed(),
         }
     }
+
+    /// Render a [`HealthStatus`] into a report string.
+    ///
+    /// In verbose mode this returns pretty-printed JSON; otherwise a concise
+    /// human-readable summary. This is shared by the MCP tool execution path
+    /// and the CLI `health` command so their output stays consistent.
+    fn render_report(health_status: &HealthStatus, verbose: bool) -> String {
+        if verbose {
+            serde_json::to_string_pretty(health_status)
+                .unwrap_or_else(|e| format!("JSON serialization failed: {e}"))
+        } else {
+            let mut summary = format!(
+                "Status: {}\nUptime: {:.2?}\nTimestamp: {}",
+                health_status.status, health_status.uptime, health_status.timestamp
+            );
+
+            if !health_status.checks.is_empty() {
+                use std::fmt::Write;
+                summary.push_str("\n\nCheck Results:");
+                for check in &health_status.checks {
+                    let _ = write!(
+                        summary,
+                        "\n- {}: {} ({:.2}ms)",
+                        check.name, check.status, check.duration_ms
+                    );
+                    if let Some(ref msg) = check.message {
+                        let _ = write!(summary, " - {msg}");
+                    }
+                    if let Some(ref err) = check.error {
+                        let _ = write!(summary, " [Error: {err}]");
+                    }
+                }
+            }
+
+            summary
+        }
+    }
+
+    /// Run a health check for CLI usage.
+    ///
+    /// Returns the rendered report and whether the overall status is healthy
+    /// (`true` only when every individual check is healthy). Callers can use the
+    /// boolean to set a process exit code so container/orchestrator health
+    /// probes behave correctly.
+    pub async fn run_check_report(&self, check_type: &str, verbose: bool) -> (String, bool) {
+        let health_status = self.perform_checks(check_type, verbose).await;
+        let is_healthy = health_status.status == "healthy";
+        (Self::render_report(&health_status, verbose), is_healthy)
+    }
 }
 
 #[async_trait]
@@ -260,40 +309,7 @@ impl Tool for HealthCheckToolImpl {
 
         let health_status = self.perform_checks(&check_type, verbose).await;
 
-        let content = if verbose {
-            // SAFETY: write! to String never fails (writes to memory buffer). unwrap() is safe here.
-            serde_json::to_string_pretty(&health_status).map_err(|e| {
-                rust_mcp_sdk::schema::CallToolError::from_message(format!(
-                    "JSON serialization failed: {e}"
-                ))
-            })?
-        } else {
-            let mut summary = format!(
-                "Status: {}\nUptime: {:.2?}\nTimestamp: {}",
-                health_status.status, health_status.uptime, health_status.timestamp
-            );
-
-            if !health_status.checks.is_empty() {
-                use std::fmt::Write;
-                summary.push_str("\n\nCheck Results:");
-                for check in &health_status.checks {
-                    write!(
-                        summary,
-                        "\n- {}: {} ({:.2}ms)",
-                        check.name, check.status, check.duration_ms
-                    )
-                    .unwrap();
-                    if let Some(ref msg) = check.message {
-                        write!(summary, " - {msg}").unwrap();
-                    }
-                    if let Some(ref err) = check.error {
-                        write!(summary, " [Error: {err}]").unwrap();
-                    }
-                }
-            }
-
-            summary
-        };
+        let content = Self::render_report(&health_status, verbose);
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
             content.into(),

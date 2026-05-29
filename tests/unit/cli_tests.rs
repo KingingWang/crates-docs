@@ -467,28 +467,59 @@ fn test_run_config_command_nested_directory() {
 // health_cmd tests
 // ============================================================================
 
-/// Test health command - default check type
+/// Test health command - internal check is deterministic (no network) and healthy.
 #[tokio::test]
-async fn test_run_health_command_default() {
-    let result = crates_docs::cli::run_health_command("all", false).await;
+async fn test_run_health_command_internal_ok() {
+    let result = crates_docs::cli::run_health_command("internal", false).await;
     assert!(result.is_ok());
 }
 
-/// Test health command - verbose mode
+/// The CLI health command must perform real checks, not a stubbed/simulated
+/// placeholder. The internal-only report is deterministic and must report a
+/// healthy memory check.
 #[tokio::test]
-async fn test_run_health_command_verbose() {
-    let result = crates_docs::cli::run_health_command("external", true).await;
-    assert!(result.is_ok());
+async fn test_run_health_command_report_is_real_not_simulated() {
+    use crates_docs::tools::health::HealthCheckToolImpl;
+    let tool = HealthCheckToolImpl::new();
+    let (report, healthy) = tool.run_check_report("internal", false).await;
+    assert!(healthy, "internal check should be healthy");
+    assert!(report.contains("Status: healthy"), "unexpected report: {report}");
+    assert!(
+        !report.contains("simulated"),
+        "health report must not be a simulated placeholder: {report}"
+    );
+    // In verbose mode the individual memory check is included in the report.
+    let (verbose_report, _) = tool.run_check_report("internal", true).await;
+    assert!(
+        verbose_report.contains("memory"),
+        "verbose report should include memory check: {verbose_report}"
+    );
 }
 
-/// Test health command - various check types
+/// Verbose mode renders JSON containing the individual checks array.
 #[tokio::test]
-async fn test_run_health_command_various_types() {
+async fn test_run_health_command_verbose_json_report() {
+    use crates_docs::tools::health::HealthCheckToolImpl;
+    let tool = HealthCheckToolImpl::new();
+    let (report, _healthy) = tool.run_check_report("internal", true).await;
+    assert!(report.contains("\"checks\""), "verbose report should be JSON: {report}");
+    assert!(report.contains("\"status\""), "verbose report should include status: {report}");
+}
+
+/// Various check types should all produce a non-empty report and not panic.
+/// (Network-backed checks may be healthy or unhealthy depending on connectivity,
+/// so we only assert that a report is produced.)
+#[tokio::test]
+async fn test_run_health_command_various_types_produce_report() {
+    use crates_docs::tools::health::HealthCheckToolImpl;
     let check_types = ["all", "external", "internal", "docs_rs", "crates_io"];
-
+    let tool = HealthCheckToolImpl::new();
     for check_type in check_types {
-        let result = crates_docs::cli::run_health_command(check_type, false).await;
-        assert!(result.is_ok(), "Failed for check_type: {}", check_type);
+        let (report, _healthy) = tool.run_check_report(check_type, false).await;
+        assert!(
+            report.contains("Status:"),
+            "missing status for check_type {check_type}: {report}"
+        );
     }
 }
 

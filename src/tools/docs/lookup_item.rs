@@ -203,12 +203,10 @@ impl Tool for LookupItemToolImpl {
             )
         })?;
 
-        let format = super::parse_format(params.format.as_deref()).map_err(|_| {
-            rust_mcp_sdk::schema::CallToolError::invalid_arguments(
-                "lookup_item",
-                Some("Invalid format".to_string()),
-            )
-        })?;
+        // Propagate the detailed parse error (e.g. "Invalid format 'xml'. Expected
+        // one of: ...") rather than masking it with a generic message, so callers
+        // get actionable feedback.
+        let format = super::parse_format(params.format.as_deref())?;
         let content = match format {
             super::Format::Text => {
                 self.fetch_item_docs_as_text(

@@ -601,7 +601,7 @@ crates-docs version
 
 > 全局参数见 [`Cli`](src/cli/mod.rs:27)，常用项包括 `--config`、`--debug`、`--verbose`。
 >
-> 当前 [`run_health_command()`](src/cli/health_cmd.rs:4) 仍是 CLI 级占位输出；需要真实探测 docs.rs / crates.io 状态时，应优先使用 MCP 工具 [`health_check`](src/tools/health.rs:11)。
+> [`run_health_command()`](src/cli/health_cmd.rs) 会执行真实的健康检查（内部状态 + docs.rs / crates.io 探测），与 MCP 工具 [`health_check`](src/tools/health.rs) 共用同一套检测逻辑。当整体状态不是 `healthy` 时，命令以非零退出码结束，可直接用作容器/编排器的健康探针（例如 Docker Compose 的 `healthcheck`）。
 
 ## 配置
 

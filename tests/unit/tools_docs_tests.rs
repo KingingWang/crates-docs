@@ -643,6 +643,43 @@ async fn test_lookup_crate_tool_invalid_params() {
     assert!(result.is_err());
 }
 
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_lookup_crate_tool_invalid_format_preserves_detailed_message() {
+    use crates_docs::tools::Tool;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let tool = crates_docs::tools::docs::lookup_crate::LookupCrateToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "crate_name": "serde",
+        "format": "xml"
+    });
+
+    // Invalid format must fail fast with a detailed, actionable message and
+    // without performing any network request.
+    let error = tool
+        .execute(args)
+        .await
+        .expect_err("invalid format should fail");
+    let error_message = error.to_string();
+    assert!(
+        error_message.contains("Invalid format 'xml'"),
+        "unexpected error message: {error_message}"
+    );
+    assert!(error_message.contains("markdown, text, html, json"));
+}
+
 // ============================================================================
 // LookupItemTool tests
 // ============================================================================
@@ -989,6 +1026,44 @@ async fn test_lookup_item_tool_invalid_params() {
 
     let result = tool.execute(args).await;
     assert!(result.is_err());
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_lookup_item_tool_invalid_format_preserves_detailed_message() {
+    use crates_docs::tools::Tool;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "crate_name": "serde",
+        "item_path": "serde::Serialize",
+        "format": "xml"
+    });
+
+    // Invalid format must fail fast with a detailed, actionable message and
+    // without performing any network request.
+    let error = tool
+        .execute(args)
+        .await
+        .expect_err("invalid format should fail");
+    let error_message = error.to_string();
+    assert!(
+        error_message.contains("Invalid format 'xml'"),
+        "unexpected error message: {error_message}"
+    );
+    assert!(error_message.contains("markdown, text, html, json"));
 }
 
 // ============================================================================

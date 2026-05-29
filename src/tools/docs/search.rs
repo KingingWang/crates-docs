@@ -320,11 +320,15 @@ impl Tool for SearchCratesToolImpl {
             )
         })?;
 
+        // Validate all input parameters up front (fail-fast) before making any
+        // network requests. This avoids wasted crates.io calls on invalid input
+        // and keeps input-validation errors deterministic regardless of network
+        // availability.
         let limit = params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(100);
         let sort = normalize_search_sort(params.sort.as_deref())?;
-        let crates = self.search_crates(&params.query, limit, &sort).await?;
-
         let format = super::parse_format(params.format.as_deref())?;
+
+        let crates = self.search_crates(&params.query, limit, &sort).await?;
         let content = format_search_results(&crates, format);
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![
