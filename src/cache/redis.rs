@@ -71,13 +71,32 @@ impl RedisCache {
         }
     }
 
-    /// Build the pattern for scanning keys with the prefix
-    fn build_scan_pattern(&self) -> String {
-        if self.key_prefix.is_empty() {
-            "*".to_string()
-        } else {
-            format!("{}:*", self.key_prefix)
-        }
+}
+
+/// Compute the millisecond expiry for a Redis `PX` argument from a TTL.
+///
+/// Redis treats a non-positive expiry as an error, and `PX 0` (which a
+/// sub-millisecond `Duration` would otherwise produce) effectively stores the
+/// key without any expiration. To avoid silently turning a short-lived entry
+/// into a permanent one, any TTL — including a zero `Duration` — maps to at
+/// least 1 millisecond.
+fn px_millis_for_ttl(ttl: Duration) -> u64 {
+    // Saturate instead of truncating: practical TTLs are far below u64::MAX ms,
+    // and saturation keeps the value well-defined for pathological inputs.
+    let ms = u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX);
+    ms.max(1)
+}
+
+/// Build the SCAN match pattern for the configured key prefix.
+///
+/// Returns `None` when the prefix is empty. Clearing without a prefix would
+/// require matching `*`, which could wipe unrelated keys in a shared Redis
+/// database, so callers must treat an empty prefix as "refuse to clear".
+fn scan_pattern_for_prefix(prefix: &str) -> Option<String> {
+    if prefix.is_empty() {
+        None
+    } else {
+        Some(format!("{prefix}:*"))
     }
 }
 
@@ -93,7 +112,6 @@ impl super::Cache for RedisCache {
         result.ok().flatten().map(|s| Arc::from(s.into_boxed_str()))
     }
 
-    #[allow(clippy::cast_possible_truncation)]
     async fn set(
         &self,
         key: String,
@@ -104,10 +122,10 @@ impl super::Cache for RedisCache {
         let full_key = self.build_key(&key);
 
         let result: redis::RedisResult<()> = if let Some(ttl) = ttl {
-            // Use PX for millisecond precision instead of SETEX (seconds only)
-            // Note: Truncation from u128 to u64 is acceptable here because
-            // TTL values in practice are much smaller than u64::MAX milliseconds
-            let ms = ttl.as_millis() as u64;
+            // Use PX for millisecond precision instead of SETEX (seconds only).
+            // Any positive TTL maps to at least 1ms so a sub-millisecond TTL
+            // never collapses to `PX 0` (which would drop the expiry entirely).
+            let ms = px_millis_for_ttl(ttl);
             redis::cmd("SET")
                 .arg(&full_key)
                 .arg(&value)
@@ -139,10 +157,23 @@ impl super::Cache for RedisCache {
     }
 
     async fn clear(&self) -> crate::error::Result<()> {
-        // Use SCAN to find and delete keys with our prefix
-        // This is safer than FLUSHDB which would delete ALL keys in the database
+        // Use SCAN to find and delete only keys with our prefix.
+        // This is safer than FLUSHDB which would delete ALL keys in the database.
+        //
+        // Without a configured key prefix the only possible match pattern is
+        // `*`, which would wipe a shared Redis database. Refuse to clear in
+        // that case instead of risking unrelated data.
+        let Some(pattern) = scan_pattern_for_prefix(&self.key_prefix) else {
+            return Err(Error::cache(
+                "clear",
+                None,
+                "refusing to clear cache without a configured key_prefix; \
+                 clearing would require matching '*' and could wipe a shared \
+                 Redis database",
+            ));
+        };
+
         let mut conn = self.conn.clone();
-        let pattern = self.build_scan_pattern();
 
         let mut cursor: u64 = 0;
         let mut total_deleted: u64 = 0;
@@ -293,25 +324,38 @@ mod tests {
     }
 
     #[test]
-    fn test_build_scan_pattern() {
-        // Test with no prefix
-        let prefix = "";
-        let expected = "*";
-        let result = if prefix.is_empty() {
-            "*".to_string()
-        } else {
-            format!("{prefix}:*")
-        };
-        assert_eq!(result, expected);
+    fn test_scan_pattern_for_prefix_empty_refuses() {
+        // An empty prefix must NOT produce a "*" pattern (which would target
+        // the whole database); callers treat None as "refuse to clear".
+        assert_eq!(scan_pattern_for_prefix(""), None);
+    }
 
-        // Test with prefix
-        let prefix = "myapp";
-        let expected = "myapp:*";
-        let result = if prefix.is_empty() {
-            "*".to_string()
-        } else {
-            format!("{prefix}:*")
-        };
-        assert_eq!(result, expected);
+    #[test]
+    fn test_scan_pattern_for_prefix_with_prefix() {
+        assert_eq!(
+            scan_pattern_for_prefix("myapp"),
+            Some("myapp:*".to_string())
+        );
+    }
+
+    #[test]
+    fn test_px_millis_for_ttl_zero_is_minimum() {
+        // A zero Duration must not collapse to `PX 0` (no expiry); it maps to
+        // the smallest positive expiry instead.
+        assert_eq!(px_millis_for_ttl(Duration::from_millis(0)), 1);
+    }
+
+    #[test]
+    fn test_px_millis_for_ttl_submillisecond_is_minimum() {
+        // Sub-millisecond TTLs round up to 1ms instead of truncating to 0.
+        assert_eq!(px_millis_for_ttl(Duration::from_micros(500)), 1);
+        assert_eq!(px_millis_for_ttl(Duration::from_nanos(1)), 1);
+    }
+
+    #[test]
+    fn test_px_millis_for_ttl_normal_values() {
+        assert_eq!(px_millis_for_ttl(Duration::from_millis(1)), 1);
+        assert_eq!(px_millis_for_ttl(Duration::from_millis(1500)), 1500);
+        assert_eq!(px_millis_for_ttl(Duration::from_secs(2)), 2000);
     }
 }
