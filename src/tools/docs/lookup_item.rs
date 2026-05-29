@@ -134,6 +134,44 @@ impl LookupItemToolImpl {
         item_path: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
+        if let Some(html) = self
+            .try_resolve_item_path(crate_name, item_path, version)
+            .await?
+        {
+            return Ok(html);
+        }
+
+        // Method / associated-item fallback: `Type::member` and trait methods
+        // have no standalone rustdoc page; the member is documented on the
+        // containing type's page. If the full path did not resolve, retry with
+        // the parent path so the caller gets the focused type page (e.g. the
+        // `Vec` struct for `Vec::push`) instead of the entire crate overview.
+        if let Some((parent, _member)) = item_path.rsplit_once("::") {
+            let parent = parent.trim();
+            if !parent.is_empty() {
+                if let Some(html) = self
+                    .try_resolve_item_path(crate_name, parent, version)
+                    .await?
+                {
+                    return Ok(html);
+                }
+            }
+        }
+
+        // Fallback: the crate page (legacy `?search=` behaviour).
+        let url = Self::build_search_url(crate_name, item_path, version);
+        self.service.fetch_html(&url, Some(TOOL_NAME)).await
+    }
+
+    /// Probe the candidate rustdoc item pages and the crate `all.html`
+    /// re-export index for an exact item path. Returns the page HTML if found,
+    /// or `None` if neither path resolves.
+    async fn try_resolve_item_path(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+    ) -> std::result::Result<Option<String>, CallToolError> {
         let candidates = super::build_docs_item_url_candidates(crate_name, version, item_path);
         for url in candidates {
             if let Some(html) = self
@@ -141,7 +179,7 @@ impl LookupItemToolImpl {
                 .fetch_html_optional(&url, Some(TOOL_NAME))
                 .await?
             {
-                return Ok(html);
+                return Ok(Some(html));
             }
         }
 
@@ -167,14 +205,12 @@ impl LookupItemToolImpl {
                     .fetch_html_optional(&item_url, Some(TOOL_NAME))
                     .await?;
                 if let Some(html) = resolved {
-                    return Ok(html);
+                    return Ok(Some(html));
                 }
             }
         }
 
-        // Fallback: the crate page (legacy `?search=` behaviour).
-        let url = Self::build_search_url(crate_name, item_path, version);
-        self.service.fetch_html(&url, Some(TOOL_NAME)).await
+        Ok(None)
     }
 
     /// Get item documentation (markdown format)
