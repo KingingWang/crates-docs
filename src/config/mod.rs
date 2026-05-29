@@ -204,6 +204,21 @@ pub struct ServerConfig {
     /// Use `"*"` only in development, specify exact origins in production
     #[serde(default = "default_server_allowed_origins")]
     pub allowed_origins: Vec<String>,
+
+    /// Enable DNS rebinding protection for HTTP/SSE transports.
+    ///
+    /// When `true`, the server validates the `Host` and `Origin` request
+    /// headers against `allowed_hosts` / `allowed_origins` and rejects
+    /// mismatches with HTTP 403. Defaults to `false` for backwards
+    /// compatibility (matching the underlying SDK).
+    ///
+    /// Note: matching is exact and case-insensitive (no wildcards). When
+    /// enabling this, `allowed_hosts` must contain the exact `host:port`
+    /// values clients send (e.g. `"127.0.0.1:8080"`), and `allowed_origins`
+    /// must list exact origins (e.g. `"http://localhost:8080"`); the example
+    /// defaults with a `*` wildcard will not match.
+    #[serde(default = "default_server_dns_rebinding_protection")]
+    pub dns_rebinding_protection: bool,
 }
 
 /// Default server version from Cargo.toml
@@ -280,6 +295,10 @@ fn default_server_allowed_hosts() -> Vec<String> {
 
 fn default_server_allowed_origins() -> Vec<String> {
     ServerConfig::default().allowed_origins
+}
+
+fn default_server_dns_rebinding_protection() -> bool {
+    ServerConfig::default().dns_rebinding_protection
 }
 fn default_logging_level() -> String {
     LoggingConfig::default().level
@@ -511,6 +530,9 @@ impl Default for ServerConfig {
             // Secure defaults: only allow localhost by default
             allowed_hosts: vec!["localhost".to_string(), "127.0.0.1".to_string()],
             allowed_origins: vec!["http://localhost:*".to_string()],
+            // Off by default: the exact-match allowlists above (with a `*`
+            // wildcard and no ports) would otherwise 403 normal requests.
+            dns_rebinding_protection: false,
         }
     }
 }

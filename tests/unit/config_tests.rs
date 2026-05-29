@@ -555,3 +555,27 @@ fn test_config_validation_invalid_cache_type_rejected() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("cache"));
 }
+
+// ============================================================================
+// DNS rebinding protection config tests
+// ============================================================================
+
+#[test]
+fn test_dns_rebinding_protection_defaults_off() {
+    let config = ServerConfig::default();
+    assert!(
+        !config.dns_rebinding_protection,
+        "dns_rebinding_protection must default to false for backwards compatibility"
+    );
+}
+
+#[test]
+fn test_dns_rebinding_protection_toml_roundtrip() {
+    // Omitted in TOML -> serde default (false).
+    let cfg: AppConfig = toml::from_str("[server]\nhost = \"127.0.0.1\"\n").unwrap();
+    assert!(!cfg.server.dns_rebinding_protection);
+
+    // Explicitly enabled.
+    let cfg: AppConfig = toml::from_str("[server]\ndns_rebinding_protection = true\n").unwrap();
+    assert!(cfg.server.dns_rebinding_protection);
+}

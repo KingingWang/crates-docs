@@ -241,9 +241,22 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
         client_task_store: None,
         allowed_hosts: Some(server_config.server.allowed_hosts.clone()),
         allowed_origins: Some(server_config.server.allowed_origins.clone()),
+        // Without this flag the SDK never installs the DnsRebindProtector, so
+        // the allowlists above would be silently ignored. Honor the operator's
+        // explicit opt-in instead.
+        dns_rebinding_protection: server_config.server.dns_rebinding_protection,
         health_endpoint: Some("/health".to_string()),
         ..Default::default()
     };
+
+    if server_config.server.dns_rebinding_protection
+        && server_config.server.allowed_hosts.is_empty()
+        && server_config.server.allowed_origins.is_empty()
+    {
+        tracing::warn!(
+            "dns_rebinding_protection is enabled but both allowed_hosts and              allowed_origins are empty; no Host/Origin validation will occur"
+        );
+    }
 
     // Create HTTP/SSE/Hybrid server
     let mcp_server =
