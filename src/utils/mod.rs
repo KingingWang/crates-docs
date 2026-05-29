@@ -131,7 +131,7 @@ impl Default for HttpClientBuilder {
             read_timeout: Duration::from_secs(30),
             pool_max_idle_per_host: 10,
             pool_idle_timeout: Duration::from_secs(90),
-            user_agent: format!("CratesDocsMCP/{}", crate::VERSION),
+            user_agent: crate::user_agent(),
             enable_gzip: true,
             enable_brotli: true,
             max_retries: 3,

@@ -72,6 +72,25 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Server name
 pub const NAME: &str = "crates-docs";
 
+/// Repository URL, used as the contact handle in the outbound `User-Agent`.
+///
+/// Obtained from the `CARGO_PKG_REPOSITORY` environment variable.
+pub const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
+
+/// Build the `User-Agent` header sent to upstream services (docs.rs, crates.io).
+///
+/// crates.io's API data-access policy requires a `User-Agent` that identifies
+/// the application and provides a way to contact the operator. The repository
+/// URL serves as that contact. See <https://crates.io/data-access>.
+#[must_use]
+pub fn user_agent() -> String {
+    if REPOSITORY.is_empty() {
+        format!("CratesDocsMCP/{VERSION}")
+    } else {
+        format!("CratesDocsMCP/{VERSION} ({REPOSITORY})")
+    }
+}
+
 /// Initialize logging system with configuration
 ///
 /// # Errors

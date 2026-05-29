@@ -121,7 +121,7 @@ impl HealthCheckToolImpl {
 
         match client
             .get(url)
-            .header("User-Agent", format!("CratesDocsMCP/{}", crate::VERSION))
+            .header("User-Agent", crate::user_agent())
             .timeout(Duration::from_secs(5))
             .send()
             .await

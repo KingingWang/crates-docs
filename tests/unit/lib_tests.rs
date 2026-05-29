@@ -20,6 +20,22 @@ fn test_name_constant() {
     assert_eq!(NAME, "crates-docs");
 }
 
+#[test]
+fn test_user_agent_identifies_app_and_contact() {
+    let ua = crates_docs::user_agent();
+    assert!(ua.starts_with("CratesDocsMCP/"), "UA missing app id: {ua}");
+    assert!(ua.contains(VERSION), "UA missing version: {ua}");
+    // crates.io's data-access policy wants a contact handle; the repository URL
+    // is embedded in parentheses when available.
+    if !crates_docs::REPOSITORY.is_empty() {
+        assert!(
+            ua.contains(crates_docs::REPOSITORY),
+            "UA missing contact/repository: {ua}"
+        );
+        assert!(ua.contains("https://"), "UA contact is not a URL: {ua}");
+    }
+}
+
 // ============================================================================
 // Re-exports tests
 // ============================================================================

@@ -173,7 +173,7 @@ impl SearchCratesToolImpl {
             .service
             .client()
             .get(&url)
-            .header("User-Agent", format!("CratesDocsMCP/{}", crate::VERSION))
+            .header("User-Agent", crate::user_agent())
             .send()
             .await
             .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
