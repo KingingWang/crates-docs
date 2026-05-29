@@ -25,6 +25,10 @@ pub struct ConfigReloader {
     current_config: AppConfig,
     /// Debounce timer to avoid rapid reloads
     last_reload: std::time::Instant,
+    /// Set once the file-system watcher channel has disconnected. The watcher
+    /// cannot recover after this, so it is used to stop the polling loop and to
+    /// log the disconnect exactly once instead of every poll.
+    watcher_disconnected: bool,
 }
 
 impl ConfigReloader {
@@ -67,6 +71,7 @@ impl ConfigReloader {
             last_reload: std::time::Instant::now()
                 .checked_sub(Duration::from_secs(10))
                 .unwrap_or_else(std::time::Instant::now),
+            watcher_disconnected: false,
         })
     }
 
@@ -115,11 +120,28 @@ impl ConfigReloader {
                 // No events available
             }
             Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                warn!("File system watcher disconnected");
+                // The watcher thread is gone and will not come back. Log once
+                // and latch the state so the caller can stop polling rather
+                // than spinning here forever and spamming this warning every
+                // tick.
+                if !self.watcher_disconnected {
+                    warn!(
+                        "File system watcher disconnected; configuration                          hot-reload is now inactive (will not retry)"
+                    );
+                    self.watcher_disconnected = true;
+                }
             }
         }
 
         None
+    }
+
+    /// Returns `true` while the underlying file-system watcher is still
+    /// connected. Once it returns `false`, `check_for_changes` will never
+    /// detect further changes and the polling loop should stop.
+    #[must_use]
+    pub fn is_watcher_alive(&self) -> bool {
+        !self.watcher_disconnected
     }
 
     /// Reload configuration from file
@@ -493,6 +515,21 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_is_watcher_alive_true_after_creation() {
+        let config = AppConfig::default();
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        writeln!(temp_file, "[server]").expect("Failed to write to temp file");
+        temp_file.flush().expect("Failed to flush temp file");
+
+        let reloader = ConfigReloader::new(Arc::from(temp_file.path().to_path_buf()), config)
+            .expect("Failed to create reloader");
+
+        // A freshly created reloader has a live watcher; the disconnect latch
+        // only flips after the watcher channel actually disconnects.
+        assert!(reloader.is_watcher_alive());
+    }
 
     #[test]
     fn test_config_change_detection_no_change() {

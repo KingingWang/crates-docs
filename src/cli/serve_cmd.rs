@@ -75,6 +75,16 @@ fn start_config_reloader(config_path: &std::path::Path, server: &CratesDocsServe
                 loop {
                     check_interval.tick().await;
 
+                    // Stop the task if the watcher has died; otherwise this loop
+                    // would spin every second forever (and previously spammed a
+                    // warning each tick) with no way to detect changes.
+                    if !reloader.is_watcher_alive() {
+                        tracing::warn!(
+                            "Stopping configuration hot-reload task: file watcher disconnected."
+                        );
+                        break;
+                    }
+
                     if let Some(change) = reloader.check_for_changes() {
                         if let Some(changes) = change.changes() {
                             tracing::info!("Configuration file changed:");
