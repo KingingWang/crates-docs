@@ -223,11 +223,18 @@ impl LookupItemToolImpl {
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
         let html = self.fetch_item_html(crate_name, item_path, version).await?;
-        Ok(format!(
-            "Documentation: {}\n\n{}",
-            item_path,
-            html::extract_documentation_as_text(&html)
-        ))
+        let body = html::extract_documentation_as_text(&html);
+        // Mirror the markdown fallback note: a body that begins with "Crate "
+        // means the dedicated item page could not be resolved and the crate
+        // overview is shown instead.
+        let note = if body.trim_start().starts_with("Crate ") {
+            format!(
+                "No dedicated documentation page was found for '{item_path}'; showing the crate overview instead. It may be a method, associated item, or trait method, or it may not exist.\n\n"
+            )
+        } else {
+            String::new()
+        };
+        Ok(format!("Documentation: {item_path}\n\n{note}{body}"))
     }
 
     /// Get item documentation as raw HTML
