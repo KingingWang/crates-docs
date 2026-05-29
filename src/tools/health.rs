@@ -12,6 +12,10 @@ use rust_mcp_sdk::macros;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
+/// The set of valid `check_type` values accepted by the `health_check` tool.
+/// Kept in sync with the schema description and the `perform_checks` match.
+const VALID_CHECK_TYPES: &[&str] = &["all", "external", "internal", "docs_rs", "crates_io"];
+
 /// Parameters for the `health_check` tool
 ///
 /// Defines the input parameters for performing health checks,
@@ -341,6 +345,18 @@ impl Tool for HealthCheckToolImpl {
         })?;
 
         let check_type = params.check_type.unwrap_or_else(|| "all".to_string());
+        // Validate up front (fail-fast) like the other tools, rather than
+        // emitting a misleading "degraded" report with an "unknown_check" for a
+        // simple typo such as "al" instead of "all".
+        if !VALID_CHECK_TYPES.contains(&check_type.as_str()) {
+            return Err(rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                "health_check",
+                Some(format!(
+                    "Invalid check_type '{check_type}'. Expected one of: {}",
+                    VALID_CHECK_TYPES.join(", ")
+                )),
+            ));
+        }
         let verbose = params.verbose.unwrap_or(false);
 
         let health_status = self.perform_checks(&check_type, verbose).await;

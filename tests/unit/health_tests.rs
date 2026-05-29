@@ -110,6 +110,27 @@ async fn test_internal_check_non_verbose() {
     assert!(result.is_ok());
 }
 
+/// An unrecognized `check_type` must fail fast with an invalid-arguments error
+/// (consistent with the other tools) instead of returning a misleading
+/// "degraded" report containing a synthetic "unknown_check".
+#[tokio::test]
+async fn test_check_type_invalid_returns_error() {
+    let tool = HealthCheckToolImpl::new();
+    let result = tool
+        .execute(serde_json::json!({
+            "check_type": "al",
+            "verbose": false
+        }))
+        .await;
+
+    assert!(result.is_err(), "invalid check_type should error");
+    let msg = format!("{:?}", result.unwrap_err());
+    assert!(
+        msg.contains("Invalid check_type"),
+        "error should name the invalid check_type: {msg}"
+    );
+}
+
 // ============================================================================
 // Check type parameter tests
 // ============================================================================
@@ -178,11 +199,14 @@ async fn test_check_type_unknown() {
         }))
         .await;
 
-    assert!(result.is_ok());
-    let content = result.unwrap().content;
-    let content_str = format!("{:?}", content);
-    // Should contain "unknown" status for unknown check type
-    assert!(content_str.contains("unknown") || content_str.contains("Status"));
+    // An unrecognized check type now fails fast with an invalid-arguments
+    // error instead of returning a misleading "degraded"/"unknown" report.
+    assert!(result.is_err());
+    let msg = format!("{:?}", result.unwrap_err());
+    assert!(
+        msg.contains("Invalid check_type"),
+        "error should name the invalid check_type: {msg}"
+    );
 }
 
 // ============================================================================
@@ -403,7 +427,9 @@ async fn test_empty_string_check_type() {
         }))
         .await;
 
-    assert!(result.is_ok());
+    // An empty check type is not a valid value; it must error rather than
+    // silently producing an "unknown_check" report.
+    assert!(result.is_err());
 }
 
 #[tokio::test]
@@ -416,7 +442,8 @@ async fn test_whitespace_check_type() {
         }))
         .await;
 
-    assert!(result.is_ok());
+    // A whitespace-only check type is not a recognized value; it must error.
+    assert!(result.is_err());
 }
 
 #[tokio::test]
