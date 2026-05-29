@@ -166,9 +166,9 @@ impl LookupItemToolImpl {
     ) -> std::result::Result<String, CallToolError> {
         let html = self.fetch_item_html(crate_name, item_path, version).await?;
         Ok(format!(
-            "Search results: {}\n\n{}",
+            "Search Results: {}\n\n{}",
             item_path,
-            html::html_to_text(&html)
+            html::extract_documentation_as_text(&html)
         ))
     }
 

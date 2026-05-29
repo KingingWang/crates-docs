@@ -158,7 +158,7 @@ impl LookupCrateToolImpl {
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
         let html = self.fetch_crate_html(crate_name, version).await?;
-        Ok(html::html_to_text(&html))
+        Ok(html::extract_documentation_as_text(&html))
     }
 
     /// Get crate documentation as raw HTML

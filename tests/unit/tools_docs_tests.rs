@@ -1304,6 +1304,41 @@ async fn test_search_crates_tool_invalid_format_preserves_detailed_message() {
 
 #[tokio::test]
 #[serial(crates_io_env)]
+async fn test_search_crates_tool_rejects_html_format() {
+    use crates_docs::tools::Tool;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    // search_crates does not support html output; it must reject it explicitly
+    // (fail-fast, before any network request) rather than silently returning
+    // markdown.
+    let args = serde_json::json!({
+        "query": "serde",
+        "format": "html"
+    });
+
+    let error = tool
+        .execute(args)
+        .await
+        .expect_err("html format should be rejected for search_crates");
+    let msg = error.to_string();
+    assert!(msg.contains("html"), "unexpected message: {msg}");
+    assert!(msg.contains("markdown, text, json"), "unexpected message: {msg}");
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
 async fn test_search_crates_tool_uses_canonical_search_cache_key() {
     use crates_docs::tools::Tool;
     use wiremock::MockServer;

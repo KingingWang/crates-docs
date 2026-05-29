@@ -222,7 +222,6 @@ pub fn html_to_text(html: &str) -> String {
     clean_whitespace(&text_parts.join(" "))
 }
 
-#[inline]
 fn extract_text_excluding_skip_tags(
     element: &scraper::element_ref::ElementRef,
     text_parts: &mut Vec<String>,
@@ -233,10 +232,24 @@ fn extract_text_excluding_skip_tags(
         return;
     }
 
-    for text in element.text() {
-        let trimmed = text.trim();
-        if !trimmed.is_empty() {
-            text_parts.push(trimmed.to_string());
+    // Walk children, collecting only text nodes that are not inside a skip tag.
+    // We must recurse manually: `ElementRef::text()` yields *all* descendant
+    // text (including the contents of <script>/<style>/...), so a single
+    // top-level skip check would still leak nested script/style content.
+    for child in element.children() {
+        match child.value() {
+            scraper::node::Node::Text(text) => {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    text_parts.push(trimmed.to_string());
+                }
+            }
+            scraper::node::Node::Element(_) => {
+                if let Some(child_ref) = scraper::element_ref::ElementRef::wrap(child) {
+                    extract_text_excluding_skip_tags(&child_ref, text_parts);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -305,6 +318,19 @@ pub fn extract_search_results(html: &str, item_path: &str) -> String {
     }
 }
 
+/// Extract documentation from HTML as plain text.
+///
+/// Mirrors [`extract_documentation`] but produces plain text: it isolates the
+/// main content area (dropping navigation, sidebars and footers) before
+/// flattening to text. [`html_to_text`] already excludes `<script>`/`<style>`
+/// and other skip tags recursively, so the result is clean prose rather than
+/// the full page chrome plus inline JS/CSS.
+#[must_use]
+pub fn extract_documentation_as_text(html: &str) -> String {
+    let main_content = extract_main_content(html);
+    html_to_text(&main_content)
+}
+
 #[inline]
 fn clean_whitespace(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
@@ -340,6 +366,19 @@ mod tests {
         assert!(!text.contains('>'));
         assert!(text.contains("Hello"));
         assert!(text.contains("World"));
+    }
+
+    #[test]
+    fn test_html_to_text_excludes_script_and_style_recursively() {
+        // Regression: skip-tag exclusion must be recursive. Script/style content
+        // nested anywhere in the tree must not leak into the plain-text output.
+        let html = "<body>Hello<script>var secret = 1;</script>                    <div><style>.x{color:red}</style>World</div>                    <noscript>NOSCRIPT</noscript></body>";
+        let text = html_to_text(html);
+        assert!(text.contains("Hello"), "text: {text}");
+        assert!(text.contains("World"), "text: {text}");
+        assert!(!text.contains("secret"), "script content leaked: {text}");
+        assert!(!text.contains("color:red"), "style content leaked: {text}");
+        assert!(!text.contains("NOSCRIPT"), "noscript content leaked: {text}");
     }
 
     #[test]

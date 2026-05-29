@@ -120,14 +120,23 @@ pub struct SearchCratesToolImpl {
 
 fn normalize_search_sort(sort: Option<&str>) -> std::result::Result<String, CallToolError> {
     match sort {
-        Some(sort) if VALID_SEARCH_SORTS.contains(&sort) => Ok(sort.to_string()),
-        Some(sort) => Err(CallToolError::invalid_arguments(
-            "search_crates",
-            Some(format!(
-                "Invalid sort option '{sort}', expected one of: {}",
-                VALID_SEARCH_SORTS.join(", ")
-            )),
-        )),
+        Some(raw) => {
+            // Normalize like `parse_format`: trim surrounding whitespace and
+            // compare case-insensitively so e.g. "Downloads" or " downloads "
+            // are accepted. This also matches the cache-key normalization.
+            let normalized = raw.trim().to_lowercase();
+            if VALID_SEARCH_SORTS.contains(&normalized.as_str()) {
+                Ok(normalized)
+            } else {
+                Err(CallToolError::invalid_arguments(
+                    "search_crates",
+                    Some(format!(
+                        "Invalid sort option '{raw}', expected one of: {}",
+                        VALID_SEARCH_SORTS.join(", ")
+                    )),
+                ))
+            }
+        }
         None => Ok(DEFAULT_SEARCH_SORT.to_string()),
     }
 }
@@ -324,9 +333,24 @@ impl Tool for SearchCratesToolImpl {
         // network requests. This avoids wasted crates.io calls on invalid input
         // and keeps input-validation errors deterministic regardless of network
         // availability.
-        let limit = params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).min(100);
+        // Clamp to the documented range [1, 100]. A lower bound of 0 (or a
+        // value above 100) would otherwise silently produce an empty/odd
+        // result set and a `per_page=0` upstream request.
+        let limit = params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).clamp(1, 100);
         let sort = normalize_search_sort(params.sort.as_deref())?;
         let format = super::parse_format(params.format.as_deref())?;
+        // search_crates only supports markdown/text/json. Reject `html`
+        // explicitly with an actionable error instead of silently returning
+        // markdown (the tool schema does not advertise html for search).
+        if matches!(format, super::Format::Html) {
+            return Err(rust_mcp_sdk::schema::CallToolError::invalid_arguments(
+                "search_crates",
+                Some(
+                    "Invalid format 'html' for search_crates. Expected one of: markdown, text, json"
+                        .to_string(),
+                ),
+            ));
+        }
 
         let crates = self.search_crates(&params.query, limit, &sort).await?;
         let content = format_search_results(&crates, format);
