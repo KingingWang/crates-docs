@@ -91,6 +91,20 @@ static BUTTON_SELECTOR: LazyLock<Selector> =
 static SUMMARY_SELECTOR: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("summary").expect("hardcoded valid selector"));
 
+/// Regex to strip rustdoc source-code links (`<a class="src ...">Source</a>`)
+/// from raw HTML *before* parsing.
+///
+/// These anchors point at the crate's `src/...rs.html` listings and add no
+/// value to extracted documentation. They are commonly nested inside
+/// `<summary>` elements whose text content is otherwise preserved, so removing
+/// them at the DOM level would be too late (the "Source" label would survive as
+/// plain text). Stripping them from the raw HTML first guarantees they leak
+/// into neither plain-text nor markdown output.
+static SRC_ANCHOR_HTML_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?s)<a\b[^>]*\bclass="[^"]*\bsrc\b[^"]*"[^>]*>.*?</a>"#)
+        .expect("hardcoded valid regex pattern")
+});
+
 /// Cached selectors for main content extraction
 static MAIN_CONTENT_SELECTOR: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("#main-content").expect("hardcoded valid selector"));
@@ -106,8 +120,11 @@ static RUSTDOC_BODY_WRAPPER_SELECTOR: LazyLock<Selector> =
 /// unwanted elements to minimize parsing overhead.
 #[must_use]
 pub fn clean_html(html: &str) -> String {
-    let document = Html::parse_document(html);
-    remove_unwanted_elements(&document, html)
+    // Strip source-code anchors from the raw HTML first so their "Source" label
+    // cannot survive as plain text when nested inside preserved <summary> nodes.
+    let html = SRC_ANCHOR_HTML_REGEX.replace_all(html, "");
+    let document = Html::parse_document(&html);
+    remove_unwanted_elements(&document, &html)
 }
 
 /// Remove unwanted elements from HTML using scraper for parsing
@@ -382,6 +399,21 @@ fn clean_whitespace(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_clean_html_removes_source_links() {
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<a class=\"src rightside\" href=\"../src/foo/lib.rs.html#1-2\">Source</a>",
+            "<a class=\"src\" href=\"../src/foo/lib.rs.html#5\">Source</a>",
+            "<p>Real documentation text.</p>",
+            "</section></body></html>"
+        );
+        // Plain-text extraction must not leak the "Source" link labels.
+        let text = extract_documentation_as_text(html);
+        assert!(text.contains("Real documentation text."));
+        assert!(!text.contains("Source"), "source label leaked: {text}");
+    }
 
     #[test]
     fn test_clean_html_removes_script() {
