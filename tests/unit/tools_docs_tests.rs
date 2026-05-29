@@ -1001,6 +1001,59 @@ async fn test_lookup_item_tool_reuses_single_upstream_fetch_across_formats() {
     );
 }
 
+/// Resolving an item whose direct candidate pages do not exist falls back to
+/// the crate `all.html` index for both the full path and its parent path. The
+/// index must be fetched at most once across both attempts (it is the same
+/// crate-level URL), not re-fetched per attempt.
+#[tokio::test]
+#[serial(docs_rs_env)]
+async fn test_lookup_item_tool_fetches_all_html_index_only_once() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+
+    // The `all.html` index exists but lists nothing matching the requested
+    // item, so neither the full path (`mycrate::Foo::bar`) nor the parent path
+    // (`mycrate::Foo`) resolves through it. `expect(1)` makes the MockServer
+    // assert (on drop) that exactly one request reached the index.
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/mycrate/latest/mycrate/all.html"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"<html><body><a href="index.html">no items</a></body></html>"#),
+        )
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+    // Every other URL (candidate item pages, final crate search page) is
+    // unmounted, so wiremock answers 404, which the resolver treats as "absent".
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let request_count = Arc::new(AtomicUsize::new(0));
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        build_docs_rs_test_client(&mock_uri, request_count.clone()),
+    );
+    let tool = crates_docs::tools::docs::lookup_item::LookupItemToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "crate_name": "mycrate",
+        "item_path": "mycrate::Foo::bar",
+        "format": "markdown"
+    });
+
+    // The final fallback (crate search page) 404s, so execution ultimately
+    // errors; we only care that the index was not fetched twice. Drop the
+    // MockServer explicitly to trigger `expect(1)` verification.
+    let _ = tool.execute(args).await;
+    drop(mock_server);
+}
+
 #[tokio::test]
 #[serial(docs_rs_env)]
 async fn test_lookup_item_tool_keeps_versioned_and_unversioned_cache_entries_distinct() {

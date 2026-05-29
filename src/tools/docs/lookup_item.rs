@@ -78,6 +78,17 @@ pub struct LookupItemToolImpl {
     service: Arc<DocService>,
 }
 
+/// Memoized result of fetching a crate's `all.html` index.
+///
+/// Distinguishes "not fetched yet" from "fetched, but the index does not
+/// exist" so the underlying network request is issued at most once per item
+/// resolution, even when both the full-path and parent-path attempts fall back
+/// to the index.
+enum AllHtmlMemo {
+    Unfetched,
+    Fetched(Option<String>),
+}
+
 impl LookupItemToolImpl {
     /// Create a new lookup item tool instance
     #[must_use]
@@ -134,8 +145,13 @@ impl LookupItemToolImpl {
         item_path: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
+        // Reuse a single `all.html` fetch across the full-path and parent-path
+        // resolution attempts. Both attempts consult the same crate-level
+        // `all.html` index, so memoizing it here avoids a duplicate network
+        // round trip when neither path resolves via a direct item page.
+        let mut all_html_memo = AllHtmlMemo::Unfetched;
         if let Some(html) = self
-            .try_resolve_item_path(crate_name, item_path, version)
+            .try_resolve_item_path(crate_name, item_path, version, &mut all_html_memo)
             .await?
         {
             return Ok(html);
@@ -150,7 +166,7 @@ impl LookupItemToolImpl {
             let parent = parent.trim();
             if !parent.is_empty() {
                 if let Some(html) = self
-                    .try_resolve_item_path(crate_name, parent, version)
+                    .try_resolve_item_path(crate_name, parent, version, &mut all_html_memo)
                     .await?
                 {
                     return Ok(html);
@@ -171,6 +187,7 @@ impl LookupItemToolImpl {
         crate_name: &str,
         item_path: &str,
         version: Option<&str>,
+        all_html_memo: &mut AllHtmlMemo,
     ) -> std::result::Result<Option<String>, CallToolError> {
         let candidates = super::build_docs_item_url_candidates(crate_name, version, item_path);
         for url in candidates {
@@ -188,17 +205,32 @@ impl LookupItemToolImpl {
         // (e.g. `tokio::spawn`, actually defined at `tokio::task::spawn`).
         let item_name = item_path.rsplit("::").next().unwrap_or(item_path).trim();
         if !item_name.is_empty() {
-            let all_url = super::build_docs_all_items_url(crate_name, version);
-            // Bind each fallible await to a `let` so the `?` temporary is dropped
-            // at the statement boundary and not held across the next await
-            // (which would make the future non-`Send`).
-            let all_html = self
-                .service
-                .fetch_html_optional(&all_url, Some(TOOL_NAME))
-                .await?;
-            let item_url = all_html.as_deref().and_then(|html| {
-                super::find_item_url_in_all_html(crate_name, version, html, item_name)
-            });
+            // Lazily fetch `all.html` exactly once, memoizing the result (which
+            // may itself be `None` when the index does not exist) so a second
+            // resolution attempt for the parent path reuses it instead of
+            // issuing a duplicate request.
+            if matches!(all_html_memo, AllHtmlMemo::Unfetched) {
+                let all_url = super::build_docs_all_items_url(crate_name, version);
+                // Bind the fallible await to a `let` so the `?` temporary is
+                // dropped at the statement boundary and not held across a later
+                // await (which would make the future non-`Send`).
+                let fetched = self
+                    .service
+                    .fetch_html_optional(&all_url, Some(TOOL_NAME))
+                    .await?;
+                *all_html_memo = AllHtmlMemo::Fetched(fetched);
+            }
+            // Compute the resolved URL in a scope that ends before the next
+            // await so the borrow of `all_html_memo` is not held across it.
+            let item_url = {
+                let all_html = match &*all_html_memo {
+                    AllHtmlMemo::Fetched(html) => html.as_deref(),
+                    AllHtmlMemo::Unfetched => None,
+                };
+                all_html.and_then(|html| {
+                    super::find_item_url_in_all_html(crate_name, version, html, item_name)
+                })
+            };
             if let Some(item_url) = item_url {
                 let resolved = self
                     .service
@@ -285,11 +317,9 @@ impl LookupItemToolImpl {
         // Mirror the markdown/text fallback note so all three formats are
         // consistent. Detect the crate-overview fallback via the extracted
         // text (a body that begins with "Crate " means the dedicated item
-        // page could not be resolved).
-        if html::extract_documentation_as_text(&html)
-            .trim_start()
-            .starts_with("Crate ")
-        {
+        // page could not be resolved). Derive the text from the already
+        // cleaned `body` rather than re-parsing the raw HTML a second time.
+        if html::html_to_text(&body).trim_start().starts_with("Crate ") {
             // item_path is validated to [A-Za-z0-9_:-]; escape defensively
             // anyway since this is an HTML context.
             let safe_path = item_path
