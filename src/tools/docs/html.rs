@@ -385,7 +385,21 @@ pub fn extract_search_results(html: &str, item_path: &str) -> String {
     let cleaned_markdown = clean_markdown(&markdown);
 
     if cleaned_markdown.trim().is_empty() {
-        format!("Documentation for '{item_path}' not found")
+        return format!("Documentation for '{item_path}' not found");
+    }
+
+    // Detect the crate-landing-page fallback: item pages always start with
+    // their kind ("Function", "Struct", "Trait", "Module", ...), so a body that
+    // begins with "Crate " means no dedicated item page was resolved. Surface an
+    // honest note so the heading is not mistaken for the item's own docs.
+    let first_line = cleaned_markdown
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("");
+    if first_line.trim_start().starts_with("Crate ") {
+        format!(
+            "## Documentation: {item_path}\n\n_No dedicated documentation page was found for `{item_path}`; showing the crate overview instead. It may be a method, associated item, or trait method, or it may not exist._\n\n{cleaned_markdown}"
+        )
     } else {
         format!("## Documentation: {item_path}\n\n{cleaned_markdown}")
     }
@@ -537,6 +551,28 @@ mod tests {
         let docs = extract_documentation(html);
         assert!(docs.contains("Title"));
         assert!(docs.contains("Content"));
+    }
+
+    #[test]
+    fn test_extract_search_results_crate_fallback_adds_note() {
+        // A crate-landing page (starts with "Crate ") used as fallback for an
+        // item lookup must surface an honest note.
+        let html = "<html><body><section id=\"main-content\"><h1>Crate serde</h1><p>Crate docs.</p></section></body></html>";
+        let result = extract_search_results(html, "DoesNotExist");
+        assert!(result.contains("## Documentation: DoesNotExist"));
+        assert!(
+            result.contains("No dedicated documentation page was found"),
+            "missing fallback note: {result}"
+        );
+    }
+
+    #[test]
+    fn test_extract_search_results_direct_item_no_note() {
+        // A real item page (starts with its kind) must NOT get the fallback note.
+        let html = "<html><body><section id=\"main-content\"><h1>Function spawn</h1><p>Spawns.</p></section></body></html>";
+        let result = extract_search_results(html, "spawn");
+        assert!(result.contains("## Documentation: spawn"));
+        assert!(!result.contains("No dedicated documentation page was found"));
     }
 
     #[test]
