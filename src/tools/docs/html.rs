@@ -46,11 +46,15 @@ static EMPTY_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\[([^\]]*)\]\(\)").expect("hardcoded valid regex pattern")
 });
 
-/// Regex to drop no-op fragment-only toggle links like `[i](#)` or `[s](#)`
-/// (a bare `#` target navigates nowhere). Real in-page anchors such as
-/// `[Quick start](#quick-start)` keep a fragment id and are preserved.
+/// Regex to match no-op fragment-only links like `[serde](#)` or `[ⓘ](#)`
+/// (a bare `#` target navigates nowhere). The captured label is inspected by
+/// the caller: meaningful labels (containing an alphanumeric, e.g. a crate name
+/// in a versioned-page heading where rustdoc renders `<a href="#">serde</a>`)
+/// are downgraded to plain text, while symbol-only toggle markers (ⓘ, −, +)
+/// are dropped. Real in-page anchors such as `[Quick start](#quick-start)`
+/// keep a fragment id and never match.
 static FRAGMENT_TOGGLE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\[[^\]]*\]\(#\)").expect("hardcoded valid regex pattern"));
+    LazyLock::new(|| Regex::new(r"\[([^\]]*)\]\(#\)").expect("hardcoded valid regex pattern"));
 
 /// Regex to drop breadcrumb-residue lines that contain only `::` separators.
 ///
@@ -366,7 +370,16 @@ fn clean_markdown(markdown: &str) -> String {
     let result = SRC_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
-    let result = FRAGMENT_TOGGLE_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = FRAGMENT_TOGGLE_REGEX.replace_all(&result, |caps: &regex::Captures| {
+        let label = &caps[1];
+        // Keep crate/module names (which contain alphanumerics); drop bare
+        // toggle markers such as the info circle or expand/collapse glyphs.
+        if label.chars().any(|c| c.is_ascii_alphanumeric()) {
+            label.to_string()
+        } else {
+            String::new()
+        }
+    });
     let result = EMPTY_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = STRAY_COLON_LINE_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = MULTIPLE_NEWLINES_REGEX.replace_all(&result, Cow::Borrowed("\n\n"));
@@ -720,6 +733,18 @@ mod tests {
         // No-op fragment-only toggles are removed, real anchors preserved.
         assert!(!out.contains("(#)"), "fragment toggle leaked: {out}");
         assert!(out.contains("#quick-start"), "real anchor dropped: {out}");
+    }
+
+    #[test]
+    fn test_clean_markdown_keeps_named_fragment_link_text() {
+        // Versioned docs.rs pages render the crate name in the h1 as
+        // `<a class="mod" href="#">serde</a>`, which becomes `[serde](#)` in
+        // markdown. The label must survive (only symbol toggles are dropped).
+        let md = "Crate [serde](#) [ⓘ](#)\n\nbody";
+        let out = clean_markdown(md);
+        assert!(out.contains("Crate serde"), "crate name dropped: {out}");
+        assert!(!out.contains("(#)"), "fragment link syntax leaked: {out}");
+        assert!(!out.contains("ⓘ"), "symbol toggle leaked: {out}");
     }
 
     #[test]
