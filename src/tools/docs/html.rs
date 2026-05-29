@@ -62,10 +62,16 @@ static FRAGMENT_TOGGLE_REGEX: LazyLock<Regex> =
 static STRAY_COLON_LINE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?m)^[ \t]*:{2,}[ \t]*$").expect("hardcoded valid regex pattern"));
 
-/// Regex to remove relative documentation links like [de](de/index.html) or [forward\_to\_deserialize\_any](macro.xxx.html)
-/// Matches: [text](relative_path.html) where `relative_path` starts with letter and ends with .html
+/// Regex to rewrite relative documentation links to their link text.
+///
+/// Matches `[text](relative_path.html)` where `relative_path` begins with a
+/// letter, digit, `_`, `.` or `/` (covering module paths such as
+/// `_derive/index.html`, `../index.html`, `struct.Foo.html`) and ends with
+/// `.html` (optionally followed by a `#fragment`). The captured link text is
+/// preserved (replacement `$1`) because these targets are docs.rs-relative and
+/// useless to an MCP client, but the label (e.g. "tutorial") is meaningful.
 static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[[^\]]*\]\([a-zA-Z./][^)]*\.html(?:#[^)]*)?\)")
+    Regex::new(r"\[([^\]]*)\]\([a-zA-Z0-9._/][^)]*\.html(?:#[^)]*)?\)")
         .expect("hardcoded valid regex pattern")
 });
 
@@ -358,7 +364,7 @@ fn clean_markdown(markdown: &str) -> String {
     let result = JS_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = SOURCE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = SRC_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
-    let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = FRAGMENT_TOGGLE_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = EMPTY_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
@@ -670,6 +676,9 @@ mod tests {
         assert!(re.is_match("[tokio](../index.html)"));
         assert!(re.is_match("[crate](./index.html)"));
         assert!(re.is_match("[root](/serde/index.html)"));
+        // Module paths beginning with `_` or digits (e.g. clap's `_derive`).
+        assert!(re.is_match("[tutorial](_derive/_tutorial/index.html)"));
+        assert!(re.is_match("[v2](2/index.html)"));
 
         // Should NOT match
         assert!(!re.is_match("[Section](#section)")); // Anchor link
@@ -677,6 +686,17 @@ mod tests {
             !re.is_match("[External](https://example.com)"),
             "Should not match external URLs"
         ); // External URL
+    }
+
+    #[test]
+    fn test_clean_markdown_relative_links_keep_text() {
+        // clap-style underscore module links must be rewritten to their text,
+        // not left as broken docs.rs-relative links.
+        let md = "Derive [tutorial](_derive/_tutorial/index.html) and [reference](_derive/index.html).";
+        let out = clean_markdown(md);
+        assert!(!out.contains(".html"), "relative link survived: {out}");
+        assert!(!out.contains("_derive"), "relative target survived: {out}");
+        assert!(out.contains("Derive tutorial and reference."), "text not kept: {out}");
     }
 
     #[test]
