@@ -86,6 +86,19 @@ fn build_docs_rs_test_client(
     )
 }
 
+/// Build a test client that transparently redirects crates.io API requests to
+/// a wiremock server, mirroring `build_docs_rs_test_client`. Routing via
+/// middleware keeps the search tests hermetic without relying on the
+/// `#[cfg(test)]`-gated `CRATES_DOCS_CRATES_IO_URL` override, which is not
+/// compiled into the integration-test build of the library and would otherwise
+/// let these tests fall through to the live crates.io API (a source of
+/// rate-limit flakes and false-positive assertions).
+fn build_crates_io_test_client(
+    target_base_url: &str,
+) -> Arc<reqwest_middleware::ClientWithMiddleware> {
+    build_docs_rs_test_client(target_base_url, Arc::new(AtomicUsize::new(0)))
+}
+
 /// Test DocCacheTtl default values
 #[test]
 fn test_doc_cache_ttl_default() {
@@ -1125,17 +1138,14 @@ async fn test_search_crates_tool_execute_markdown() {
         .mount(&mock_server)
         .await;
 
-    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
-
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
     let service = crates_docs::tools::docs::DocService::with_custom_client(
         cache,
         &cache_config,
-        Arc::new(test_client),
+        build_crates_io_test_client(&mock_uri),
     );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
@@ -1178,17 +1188,14 @@ async fn test_search_crates_tool_execute_text_format() {
         .mount(&mock_server)
         .await;
 
-    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
-
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
     let service = crates_docs::tools::docs::DocService::with_custom_client(
         cache,
         &cache_config,
-        Arc::new(test_client),
+        build_crates_io_test_client(&mock_uri),
     );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
@@ -1229,17 +1236,14 @@ async fn test_search_crates_tool_execute_json_format() {
         .mount(&mock_server)
         .await;
 
-    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
-
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
     let service = crates_docs::tools::docs::DocService::with_custom_client(
         cache,
         &cache_config,
-        Arc::new(test_client),
+        build_crates_io_test_client(&mock_uri),
     );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
@@ -1356,17 +1360,14 @@ async fn test_search_crates_tool_uses_canonical_search_cache_key() {
     use wiremock::MockServer;
 
     let mock_server = MockServer::start().await;
-    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_server.uri());
-
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
     let service = crates_docs::tools::docs::DocService::with_custom_client(
         cache,
         &cache_config,
-        Arc::new(test_client),
+        build_crates_io_test_client(&mock_server.uri()),
     );
 
     service
@@ -1423,17 +1424,14 @@ async fn test_search_crates_tool_limit_clamping() {
         .mount(&mock_server)
         .await;
 
-    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
-
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
     let service = crates_docs::tools::docs::DocService::with_custom_client(
         cache,
         &cache_config,
-        Arc::new(test_client),
+        build_crates_io_test_client(&mock_uri),
     );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
@@ -1459,7 +1457,8 @@ async fn test_search_crates_tool_cache_key_differs_by_sort() {
     // Setup mock to expect two different requests (different sort parameters)
     // relevance sort request
     Mock::given(matchers::method("GET"))
-        .and(matchers::path_regex(r"/api/v1/crates.*sort=relevance.*"))
+        .and(matchers::path("/api/v1/crates"))
+        .and(matchers::query_param("sort", "relevance"))
         .respond_with(ResponseTemplate::new(200).set_body_string(
             r#"{"crates":[{"name":"reqwest","max_version":"1.0","downloads":1000}]}"#,
         ))
@@ -1468,24 +1467,22 @@ async fn test_search_crates_tool_cache_key_differs_by_sort() {
 
     // downloads sort request
     Mock::given(matchers::method("GET"))
-        .and(matchers::path_regex(r"/api/v1/crates.*sort=downloads.*"))
+        .and(matchers::path("/api/v1/crates"))
+        .and(matchers::query_param("sort", "downloads"))
         .respond_with(ResponseTemplate::new(200).set_body_string(
             r#"{"crates":[{"name":"tokio","max_version":"2.0","downloads":2000}]}"#,
         ))
         .mount(&mock_server)
         .await;
 
-    let _guard = EnvVarGuard::new("CRATES_DOCS_CRATES_IO_URL", &mock_uri);
-
     let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
     let cache = Arc::new(memory_cache);
     let cache_config = crates_docs::cache::CacheConfig::default();
 
-    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
     let service = crates_docs::tools::docs::DocService::with_custom_client(
         cache,
         &cache_config,
-        Arc::new(test_client),
+        build_crates_io_test_client(&mock_uri),
     );
 
     let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
