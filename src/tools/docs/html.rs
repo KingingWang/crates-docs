@@ -22,7 +22,7 @@ static SOURCE_LINK_REGEX: LazyLock<Regex> =
 /// Regex to remove relative documentation links like [de](de/index.html) or [forward\_to\_deserialize\_any](macro.xxx.html)
 /// Matches: [text](relative_path.html) where `relative_path` starts with letter and ends with .html
 static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[[^\]]*\]\([a-zA-Z][^)]*\.html\)").expect("hardcoded valid regex pattern")
+    Regex::new(r"\[[^\]]*\]\([a-zA-Z./][^)]*\.html\)").expect("hardcoded valid regex pattern")
 });
 
 /// Regex to collapse three or more newlines to two newlines
@@ -511,6 +511,9 @@ mod tests {
         // Should match - relative .html links
         assert!(re.is_match("[module](module/index.html)"));
         assert!(re.is_match("[struct](struct.Struct.html)"));
+        assert!(re.is_match("[tokio](../index.html)"));
+        assert!(re.is_match("[crate](./index.html)"));
+        assert!(re.is_match("[root](/serde/index.html)"));
 
         // Should NOT match
         assert!(!re.is_match("[Section](#section)")); // Anchor link
