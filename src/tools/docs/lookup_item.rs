@@ -307,12 +307,7 @@ impl Tool for LookupItemToolImpl {
 
         super::validate_crate_name(&params.crate_name)?;
         super::validate_version(params.version.as_deref())?;
-        if params.item_path.trim().is_empty() {
-            return Err(rust_mcp_sdk::schema::CallToolError::invalid_arguments(
-                "item_path",
-                Some("item_path must not be empty".to_string()),
-            ));
-        }
+        super::validate_item_path(&params.item_path)?;
         // Normalise surrounding whitespace so it does not leak into headings or
         // candidate URL construction.
         params.item_path = params.item_path.trim().to_string();

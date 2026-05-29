@@ -180,6 +180,46 @@ pub fn validate_search_query(query: &str) -> Result<(), CallToolError> {
     Ok(())
 }
 
+/// Validate an item path supplied by a tool caller.
+///
+/// Item paths are Rust paths made of identifier segments separated by `::`
+/// (for example `serde::Serialize` or `std::vec::Vec::push`). This rejects
+/// path-traversal sequences and characters such as `/`, `.` or whitespace that
+/// could escape the docs.rs path or otherwise form an invalid request, giving
+/// callers an actionable error instead of an opaque HTTP 400.
+///
+/// # Errors
+///
+/// Returns a `CallToolError` describing the first problem found.
+pub fn validate_item_path(item_path: &str) -> Result<(), CallToolError> {
+    let path = item_path.trim();
+    if path.is_empty() {
+        return Err(CallToolError::invalid_arguments(
+            "item_path",
+            Some("item_path must not be empty".to_string()),
+        ));
+    }
+    if path.len() > 256 {
+        return Err(CallToolError::invalid_arguments(
+            "item_path",
+            Some("item_path is too long (max 256 characters)".to_string()),
+        ));
+    }
+    if path.contains("..")
+        || !path
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b':')
+    {
+        return Err(CallToolError::invalid_arguments(
+            "item_path",
+            Some(format!(
+                "Invalid item_path '{item_path}'. Only ASCII letters, digits, '_' and '::' separators are allowed"
+            )),
+        ));
+    }
+    Ok(())
+}
+
 /// Summarize a non-success HTTP response from docs.rs into a concise,
 /// actionable error string.
 ///
@@ -727,6 +767,28 @@ mod tests {
         assert!(validate_version(Some("1.0 0")).is_err());
         assert!(validate_version(Some("..")).is_err());
         assert!(validate_version(Some(&"1".repeat(65))).is_err());
+    }
+
+    #[test]
+    fn test_validate_item_path_accepts_valid() {
+        assert!(validate_item_path("Serialize").is_ok());
+        assert!(validate_item_path("serde::Serialize").is_ok());
+        assert!(validate_item_path("std::vec::Vec::push").is_ok());
+        assert!(validate_item_path("collections::HashMap").is_ok());
+        assert!(validate_item_path("u32").is_ok());
+        assert!(validate_item_path("  tokio::main  ").is_ok());
+    }
+
+    #[test]
+    fn test_validate_item_path_rejects_invalid() {
+        assert!(validate_item_path("").is_err());
+        assert!(validate_item_path("   ").is_err());
+        assert!(validate_item_path("../../etc/passwd").is_err());
+        assert!(validate_item_path("serde/Serialize").is_err());
+        assert!(validate_item_path("serde::Ser ialize").is_err());
+        assert!(validate_item_path("foo;rm").is_err());
+        assert!(validate_item_path("foo.bar").is_err());
+        assert!(validate_item_path(&"a".repeat(257)).is_err());
     }
 
     #[test]
