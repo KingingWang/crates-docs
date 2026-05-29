@@ -262,7 +262,10 @@ fn format_search_results(crates: &[CrateInfo], format: super::Format) -> String 
             serde_json::to_string_pretty(crates).unwrap_or_else(|_| "[]".to_string())
         }
         super::Format::Text => format_text_results(crates),
-        _ => format_markdown_results(crates),
+        // `html` is rejected before formatting (see `execute`); list both
+        // variants explicitly so adding a new `Format` variant becomes a
+        // compile error here rather than a silent fall-through to markdown.
+        super::Format::Markdown | super::Format::Html => format_markdown_results(crates),
     }
 }
 
