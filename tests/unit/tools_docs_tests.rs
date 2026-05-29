@@ -925,13 +925,18 @@ async fn test_lookup_item_tool_reuses_single_upstream_fetch_across_formats() {
     let markdown_result = tool.execute(markdown_args).await;
     assert!(markdown_result.is_ok());
 
+    // The first lookup probes candidate item URLs and then falls back to the
+    // crate page; record however many upstream requests that took.
+    let after_first = request_count.load(Ordering::SeqCst);
+    assert!(after_first > 0, "first lookup should hit upstream");
+
     let html_result = tool.execute(html_args).await;
     assert!(html_result.is_ok());
 
     assert_eq!(
         request_count.load(Ordering::SeqCst),
-        1,
-        "expected a single upstream request"
+        after_first,
+        "second format should be served entirely from cache (no new upstream requests)"
     );
 }
 
@@ -991,14 +996,15 @@ async fn test_lookup_item_tool_keeps_versioned_and_unversioned_cache_entries_dis
 
     let latest_result = tool.execute(latest_args).await;
     assert!(latest_result.is_ok());
+    let after_latest = request_count.load(Ordering::SeqCst);
+    assert!(after_latest > 0, "first (latest) lookup should hit upstream");
 
     let versioned_result = tool.execute(versioned_args).await;
     assert!(versioned_result.is_ok());
 
-    assert_eq!(
-        request_count.load(Ordering::SeqCst),
-        2,
-        "expected separate upstream requests"
+    assert!(
+        request_count.load(Ordering::SeqCst) > after_latest,
+        "versioned lookup must use a distinct cache key and trigger its own upstream fetch"
     );
 }
 

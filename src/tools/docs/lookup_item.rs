@@ -105,8 +105,9 @@ impl LookupItemToolImpl {
             return Ok(cached.to_string());
         }
 
-        let url = Self::build_search_url(crate_name, item_path, version);
-        let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
+        let html = self
+            .resolve_item_html(crate_name, item_path, version)
+            .await?;
 
         self.service
             .doc_cache()
@@ -117,6 +118,36 @@ impl LookupItemToolImpl {
             })?;
 
         Ok(html)
+    }
+
+    /// Resolve and fetch the HTML for a specific item.
+    ///
+    /// Probes the candidate rustdoc item URLs (`struct.`, `trait.`, `fn.`, ...)
+    /// and returns the first that exists. docs.rs renders in-page search with
+    /// client-side JavaScript, so the `?search=` URL only ever returns the
+    /// crate landing page server-side; therefore, if no direct item page is
+    /// found, it falls back to that crate page so the caller still gets useful
+    /// context instead of a hard error.
+    async fn resolve_item_html(
+        &self,
+        crate_name: &str,
+        item_path: &str,
+        version: Option<&str>,
+    ) -> std::result::Result<String, CallToolError> {
+        let candidates = super::build_docs_item_url_candidates(crate_name, version, item_path);
+        for url in candidates {
+            if let Some(html) = self
+                .service
+                .fetch_html_optional(&url, Some(TOOL_NAME))
+                .await?
+            {
+                return Ok(html);
+            }
+        }
+
+        // Fallback: the crate page (legacy `?search=` behaviour).
+        let url = Self::build_search_url(crate_name, item_path, version);
+        self.service.fetch_html(&url, Some(TOOL_NAME)).await
     }
 
     /// Get item documentation (markdown format)

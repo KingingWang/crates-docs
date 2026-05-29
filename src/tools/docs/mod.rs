@@ -258,6 +258,71 @@ pub fn build_docs_item_url(crate_name: &str, version: Option<&str>, item_path: &
     }
 }
 
+/// Build candidate docs.rs URLs for a specific item, in priority order.
+///
+/// rustdoc item pages use predictable `{kind}.{name}.html` file names, but the
+/// item kind (struct/trait/fn/...) cannot be derived from the path alone. This
+/// returns the plausible candidate URLs to probe; the caller fetches each in
+/// order and uses the first that exists (HTTP 200). A trailing module candidate
+/// (`{name}/index.html`) covers items that are themselves modules.
+///
+/// The crate's library path component uses the underscore form (docs.rs maps
+/// `-` to `_` for module paths). A leading path segment equal to the crate name
+/// is dropped so both `Serialize` and `serde::Serialize` resolve correctly.
+#[must_use]
+pub fn build_docs_item_url_candidates(
+    crate_name: &str,
+    version: Option<&str>,
+    item_path: &str,
+) -> Vec<String> {
+    let base_url = docs_rs_base_url();
+    let ver = version.unwrap_or("latest");
+    let krate = crate_name.replace('-', "_");
+
+    let segments: Vec<&str> = item_path
+        .split("::")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    let Some((item, mods)) = segments.split_last() else {
+        return Vec::new();
+    };
+
+    // Drop a redundant leading crate-name segment (e.g. `serde::Serialize`).
+    let mods: &[&str] = if mods.first().map(|m| m.replace('-', "_")) == Some(krate.clone()) {
+        &mods[1..]
+    } else {
+        mods
+    };
+
+    let mut prefix = format!("{base_url}/{crate_name}/{ver}/{krate}/");
+    for m in mods {
+        prefix.push_str(m);
+        prefix.push('/');
+    }
+
+    // Ordered roughly by how common each item kind is.
+    let kinds = [
+        "struct",
+        "trait",
+        "enum",
+        "fn",
+        "type",
+        "macro",
+        "constant",
+        "derive",
+        "union",
+        "primitive",
+    ];
+    let mut candidates: Vec<String> = kinds
+        .iter()
+        .map(|k| format!("{prefix}{k}.{item}.html"))
+        .collect();
+    // The item itself may be a module.
+    candidates.push(format!("{prefix}{item}/index.html"));
+    candidates
+}
+
 /// Build crates.io API search URL
 #[must_use]
 pub fn build_crates_io_search_url(query: &str, sort: Option<&str>, limit: Option<usize>) -> String {
@@ -445,6 +510,46 @@ impl DocService {
         })
     }
 
+    /// Fetch HTML from `url`, returning `Ok(None)` when the resource does not
+    /// exist (HTTP 404) instead of an error.
+    ///
+    /// This is used to probe candidate docs.rs item URLs where a 404 simply
+    /// means "this item kind does not match" rather than a hard failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `CallToolError` if the request fails, the response has a
+    /// non-success status other than 404, or reading the body fails.
+    pub async fn fetch_html_optional(
+        &self,
+        url: &str,
+        tool_name: Option<&str>,
+    ) -> Result<Option<String>, CallToolError> {
+        let response = self.client.get(url).send().await.map_err(|e| {
+            let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+            CallToolError::from_message(format!("{prefix}HTTP request failed: {e}"))
+        })?;
+
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !status.is_success() {
+            let error_body = response.text().await.unwrap_or_default();
+            let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+            return Err(CallToolError::from_message(format!(
+                "{prefix}Failed to get documentation: {}",
+                summarize_http_status(status, &error_body)
+            )));
+        }
+
+        let body = response.text().await.map_err(|e| {
+            let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+            CallToolError::from_message(format!("{prefix}Failed to read response: {e}"))
+        })?;
+        Ok(Some(body))
+    }
+
     /// Create new document service with custom HTTP client (for testing)
     #[must_use]
     pub fn with_custom_client(
@@ -565,6 +670,37 @@ mod tests {
         assert!(validate_search_query("").is_err());
         assert!(validate_search_query("   ").is_err());
         assert!(validate_search_query(&"a".repeat(201)).is_err());
+    }
+
+    #[test]
+    fn test_item_url_candidates_strip_redundant_crate_segment() {
+        let c = build_docs_item_url_candidates("serde", None, "serde::Serialize");
+        assert!(c.iter().any(|u| u.ends_with("/serde/latest/serde/trait.Serialize.html")));
+        assert!(c.iter().any(|u| u.ends_with("/serde/latest/serde/struct.Serialize.html")));
+        // module fallback candidate is last
+        assert!(c.last().unwrap().ends_with("/serde/latest/serde/Serialize/index.html"));
+    }
+
+    #[test]
+    fn test_item_url_candidates_nested_module_and_version() {
+        let c = build_docs_item_url_candidates("serde", Some("1.0.0"), "de::Deserializer");
+        assert!(c
+            .iter()
+            .any(|u| u.ends_with("/serde/1.0.0/serde/de/trait.Deserializer.html")));
+    }
+
+    #[test]
+    fn test_item_url_candidates_hyphen_crate_uses_underscore_path() {
+        let c = build_docs_item_url_candidates("serde-with", None, "As");
+        // First path component keeps the crate name; the lib path uses underscores.
+        assert!(c
+            .iter()
+            .any(|u| u.ends_with("/serde-with/latest/serde_with/struct.As.html")));
+    }
+
+    #[test]
+    fn test_item_url_candidates_empty_path() {
+        assert!(build_docs_item_url_candidates("serde", None, "   ").is_empty());
     }
 
     #[test]
