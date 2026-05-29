@@ -36,7 +36,7 @@ pub fn run_list_api_keys_command(config_path: &Path) -> Result<(), Box<dyn std::
         println!("Status: DISABLED");
         println!();
         println!("API key authentication is not enabled.");
-        println!("Set enabled = true in [api_key] section to enable.");
+        println!("Set enabled = true in [auth.api_key] section to enable.");
         return Ok(());
     }
 

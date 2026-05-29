@@ -146,13 +146,13 @@ provider = "Custom"
 # provider = "Keycloak"
 
 # =============================================================================
-# [api_key] API Key Authentication Configuration ✅ Fully supports hot reload
+# [auth.api_key] API Key Authentication Configuration ✅ Fully supports hot reload
 # =============================================================================
 #
 # Note: Requires api-key feature to use this functionality
 # All fields support runtime hot reload, take effect immediately after modification (no restart needed)
 #
-# [api_key]
+# [auth.api_key]
 # # Enable API Key authentication ✅ Supports hot reload
 # enabled = true
 # # List of valid API Key hashes (Argon2 PHC format) ✅ Supports hot reload

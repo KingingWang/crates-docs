@@ -35,7 +35,7 @@ pub fn run_generate_api_key_command(prefix: &str) -> Result<(), Box<dyn std::err
     println!("{}", generated.hash);
     println!();
     println!("Example config:");
-    println!("[api_key]");
+    println!("[auth.api_key]");
     println!("enabled = true");
     println!("keys = [\"{}\"]", generated.hash);
     println!("header_name = \"X-API-Key\"");

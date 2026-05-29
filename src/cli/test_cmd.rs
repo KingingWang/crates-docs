@@ -75,7 +75,7 @@ async fn execute_lookup_crate(
         // Execute tool
         match registry.execute_tool("lookup_crate", arguments).await {
             Ok(result) => print_tool_result(&result),
-            Err(e) => eprintln!("Tool execution failed: {e}"),
+            Err(e) => return Err(format!("Tool execution failed: {e}").into()),
         }
     } else {
         return Err("lookup_crate requires --crate-name parameter".into());
@@ -110,7 +110,7 @@ async fn execute_search_crates(
         // Execute tool
         match registry.execute_tool("search_crates", arguments).await {
             Ok(result) => print_tool_result(&result),
-            Err(e) => eprintln!("Tool execution failed: {e}"),
+            Err(e) => return Err(format!("Tool execution failed: {e}").into()),
         }
     } else {
         return Err("search_crates requires --query parameter".into());
@@ -144,7 +144,7 @@ async fn execute_lookup_item(
         // Execute tool
         match registry.execute_tool("lookup_item", arguments).await {
             Ok(result) => print_tool_result(&result),
-            Err(e) => eprintln!("Tool execution failed: {e}"),
+            Err(e) => return Err(format!("Tool execution failed: {e}").into()),
         }
     } else {
         return Err("lookup_item requires --crate-name and --item-path parameters".into());
@@ -167,7 +167,7 @@ async fn execute_health_check(
     // Execute tool
     match registry.execute_tool("health_check", arguments).await {
         Ok(result) => print_tool_result(&result),
-        Err(e) => eprintln!("Tool execution failed: {e}"),
+        Err(e) => return Err(format!("Tool execution failed: {e}").into()),
     }
     Ok(())
 }
