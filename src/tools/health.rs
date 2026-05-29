@@ -174,15 +174,51 @@ impl HealthCheckToolImpl {
         .await
     }
 
-    /// Check memory usage
+    /// Check memory usage.
+    ///
+    /// On Linux this reports the process resident set size (RSS) read from
+    /// `/proc/self/statm` so the "internal" health check carries real, useful
+    /// information instead of a hard-coded "normal" verdict. On other platforms
+    /// it reports that the metric is unavailable rather than fabricating one.
     fn check_memory() -> HealthCheck {
+        let message = Self::memory_message();
         HealthCheck {
             name: "memory".to_string(),
             status: "healthy".to_string(),
             duration_ms: 0,
-            message: Some("Memory usage is normal".to_string()),
+            message: Some(message),
             error: None,
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn memory_message() -> String {
+        match Self::read_process_rss_bytes() {
+            Some(bytes) => {
+                // Integer math keeps this precise and avoids lossy float casts.
+                let mib = bytes / (1024 * 1024);
+                let frac = (bytes % (1024 * 1024)) * 10 / (1024 * 1024);
+                format!("Resident set size: {mib}.{frac} MiB")
+            }
+            None => "Memory metrics unavailable (could not read /proc/self/statm)".to_string(),
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn memory_message() -> String {
+        "Memory metrics are not implemented on this platform".to_string()
+    }
+
+    /// Read the current process resident set size in bytes from `/proc`.
+    #[cfg(target_os = "linux")]
+    fn read_process_rss_bytes() -> Option<u64> {
+        let statm = std::fs::read_to_string("/proc/self/statm").ok()?;
+        // Field 2 (index 1) is the resident set size measured in memory pages.
+        let resident_pages: u64 = statm.split_whitespace().nth(1)?.parse().ok()?;
+        // SAFETY: `sysconf` is a pure libc query with no memory-safety impact.
+        let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+        let page_size = u64::try_from(page_size).unwrap_or(4096);
+        Some(resident_pages.saturating_mul(page_size))
     }
 
     async fn perform_checks(&self, check_type: &str, verbose: bool) -> HealthStatus {
