@@ -52,6 +52,16 @@ static EMPTY_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 static FRAGMENT_TOGGLE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[[^\]]*\]\(#\)").expect("hardcoded valid regex pattern"));
 
+/// Regex to drop breadcrumb-residue lines that contain only `::` separators.
+///
+/// rustdoc item headers render a navigation breadcrumb such as
+/// `[tokio](../index.html)::[task](../index.html)::spawn`. Once the relative
+/// links are stripped, an orphan line of bare `::` separators can remain; it
+/// carries no information and is removed. Inline `::` inside code or text is
+/// unaffected because those lines contain other characters.
+static STRAY_COLON_LINE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?m)^[ \t]*:{2,}[ \t]*$").expect("hardcoded valid regex pattern"));
+
 /// Regex to remove relative documentation links like [de](de/index.html) or [forward\_to\_deserialize\_any](macro.xxx.html)
 /// Matches: [text](relative_path.html) where `relative_path` starts with letter and ends with .html
 static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -339,6 +349,7 @@ fn clean_markdown(markdown: &str) -> String {
     let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = FRAGMENT_TOGGLE_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = EMPTY_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
+    let result = STRAY_COLON_LINE_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = MULTIPLE_NEWLINES_REGEX.replace_all(&result, Cow::Borrowed("\n\n"));
     result.trim().to_string()
 }
@@ -618,6 +629,23 @@ mod tests {
         // No-op fragment-only toggles are removed, real anchors preserved.
         assert!(!out.contains("(#)"), "fragment toggle leaked: {out}");
         assert!(out.contains("#quick-start"), "real anchor dropped: {out}");
+    }
+
+    #[test]
+    fn test_clean_markdown_removes_breadcrumb_colon_lines() {
+        let md = "## Documentation: spawn
+
+::
+
+Function spawn
+
+let x = S::Ok;";
+        let out = clean_markdown(md);
+        // The orphan breadcrumb separator line is gone.
+        assert!(!out.contains("\n::\n"), "stray colon line leaked: {out}");
+        // Inline `::` inside content is preserved.
+        assert!(out.contains("S::Ok"), "inline path separator dropped: {out}");
+        assert!(out.contains("Function spawn"));
     }
 
     #[test]
