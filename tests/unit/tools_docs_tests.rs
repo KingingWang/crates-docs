@@ -997,7 +997,10 @@ async fn test_lookup_item_tool_keeps_versioned_and_unversioned_cache_entries_dis
     let latest_result = tool.execute(latest_args).await;
     assert!(latest_result.is_ok());
     let after_latest = request_count.load(Ordering::SeqCst);
-    assert!(after_latest > 0, "first (latest) lookup should hit upstream");
+    assert!(
+        after_latest > 0,
+        "first (latest) lookup should hit upstream"
+    );
 
     let versioned_result = tool.execute(versioned_args).await;
     assert!(versioned_result.is_ok());
@@ -1340,7 +1343,10 @@ async fn test_search_crates_tool_rejects_html_format() {
         .expect_err("html format should be rejected for search_crates");
     let msg = error.to_string();
     assert!(msg.contains("html"), "unexpected message: {msg}");
-    assert!(msg.contains("markdown, text, json"), "unexpected message: {msg}");
+    assert!(
+        msg.contains("markdown, text, json"),
+        "unexpected message: {msg}"
+    );
 }
 
 #[tokio::test]

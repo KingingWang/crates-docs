@@ -750,7 +750,8 @@ mod tests {
         // attr.<name>.html and must be among the probed candidates.
         let c = build_docs_item_url_candidates("async-trait", None, "async_trait");
         assert!(
-            c.iter().any(|u| u.ends_with("/async_trait/attr.async_trait.html")),
+            c.iter()
+                .any(|u| u.ends_with("/async_trait/attr.async_trait.html")),
             "missing attr candidate: {c:?}"
         );
     }
@@ -758,10 +759,17 @@ mod tests {
     #[test]
     fn test_item_url_candidates_strip_redundant_crate_segment() {
         let c = build_docs_item_url_candidates("serde", None, "serde::Serialize");
-        assert!(c.iter().any(|u| u.ends_with("/serde/latest/serde/trait.Serialize.html")));
-        assert!(c.iter().any(|u| u.ends_with("/serde/latest/serde/struct.Serialize.html")));
+        assert!(c
+            .iter()
+            .any(|u| u.ends_with("/serde/latest/serde/trait.Serialize.html")));
+        assert!(c
+            .iter()
+            .any(|u| u.ends_with("/serde/latest/serde/struct.Serialize.html")));
         // module fallback candidate is last
-        assert!(c.last().unwrap().ends_with("/serde/latest/serde/Serialize/index.html"));
+        assert!(c
+            .last()
+            .unwrap()
+            .ends_with("/serde/latest/serde/Serialize/index.html"));
     }
 
     #[test]
@@ -822,11 +830,14 @@ mod tests {
         );
         let c = build_docs_item_url_candidates("std", None, "collections::HashMap");
         assert!(
-            c.iter().all(|u| u.starts_with("https://doc.rust-lang.org/std/collections/")),
+            c.iter()
+                .all(|u| u.starts_with("https://doc.rust-lang.org/std/collections/")),
             "candidates not on rust-lang host: {c:?}"
         );
         assert!(
-            c.contains(&"https://doc.rust-lang.org/std/collections/struct.HashMap.html".to_string()),
+            c.contains(
+                &"https://doc.rust-lang.org/std/collections/struct.HashMap.html".to_string()
+            ),
             "missing HashMap struct candidate: {c:?}"
         );
     }

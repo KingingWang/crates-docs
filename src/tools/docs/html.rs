@@ -20,9 +20,8 @@ static SOURCE_LINK_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[Source\]\([^)]*\)").expect("hardcoded valid regex pattern"));
 
 /// Regex to remove rustdoc `[src]`/`[[src]]` source links (older rustdoc).
-static SRC_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[\[?src\]?\]\([^)]*\)").expect("hardcoded valid regex pattern")
-});
+static SRC_LINK_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[\[?src\]?\]\([^)]*\)").expect("hardcoded valid regex pattern"));
 
 /// Regex to remove rustdoc collapse-toggle links of the form
 /// `[ [-] ](javascript:void(0))` (the marker may be `-`, `+` or U+2212).
@@ -37,14 +36,12 @@ static JS_TOGGLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// Regex to remove plain `[text](javascript:...)` links emitted by older
 /// rustdoc. Link text must not contain `]` so it cannot span adjacent links.
 static JS_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[[^\]\n]*\]\(javascript:[^\n)]*\)\)?")
-        .expect("hardcoded valid regex pattern")
+    Regex::new(r"\[[^\]\n]*\]\(javascript:[^\n)]*\)\)?").expect("hardcoded valid regex pattern")
 });
 
 /// Regex to convert empty-target links `[text]()` to plain `text`.
-static EMPTY_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[([^\]]*)\]\(\)").expect("hardcoded valid regex pattern")
-});
+static EMPTY_LINK_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[([^\]]*)\]\(\)").expect("hardcoded valid regex pattern"));
 
 /// Regex to match no-op fragment-only links like `[serde](#)` or `[ⓘ](#)`
 /// (a bare `#` target navigates nowhere). The captured label is inspected by
@@ -63,8 +60,9 @@ static FRAGMENT_TOGGLE_REGEX: LazyLock<Regex> =
 /// links are stripped, an orphan line of bare `::` separators can remain; it
 /// carries no information and is removed. Inline `::` inside code or text is
 /// unaffected because those lines contain other characters.
-static STRAY_COLON_LINE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?m)^[ \t]*:{2,}[ \t]*$").expect("hardcoded valid regex pattern"));
+static STRAY_COLON_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?m)^[ \t]*:{2,}[ \t]*$").expect("hardcoded valid regex pattern")
+});
 
 /// Regex to drop orphan separator lines that contain only a middot (`·`).
 ///
@@ -138,7 +136,7 @@ static SUMMARY_SELECTOR: LazyLock<Selector> =
 /// plain text). Stripping them from the raw HTML first guarantees they leak
 /// into neither plain-text nor markdown output.
 static SRC_ANCHOR_HTML_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r#"(?s)<a\b[^>]*\bclass="[^"]*\bsrc\b[^"]*"[^>]*>.*?</a>"#)
+    Regex::new(r#"(?s)<a\b[^>]*\bclass="[^"]*\bsrc\b[^"]*"[^>]*>.*?</a>"#)
         .expect("hardcoded valid regex pattern")
 });
 
@@ -590,7 +588,10 @@ mod tests {
         assert!(text.contains("World"), "text: {text}");
         assert!(!text.contains("secret"), "script content leaked: {text}");
         assert!(!text.contains("color:red"), "style content leaked: {text}");
-        assert!(!text.contains("NOSCRIPT"), "noscript content leaked: {text}");
+        assert!(
+            !text.contains("NOSCRIPT"),
+            "noscript content leaked: {text}"
+        );
     }
 
     #[test]
@@ -717,11 +718,15 @@ mod tests {
     fn test_clean_markdown_relative_links_keep_text() {
         // clap-style underscore module links must be rewritten to their text,
         // not left as broken docs.rs-relative links.
-        let md = "Derive [tutorial](_derive/_tutorial/index.html) and [reference](_derive/index.html).";
+        let md =
+            "Derive [tutorial](_derive/_tutorial/index.html) and [reference](_derive/index.html).";
         let out = clean_markdown(md);
         assert!(!out.contains(".html"), "relative link survived: {out}");
         assert!(!out.contains("_derive"), "relative target survived: {out}");
-        assert!(out.contains("Derive tutorial and reference."), "text not kept: {out}");
+        assert!(
+            out.contains("Derive tutorial and reference."),
+            "text not kept: {out}"
+        );
     }
 
     #[test]
@@ -734,7 +739,10 @@ mod tests {
         );
         let out = clean_markdown(md);
         assert!(!out.contains("javascript:"), "js link leaked: {out}");
-        assert!(!out.contains("src/serde/lib.rs.html"), "src link leaked: {out}");
+        assert!(
+            !out.contains("src/serde/lib.rs.html"),
+            "src link leaked: {out}"
+        );
         assert!(!out.contains("[[src]]"), "src label leaked: {out}");
         assert!(!out.contains("]()"), "empty link leaked: {out}");
         // Useful text is preserved (empty link label downgraded to text).
@@ -765,12 +773,18 @@ mod tests {
         // and collapse toggle are stripped.
         let md = "Crate serde\n==========\n\n\u{00b7}\n\nSerde is a framework.";
         let out = clean_markdown(md);
-        assert!(!out.contains("\n\u{00b7}\n"), "stray middot line leaked: {out:?}");
+        assert!(
+            !out.contains("\n\u{00b7}\n"),
+            "stray middot line leaked: {out:?}"
+        );
         assert!(out.contains("Crate serde"), "heading dropped: {out}");
         assert!(out.contains("Serde is a framework."), "body dropped: {out}");
         // Inline middots in prose are preserved.
         let inline = clean_markdown("a \u{00b7} b");
-        assert!(inline.contains("\u{00b7}"), "inline middot wrongly dropped: {inline}");
+        assert!(
+            inline.contains("\u{00b7}"),
+            "inline middot wrongly dropped: {inline}"
+        );
     }
 
     #[test]
@@ -786,7 +800,10 @@ let x = S::Ok;";
         // The orphan breadcrumb separator line is gone.
         assert!(!out.contains("\n::\n"), "stray colon line leaked: {out}");
         // Inline `::` inside content is preserved.
-        assert!(out.contains("S::Ok"), "inline path separator dropped: {out}");
+        assert!(
+            out.contains("S::Ok"),
+            "inline path separator dropped: {out}"
+        );
         assert!(out.contains("Function spawn"));
     }
 

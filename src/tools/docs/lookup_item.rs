@@ -298,7 +298,7 @@ impl Tool for LookupItemToolImpl {
         rust_mcp_sdk::schema::CallToolResult,
         rust_mcp_sdk::schema::CallToolError,
     > {
-let mut params: LookupItemTool = serde_json::from_value(arguments).map_err(|e| {
+        let mut params: LookupItemTool = serde_json::from_value(arguments).map_err(|e| {
             rust_mcp_sdk::schema::CallToolError::invalid_arguments(
                 "lookup_item",
                 Some(format!("Parameter parsing failed: {e}")),

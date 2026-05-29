@@ -34,8 +34,9 @@ pub fn run_revoke_api_key_command(
 
     // Locate the keys array. The canonical location is [auth.api_key], but we
     // also fall back to a legacy top-level [api_key] table for compatibility.
-    let keys_array = find_keys_array_mut(&mut doc)
-        .ok_or("API key configuration section not found in config file (expected [auth.api_key])")?;
+    let keys_array = find_keys_array_mut(&mut doc).ok_or(
+        "API key configuration section not found in config file (expected [auth.api_key])",
+    )?;
 
     // Find and remove the key
     let mut found = false;

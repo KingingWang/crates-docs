@@ -70,7 +70,6 @@ impl RedisCache {
             format!("{}:{}", self.key_prefix, key)
         }
     }
-
 }
 
 /// Compute the millisecond expiry for a Redis `PX` argument from a TTL.

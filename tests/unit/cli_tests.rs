@@ -483,7 +483,10 @@ async fn test_run_health_command_report_is_real_not_simulated() {
     let tool = HealthCheckToolImpl::new();
     let (report, healthy) = tool.run_check_report("internal", false).await;
     assert!(healthy, "internal check should be healthy");
-    assert!(report.contains("Status: healthy"), "unexpected report: {report}");
+    assert!(
+        report.contains("Status: healthy"),
+        "unexpected report: {report}"
+    );
     assert!(
         !report.contains("simulated"),
         "health report must not be a simulated placeholder: {report}"
@@ -502,8 +505,14 @@ async fn test_run_health_command_verbose_json_report() {
     use crates_docs::tools::health::HealthCheckToolImpl;
     let tool = HealthCheckToolImpl::new();
     let (report, _healthy) = tool.run_check_report("internal", true).await;
-    assert!(report.contains("\"checks\""), "verbose report should be JSON: {report}");
-    assert!(report.contains("\"status\""), "verbose report should include status: {report}");
+    assert!(
+        report.contains("\"checks\""),
+        "verbose report should be JSON: {report}"
+    );
+    assert!(
+        report.contains("\"status\""),
+        "verbose report should include status: {report}"
+    );
 }
 
 /// Various check types should all produce a non-empty report and not panic.

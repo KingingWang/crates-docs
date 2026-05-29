@@ -533,7 +533,10 @@ fn test_config_validation_memory_size_zero_rejected() {
     let result = config.validate();
     assert!(result.is_err(), "memory_size=0 must be rejected");
     let msg = result.unwrap_err().to_string();
-    assert!(msg.contains("memory_size"), "error should mention memory_size: {msg}");
+    assert!(
+        msg.contains("memory_size"),
+        "error should mention memory_size: {msg}"
+    );
 }
 
 #[test]

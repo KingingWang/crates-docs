@@ -25,6 +25,9 @@ pub async fn run_health_command(
     if is_healthy {
         Ok(())
     } else {
-        Err(format!("Health check did not report a healthy status (check_type: {check_type})").into())
+        Err(
+            format!("Health check did not report a healthy status (check_type: {check_type})")
+                .into(),
+        )
     }
 }

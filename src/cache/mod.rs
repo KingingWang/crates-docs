@@ -262,7 +262,6 @@ fn default_cache_cache_type() -> String {
     CacheConfig::default().cache_type
 }
 
-
 /// Create cache instance
 ///
 /// # Arguments
