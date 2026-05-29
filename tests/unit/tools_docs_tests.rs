@@ -1262,6 +1262,81 @@ async fn test_search_crates_tool_execute_markdown() {
     assert!(result.is_ok());
 }
 
+/// Crate metadata (description, repository, documentation) is controlled by the
+/// crate publisher. The markdown renderer must neutralize markdown/link/HTML
+/// metacharacters so a malicious crate cannot inject an active link, inline
+/// HTML, or a non-`http` scheme into the MCP client's rendered output.
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_search_crates_tool_escapes_malicious_metadata() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+    let mock_response = r##"
+    {
+        "crates": [
+            {
+                "name": "evilcrate",
+                "max_version": "1.0.0",
+                "description": "see [click me](http://evil.example/pwn) and <img src=x>",
+                "downloads": 1,
+                "repository": "javascript:alert(1)",
+                "documentation": "https://docs.rs/evilcrate"
+            }
+        ]
+    }
+    "##;
+
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(r"/api/v1/crates.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
+        .mount(&mock_server)
+        .await;
+
+    let memory_cache = crates_docs::cache::memory::MemoryCache::new(100);
+    let cache = Arc::new(memory_cache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        build_crates_io_test_client(&mock_uri),
+    );
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({
+        "query": "evil",
+        "limit": 10,
+        "sort": "relevance",
+        "format": "markdown"
+    });
+
+    let result = tool.execute(args).await.expect("execute should succeed");
+    let rendered = serde_json::to_string(&result).expect("serialize result");
+
+    // The injected markdown link's brackets must be escaped (no active link).
+    assert!(
+        !rendered.contains("[click me]("),
+        "unescaped injected markdown link leaked: {rendered}"
+    );
+    // The inline HTML `<` must be neutralized.
+    assert!(
+        !rendered.contains("<img src=x>"),
+        "unescaped inline HTML leaked: {rendered}"
+    );
+    // The non-http repository scheme must not render as an active link target.
+    assert!(
+        !rendered.contains("[Link](javascript:"),
+        "non-http scheme rendered as active link: {rendered}"
+    );
+    // The legitimate documentation URL should still render as a normal link.
+    assert!(
+        rendered.contains("[Link](https://docs.rs/evilcrate)"),
+        "legitimate https link should be preserved: {rendered}"
+    );
+}
+
 #[tokio::test]
 #[serial(crates_io_env)]
 async fn test_search_crates_tool_execute_text_format() {

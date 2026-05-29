@@ -269,6 +269,50 @@ fn format_search_results(crates: &[CrateInfo], format: super::Format) -> String 
     }
 }
 
+/// Escape characters that would let upstream-controlled text (e.g. a crate
+/// description set by its publisher) inject markdown links, inline HTML, or
+/// code spans into the rendered output. Only structural characters are escaped
+/// so ordinary prose renders unchanged.
+fn escape_markdown_text(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '[' => out.push_str("\\["),
+            ']' => out.push_str("\\]"),
+            '`' => out.push_str("\\`"),
+            '<' => out.push_str("&lt;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Render a publisher-supplied URL as a markdown link only when it is a plain
+/// `http(s)` URL free of characters that would break the link target or smuggle
+/// in extra markdown. Anything else is shown as inert text so a crafted
+/// `repository`/`documentation` field cannot inject an active or misleading
+/// link (including non-`http` schemes such as `javascript:`).
+fn render_markdown_url(label: &str, url: &str) -> String {
+    let is_http = url.starts_with("http://") || url.starts_with("https://");
+    let is_clean = !url.chars().any(|c| {
+        c.is_whitespace()
+            || c.is_control()
+            || matches!(c, '(' | ')' | '<' | '>' | '[' | ']' | '"' | '\\')
+    });
+    if is_http && is_clean {
+        format!("[{label}]({url})")
+    } else {
+        // Not a safe http(s) URL: show inert in a code span so it is neither a
+        // clickable link nor able to inject further markdown.
+        let inert: String = url
+            .chars()
+            .map(|c| if c == '`' || c.is_control() { ' ' } else { c })
+            .collect();
+        format!("`{inert}`")
+    }
+}
+
 fn format_markdown_results(crates: &[CrateInfo]) -> String {
     // SAFETY: writeln! to String never fails (writes to memory buffer). unwrap() is safe here.
     use std::fmt::Write;
@@ -282,15 +326,25 @@ fn format_markdown_results(crates: &[CrateInfo]) -> String {
         writeln!(output, "**Downloads**: {}", crate_info.downloads).unwrap();
 
         if let Some(desc) = &crate_info.description {
-            writeln!(output, "**Description**: {desc}").unwrap();
+            writeln!(output, "**Description**: {}", escape_markdown_text(desc)).unwrap();
         }
 
         if let Some(repo) = &crate_info.repository {
-            writeln!(output, "**Repository**: [Link]({repo})").unwrap();
+            writeln!(
+                output,
+                "**Repository**: {}",
+                render_markdown_url("Link", repo)
+            )
+            .unwrap();
         }
 
         if let Some(docs) = &crate_info.documentation {
-            writeln!(output, "**Documentation**: [Link]({docs})").unwrap();
+            writeln!(
+                output,
+                "**Documentation**: {}",
+                render_markdown_url("Link", docs)
+            )
+            .unwrap();
         }
 
         writeln!(
