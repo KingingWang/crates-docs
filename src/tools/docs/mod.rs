@@ -323,8 +323,15 @@ pub fn build_docs_url(crate_name: &str, version: Option<&str>) -> String {
 /// Build docs.rs search URL for item lookup
 #[must_use]
 pub fn build_docs_item_url(crate_name: &str, version: Option<&str>, item_path: &str) -> String {
-    let base_url = docs_rs_base_url();
     let encoded_path = urlencoding::encode(item_path);
+    if is_rust_std_crate(crate_name) {
+        // std/core/alloc/etc. are not published to docs.rs; their docs live on
+        // doc.rust-lang.org. Mirror the other URL builders so the last-resort
+        // fallback degrades to the crate overview instead of a hard 404.
+        let krate = crate_name.replace('-', "_");
+        return format!("https://doc.rust-lang.org/{krate}/?search={encoded_path}");
+    }
+    let base_url = docs_rs_base_url();
     match version {
         Some(ver) => format!("{base_url}/{crate_name}/{ver}/?search={encoded_path}"),
         None => format!("{base_url}/{crate_name}/?search={encoded_path}"),

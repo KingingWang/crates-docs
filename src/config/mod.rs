@@ -795,6 +795,13 @@ impl AppConfig {
             self.oauth.validate()?;
         }
 
+        // Validate the unified auth configuration (OAuth + API key). Each
+        // sub-validator short-circuits when its section is disabled, so this is
+        // safe to call unconditionally and catches misconfigured API key
+        // settings (e.g. empty header_name/key_prefix) that were previously
+        // never validated.
+        self.auth.validate()?;
+
         Ok(())
     }
 

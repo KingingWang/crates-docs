@@ -21,10 +21,19 @@ fn is_valid_crate_name(name: &str) -> bool {
     !name.is_empty() && name.bytes().all(is_valid_crate_name_char)
 }
 
-/// Check if item path is valid (non-empty and all valid chars)
+/// Check if item path is valid (non-empty, valid chars, colons only as `::`)
+///
+/// Rust paths separate segments with `::` (a double colon). A lone `:` is not a
+/// valid path separator, and allowing it would make the item cache key
+/// ambiguous: `item:a:1.0:Serialize` could mean either path `"1.0:Serialize"`
+/// (no version) or version `"1.0"` + path `"Serialize"`. Rejecting single
+/// colons routes such inputs through the hashed-key branch, keeping keys
+/// injective and matching the tool-level `validate_item_path` guard.
 #[inline]
 fn is_valid_item_path(path: &str) -> bool {
-    !path.is_empty() && path.bytes().all(is_valid_item_path_char)
+    !path.is_empty()
+        && path.bytes().all(is_valid_item_path_char)
+        && !path.replace("::", "").contains(':')
 }
 
 /// Reversibly escape `:` and `%` in a free-form cache-key segment.
@@ -314,6 +323,20 @@ mod tests {
     }
 
     #[test]
+    fn test_item_cache_key_no_version_path_collision() {
+        // path "1.0:Serialize" (no version) must NOT collide with
+        // version "1.0" + path "Serialize".
+        let a = CacheKeyGenerator::item_cache_key("serde", "1.0:Serialize", None);
+        let b = CacheKeyGenerator::item_cache_key("serde", "Serialize", Some("1.0"));
+        assert_ne!(a, b);
+        // Legitimate `::` paths stay readable/unhashed.
+        assert_eq!(
+            CacheKeyGenerator::item_cache_key("serde", "de::Deserialize", None),
+            "item:serde:de::Deserialize"
+        );
+    }
+
+    #[test]
     fn test_item_path_case_sensitivity() {
         assert_ne!(
             CacheKeyGenerator::item_cache_key("serde", "Serialize", None),
@@ -343,9 +366,12 @@ mod tests {
         assert!(malicious_item_path.contains("hash:"));
         assert!(!malicious_item_path.contains('\n'));
 
+        // Single (non-`::`) colons are ambiguous separators and must be hashed,
+        // not embedded verbatim, to avoid version/path key collisions.
         let malicious_item_colon =
             CacheKeyGenerator::item_cache_key("serde", "Serialize:extra:colons", None);
-        assert_eq!(malicious_item_colon, "item:serde:Serialize:extra:colons");
+        assert!(malicious_item_colon.starts_with("item:serde:hash:"));
+        assert!(!malicious_item_colon.contains("Serialize:extra:colons"));
 
         let valid_item_path = CacheKeyGenerator::item_cache_key("serde", "serde::Serialize", None);
         assert_eq!(valid_item_path, "item:serde:serde::Serialize");
