@@ -16,10 +16,6 @@ use tokio::sync::Semaphore;
 static GLOBAL_HTTP_CLIENT: OnceLock<Arc<reqwest_middleware::ClientWithMiddleware>> =
     OnceLock::new();
 
-/// Storage for initialization error (if any)
-/// Used to avoid retrying failed initialization
-static INIT_ERROR: OnceLock<String> = OnceLock::new();
-
 /// Initialize the global HTTP client singleton
 ///
 /// # Arguments
@@ -32,22 +28,14 @@ static INIT_ERROR: OnceLock<String> = OnceLock::new();
 ///
 /// # Note
 ///
-/// This function is thread-safe and ensures only one thread performs the
-/// expensive client initialization (including TLS setup). Subsequent calls
-/// will return Ok(()) if initialization succeeded, or the original error
-/// if initialization previously failed.
+/// This function is thread-safe. The first successful initialization wins and
+/// is reused by all callers. A failed attempt is *not* cached: because client
+/// creation can fail for transient reasons (e.g. TLS backend or resource
+/// pressure), a subsequent call is free to retry and may succeed.
 pub fn init_global_http_client(config: &crate::config::PerformanceConfig) -> Result<()> {
     // Fast path: already initialized
     if GLOBAL_HTTP_CLIENT.get().is_some() {
         return Ok(());
-    }
-
-    // Check if previous initialization failed
-    if let Some(err_msg) = INIT_ERROR.get() {
-        return Err(Error::initialization(
-            "global_http_client",
-            format!("Previous initialization failed: {err_msg}"),
-        ));
     }
 
     // Slow path: try to initialize
@@ -61,9 +49,12 @@ pub fn init_global_http_client(config: &crate::config::PerformanceConfig) -> Res
             Ok(())
         }
         Err(e) => {
-            let err_msg = format!("Failed to create global HTTP client: {e}");
-            let _ = INIT_ERROR.set(err_msg.clone());
-            Err(Error::initialization("global_http_client", err_msg))
+            // Do not cache the failure: client creation can fail transiently,
+            // so a later call is allowed to retry.
+            Err(Error::initialization(
+                "global_http_client",
+                format!("Failed to create global HTTP client: {e}"),
+            ))
         }
     }
 }
