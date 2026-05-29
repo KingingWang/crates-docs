@@ -324,14 +324,19 @@ pub fn extract_search_results(html: &str, item_path: &str) -> String {
 /// Extract documentation from HTML as plain text.
 ///
 /// Mirrors [`extract_documentation`] but produces plain text: it isolates the
-/// main content area (dropping navigation, sidebars and footers) before
-/// flattening to text. [`html_to_text`] already excludes `<script>`/`<style>`
-/// and other skip tags recursively, so the result is clean prose rather than
-/// the full page chrome plus inline JS/CSS.
+/// main content area (dropping navigation, sidebars and footers), runs the
+/// shared [`clean_html`] pass (which strips scripts, styles, navigation,
+/// buttons, `<details>` toggles and UI labels such as "Copy item path" and
+/// "Expand description"), then flattens to text. Finally, leftover section
+/// anchor markers are removed since they carry no meaning once hyperlinks are
+/// gone.
 #[must_use]
 pub fn extract_documentation_as_text(html: &str) -> String {
     let main_content = extract_main_content(html);
-    html_to_text(&main_content)
+    let cleaned_html = clean_html(&main_content);
+    let text = html_to_text(&cleaned_html);
+    // Drop standalone section-sign markers and re-collapse whitespace.
+    clean_whitespace(&text.replace('\u{00a7}', " "))
 }
 
 #[inline]
@@ -362,6 +367,23 @@ mod tests {
         // Inner content must be preserved.
         assert!(cleaned.contains("MyCrate"));
         assert!(cleaned.contains("Useful docs."));
+    }
+
+    #[test]
+    fn test_extract_documentation_as_text_strips_ui_cruft() {
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<button>Copy item path</button>",
+            "<a class=\"anchor\" href=\"#x\">\u{00a7}</a>",
+            "<details class=\"toggle top-doc\" open=\"\"><summary>Expand description</summary>",
+            "<p>Real documentation text.</p></details>",
+            "</section></body></html>"
+        );
+        let text = extract_documentation_as_text(html);
+        assert!(text.contains("Real documentation text."));
+        assert!(!text.contains("Copy item path"));
+        assert!(!text.contains("Expand description"));
+        assert!(!text.contains('\u{00a7}'));
     }
 
     #[test]
