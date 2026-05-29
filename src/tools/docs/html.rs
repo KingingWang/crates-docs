@@ -352,7 +352,7 @@ pub fn extract_search_results(html: &str, item_path: &str) -> String {
     if cleaned_markdown.trim().is_empty() {
         format!("Documentation for '{item_path}' not found")
     } else {
-        format!("## Search Results: {item_path}\n\n{cleaned_markdown}")
+        format!("## Documentation: {item_path}\n\n{cleaned_markdown}")
     }
 }
 
@@ -493,7 +493,7 @@ mod tests {
     fn test_extract_search_results_found() {
         let html = "<html><body><h1>Result</h1></body></html>";
         let result = extract_search_results(html, "serde::Serialize");
-        assert!(result.contains("Search Results"));
+        assert!(result.contains("Documentation"));
         assert!(result.contains("serde::Serialize"));
         assert!(result.contains("Result"));
     }
@@ -683,7 +683,7 @@ cargo install dioxus-cli
         let result = extract_search_results(html, "serde::Serialize");
 
         // Should extract search results correctly
-        assert!(result.contains("Search Results"));
+        assert!(result.contains("Documentation"));
         assert!(result.contains("serde::Serialize"));
         assert!(result.contains("Serialize trait"));
 
