@@ -318,6 +318,19 @@ fn extract_text_excluding_skip_tags(
     }
 }
 
+/// Extract documentation from HTML as cleaned HTML.
+///
+/// Isolates the docs.rs main content area and runs the shared [`clean_html`]
+/// pass (removing `<head>`, scripts, styles, navigation, sidebars, footers,
+/// buttons and source-code links). Unlike [`extract_documentation`], the result
+/// remains HTML rather than being converted to Markdown, so callers requesting
+/// the `html` format get the documentation body instead of the entire raw page.
+#[must_use]
+pub fn extract_documentation_html(html: &str) -> String {
+    let main_content = extract_main_content(html);
+    clean_html(&main_content)
+}
+
 /// Extract documentation from HTML by cleaning and converting to Markdown
 ///
 /// For docs.rs pages, extracts only the main content area to avoid

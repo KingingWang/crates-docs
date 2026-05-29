@@ -244,7 +244,8 @@ impl LookupItemToolImpl {
         item_path: &str,
         version: Option<&str>,
     ) -> std::result::Result<String, CallToolError> {
-        self.fetch_item_html(crate_name, item_path, version).await
+        let html = self.fetch_item_html(crate_name, item_path, version).await?;
+        Ok(html::extract_documentation_html(&html))
     }
 }
 
@@ -261,7 +262,7 @@ impl Tool for LookupItemToolImpl {
         rust_mcp_sdk::schema::CallToolResult,
         rust_mcp_sdk::schema::CallToolError,
     > {
-        let params: LookupItemTool = serde_json::from_value(arguments).map_err(|e| {
+let mut params: LookupItemTool = serde_json::from_value(arguments).map_err(|e| {
             rust_mcp_sdk::schema::CallToolError::invalid_arguments(
                 "lookup_item",
                 Some(format!("Parameter parsing failed: {e}")),
@@ -276,6 +277,9 @@ impl Tool for LookupItemToolImpl {
                 Some("item_path must not be empty".to_string()),
             ));
         }
+        // Normalise surrounding whitespace so it does not leak into headings or
+        // candidate URL construction.
+        params.item_path = params.item_path.trim().to_string();
 
         // Propagate the detailed parse error (e.g. "Invalid format 'xml'. Expected
         // one of: ...") rather than masking it with a generic message, so callers
