@@ -1,11 +1,13 @@
 //! Test command implementation
 
 use rust_mcp_sdk::schema::ContentBlock;
+use std::path::Path;
 use std::sync::Arc;
 
 /// Test tool command
 #[allow(clippy::too_many_arguments)]
 pub async fn run_test_command(
+    config_path: &Path,
     tool: &str,
     crate_name: Option<&str>,
     item_path: Option<&str>,
@@ -17,14 +19,28 @@ pub async fn run_test_command(
 ) -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Testing tool: {}", tool);
 
-    // Create cache
-    let cache_config = crate::cache::CacheConfig::default();
+    // Honor the global `--config` flag: load cache and performance settings
+    // from the config file when present, falling back to defaults otherwise.
+    let app_config = if config_path.exists() {
+        crate::config::AppConfig::from_file(config_path)
+            .map_err(|e| format!("Failed to load config file: {e}"))?
+    } else {
+        crate::config::AppConfig::default()
+    };
 
-    let cache = crate::cache::create_cache(&cache_config)?;
+    // Initialize the global HTTP client from the configured performance
+    // settings (timeouts, user-agent, pool). Ignore the error if it was
+    // already initialized elsewhere in the process.
+    let _ = crate::utils::init_global_http_client(&app_config.performance);
+
+    let cache = crate::cache::create_cache(&app_config.cache)?;
     let cache_arc: Arc<dyn crate::cache::Cache> = Arc::from(cache);
 
-    // Create document service
-    let doc_service = Arc::new(crate::tools::docs::DocService::new(cache_arc)?);
+    // Create document service honoring the configured cache TTLs.
+    let doc_service = Arc::new(crate::tools::docs::DocService::with_config(
+        cache_arc,
+        &app_config.cache,
+    )?);
 
     // Create tool registry
     let registry = crate::tools::create_default_registry(&doc_service);

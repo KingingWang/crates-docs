@@ -470,7 +470,12 @@ fn test_run_config_command_nested_directory() {
 /// Test health command - internal check is deterministic (no network) and healthy.
 #[tokio::test]
 async fn test_run_health_command_internal_ok() {
-    let result = crates_docs::cli::run_health_command("internal", false).await;
+    let result = crates_docs::cli::run_health_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
+        "internal",
+        false,
+    )
+    .await;
     assert!(result.is_ok());
 }
 
@@ -551,6 +556,7 @@ fn test_run_version_command() {
 #[tokio::test]
 async fn test_run_test_command_unknown_tool() {
     let result = crates_docs::cli::run_test_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
         "unknown_tool",
         None,
         None,
@@ -571,6 +577,7 @@ async fn test_run_test_command_unknown_tool() {
 #[tokio::test]
 async fn test_run_test_command_lookup_crate_missing_name() {
     let result = crates_docs::cli::run_test_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
         "lookup_crate",
         None,
         None,
@@ -591,6 +598,7 @@ async fn test_run_test_command_lookup_crate_missing_name() {
 #[tokio::test]
 async fn test_run_test_command_search_crates_missing_query() {
     let result = crates_docs::cli::run_test_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
         "search_crates",
         None,
         None,
@@ -612,6 +620,7 @@ async fn test_run_test_command_search_crates_missing_query() {
 async fn test_run_test_command_lookup_item_missing_args() {
     // Missing item_path
     let result = crates_docs::cli::run_test_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
         "lookup_item",
         Some("serde"),
         None,
@@ -629,6 +638,7 @@ async fn test_run_test_command_lookup_item_missing_args() {
 
     // Missing crate_name
     let result = crates_docs::cli::run_test_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
         "lookup_item",
         None,
         Some("Deserialize"),
@@ -647,6 +657,7 @@ async fn test_run_test_command_lookup_item_missing_args() {
 #[tokio::test]
 async fn test_run_test_command_health_check() {
     let result = crates_docs::cli::run_test_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
         "health_check",
         None,
         None,
@@ -666,6 +677,7 @@ async fn test_run_test_command_health_check() {
 #[tokio::test]
 async fn test_run_test_command_search_crates_with_sort() {
     let result = crates_docs::cli::run_test_command(
+        std::path::Path::new("crates-docs-test-nonexistent-config.toml"),
         "search_crates",
         None,
         None,

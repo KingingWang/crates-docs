@@ -104,6 +104,7 @@ pub async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             format,
         } => {
             run_test_command(
+                &cli.config,
                 &tool,
                 crate_name.as_deref(),
                 item_path.as_deref(),
@@ -119,7 +120,7 @@ pub async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             check_type,
             verbose,
         } => {
-            run_health_command(&check_type, verbose).await?;
+            run_health_command(&cli.config, &check_type, verbose).await?;
         }
         Commands::Version => {
             run_version_command();
