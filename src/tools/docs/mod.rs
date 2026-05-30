@@ -1015,11 +1015,13 @@ mod tests {
             url.as_deref(),
             Some("https://doc.rust-lang.org/std/task/fn.spawn.html")
         );
+        // An explicit version is honored and embedded in the path
+        // (doc.rust-lang.org/{version}/{krate}/...).
         let core_html = r#"<a href="future/trait.Future.html">Future</a>"#;
         let core_url = find_item_url_in_all_html("core", Some("1.0.0"), core_html, "Future");
         assert_eq!(
             core_url.as_deref(),
-            Some("https://doc.rust-lang.org/core/future/trait.Future.html")
+            Some("https://doc.rust-lang.org/1.0.0/core/future/trait.Future.html")
         );
     }
 
