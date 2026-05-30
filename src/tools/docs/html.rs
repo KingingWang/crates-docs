@@ -231,6 +231,8 @@ static MAIN_CONTENT_SELECTOR: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("#main-content").expect("hardcoded valid selector"));
 static RUSTDOC_BODY_WRAPPER_SELECTOR: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("#rustdoc_body_wrapper").expect("hardcoded valid selector"));
+static H1_SELECTOR: LazyLock<Selector> =
+    LazyLock::new(|| Selector::parse("h1").expect("hardcoded valid selector"));
 
 /// Rewrite rustdoc item-index tables into HTML unordered lists.
 ///
@@ -563,6 +565,66 @@ fn extract_main_content(html: &str) -> String {
     html.to_string()
 }
 
+/// Extract the collapsed text of the page's primary `<h1>` heading.
+///
+/// rustdoc renders an item page heading as e.g. `<h1>Struct serde_json::Value</h1>`
+/// (the item kind plus the fully-qualified path) and a crate landing page as
+/// `<h1>Crate serde</h1>`. Returns the whitespace-collapsed text of the first
+/// `<h1>` inside the main content area (falling back to any `<h1>`), or `None`
+/// when the page has no heading.
+#[must_use]
+pub fn page_h1_text(html: &str) -> Option<String> {
+    let document = Html::parse_document(html);
+    let collapse = |element: scraper::ElementRef| -> String {
+        clean_whitespace(&element.text().collect::<String>())
+    };
+    let h1 = document
+        .select(&MAIN_CONTENT_SELECTOR)
+        .next()
+        .and_then(|main| main.select(&H1_SELECTOR).next().map(collapse))
+        .or_else(|| document.select(&H1_SELECTOR).next().map(collapse));
+    h1.filter(|s| !s.is_empty())
+}
+
+/// Check whether `heading` contains `ident` as a whole identifier token.
+///
+/// The heading is split on every character that cannot appear in a Rust
+/// identifier (so `Struct serde_json::Value` yields the tokens `Struct`,
+/// `serde_json`, `Value`), and an exact, case-sensitive match against any
+/// token is required. This avoids partial matches such as `is` inside `this`.
+fn heading_contains_identifier(heading: &str, ident: &str) -> bool {
+    heading
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .any(|token| token == ident)
+}
+
+/// Determine whether a resolved rustdoc page is a *fallback* rather than the
+/// dedicated page for `item_path`.
+///
+/// [`resolve_item_html`](super::lookup_item) probes the dedicated item page
+/// first, then falls back to the containing type's page (e.g. the `Value` enum
+/// page for `Value::is_null`, since methods have no standalone page) and
+/// finally to the crate overview. A dedicated item page's `<h1>` always
+/// contains the requested leaf identifier (the final `::` segment); a
+/// parent-type or crate fallback heading does not. Returns `true` when the
+/// page does not document the requested item directly, so callers can surface
+/// an honest note in every output format.
+///
+/// This is content-based (not resolution-time state) so it stays correct on
+/// cache hits, where only the raw HTML is replayed. When the page has no
+/// heading at all, returns `false` to avoid over-warning.
+#[must_use]
+pub fn is_item_fallback_page(html: &str, item_path: &str) -> bool {
+    let leaf = item_path.rsplit("::").next().unwrap_or(item_path).trim();
+    if leaf.is_empty() {
+        return false;
+    }
+    match page_h1_text(html) {
+        Some(h1) => !heading_contains_identifier(&h1, leaf),
+        None => false,
+    }
+}
+
 /// Extract search results from HTML
 #[must_use]
 pub fn extract_search_results(html: &str, item_path: &str) -> String {
@@ -575,17 +637,13 @@ pub fn extract_search_results(html: &str, item_path: &str) -> String {
         return format!("Documentation for '{item_path}' not found");
     }
 
-    // Detect the crate-landing-page fallback: item pages always start with
-    // their kind ("Function", "Struct", "Trait", "Module", ...), so a body that
-    // begins with "Crate " means no dedicated item page was resolved. Surface an
-    // honest note so the heading is not mistaken for the item's own docs.
-    let first_line = cleaned_markdown
-        .lines()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or("");
-    if first_line.trim_start().starts_with("Crate ") {
+    // Detect a fallback page (the containing type's page or the crate
+    // overview) by comparing the requested leaf identifier against the page's
+    // `<h1>` heading; a dedicated item page's heading always names the item.
+    // Operating on the raw `html` keeps this correct on cache replays.
+    if is_item_fallback_page(html, item_path) {
         format!(
-            "## Documentation: {item_path}\n\n_No dedicated documentation page was found for `{item_path}`; showing the crate overview instead. It may be a method, associated item, or trait method, or it may not exist._\n\n{cleaned_markdown}"
+            "## Documentation: {item_path}\n\n_No dedicated documentation page was found for `{item_path}`; showing the closest available page (its containing type or the crate overview) instead. It may be a method, associated item, or trait method, or it may not exist._\n\n{cleaned_markdown}"
         )
     } else {
         format!("## Documentation: {item_path}\n\n{cleaned_markdown}")
@@ -895,6 +953,56 @@ mod tests {
         let result = extract_search_results(html, "nonexistent");
         assert!(result.contains("not found"));
         assert!(result.contains("nonexistent"));
+    }
+
+    #[test]
+    fn test_is_item_fallback_page_parent_type_fallback() {
+        // Requesting a method (`Value::is_null`) resolves to the containing
+        // type's page (`Enum Value`); the heading names `Value`, not the
+        // requested leaf `is_null`, so it must be flagged as a fallback.
+        let html = "<html><body><section id=\"main-content\"><h1>Enum serde_json::Value</h1><p>An enum.</p></section></body></html>";
+        assert!(is_item_fallback_page(html, "Value::is_null"));
+        // The markdown path must surface the note for this parent fallback.
+        let result = extract_search_results(html, "Value::is_null");
+        assert!(
+            result.contains("No dedicated documentation page was found"),
+            "parent fallback note missing: {result}"
+        );
+    }
+
+    #[test]
+    fn test_is_item_fallback_page_direct_hit_not_flagged() {
+        // A dedicated item page's heading contains the requested leaf.
+        let html = "<html><body><section id=\"main-content\"><h1>Trait serde::Serialize</h1><p>A trait.</p></section></body></html>";
+        assert!(!is_item_fallback_page(html, "serde::Serialize"));
+        assert!(!is_item_fallback_page(html, "Serialize"));
+        // A re-exported function resolved at its canonical path still matches.
+        let fn_html = "<html><body><section id=\"main-content\"><h1>Function tokio::task::spawn</h1></section></body></html>";
+        assert!(!is_item_fallback_page(fn_html, "tokio::spawn"));
+    }
+
+    #[test]
+    fn test_is_item_fallback_page_crate_overview_fallback() {
+        let html = "<html><body><section id=\"main-content\"><h1>Crate serde</h1><p>Docs.</p></section></body></html>";
+        assert!(is_item_fallback_page(html, "DoesNotExist"));
+    }
+
+    #[test]
+    fn test_is_item_fallback_page_no_heading_does_not_warn() {
+        // Without an <h1> we cannot tell; do not over-warn.
+        let html = "<html><body><section id=\"main-content\"><p>No heading here.</p></section></body></html>";
+        assert!(!is_item_fallback_page(html, "Foo::bar"));
+    }
+
+    #[test]
+    fn test_heading_contains_identifier_is_token_exact() {
+        // Partial substring matches must not count.
+        assert!(!heading_contains_identifier("Struct this::That", "is"));
+        assert!(heading_contains_identifier(
+            "Struct serde_json::Value",
+            "Value"
+        ));
+        assert!(heading_contains_identifier("Method is_null", "is_null"));
     }
 
     #[test]

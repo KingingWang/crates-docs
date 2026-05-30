@@ -292,12 +292,13 @@ impl LookupItemToolImpl {
     ) -> std::result::Result<String, CallToolError> {
         let html = self.fetch_item_html(crate_name, item_path, version).await?;
         let body = html::extract_documentation_as_text(&html);
-        // Mirror the markdown fallback note: a body that begins with "Crate "
-        // means the dedicated item page could not be resolved and the crate
-        // overview is shown instead.
-        let note = if body.trim_start().starts_with("Crate ") {
+        // Mirror the markdown fallback note. `is_item_fallback_page` inspects
+        // the page `<h1>` so it catches both the containing-type fallback
+        // (e.g. the `Value` enum page for `Value::is_null`) and the crate
+        // overview fallback, and stays correct on cache replays.
+        let note = if html::is_item_fallback_page(&html, item_path) {
             format!(
-                "No dedicated documentation page was found for '{item_path}'; showing the crate overview instead. It may be a method, associated item, or trait method, or it may not exist.\n\n"
+                "No dedicated documentation page was found for '{item_path}'; showing the closest available page (its containing type or the crate overview) instead. It may be a method, associated item, or trait method, or it may not exist.\n\n"
             )
         } else {
             String::new()
@@ -315,11 +316,10 @@ impl LookupItemToolImpl {
         let html = self.fetch_item_html(crate_name, item_path, version).await?;
         let body = html::extract_documentation_html(&html);
         // Mirror the markdown/text fallback note so all three formats are
-        // consistent. Detect the crate-overview fallback via the extracted
-        // text (a body that begins with "Crate " means the dedicated item
-        // page could not be resolved). Derive the text from the already
-        // cleaned `body` rather than re-parsing the raw HTML a second time.
-        if html::html_to_text(&body).trim_start().starts_with("Crate ") {
+        // consistent. `is_item_fallback_page` inspects the page `<h1>` to catch
+        // both the containing-type fallback and the crate overview fallback,
+        // and stays correct on cache replays.
+        if html::is_item_fallback_page(&html, item_path) {
             // item_path is validated to [A-Za-z0-9_:-]; escape defensively
             // anyway since this is an HTML context.
             let safe_path = item_path
@@ -327,7 +327,7 @@ impl LookupItemToolImpl {
                 .replace('<', "&lt;")
                 .replace('>', "&gt;");
             return Ok(format!(
-                "<p><em>No dedicated documentation page was found for '{safe_path}'; showing the crate overview instead. It may be a method, associated item, or trait method, or it may not exist.</em></p>\n{body}"
+                "<p><em>No dedicated documentation page was found for '{safe_path}'; showing the closest available page (its containing type or the crate overview) instead. It may be a method, associated item, or trait method, or it may not exist.</em></p>\n{body}"
             ));
         }
         Ok(body)
