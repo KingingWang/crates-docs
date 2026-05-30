@@ -368,8 +368,21 @@ fn remove_unwanted_elements(document: &Html, original_html: &str) -> String {
     // This ensures we replace parent elements before children
     replacements.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
-    // Build result using string slices for O(n) total complexity
-    let mut result = original_html.to_string();
+    // Build result using string slices for O(n) total complexity.
+    //
+    // Use the parsed document's own serialized form (the body's inner HTML) as
+    // the replacement base rather than `original_html`. Each `element.html()`
+    // is produced by the same html5ever serializer, so it is guaranteed to be a
+    // substring here. Matching against the raw `original_html` instead would
+    // miss elements whose source formatting differs from the serialized form
+    // (e.g. extra whitespace inside a tag like `<nav  class=...>` or differing
+    // attribute quoting), silently leaking navigation, headers, footers and
+    // asides into the cleaned output. The body's inner HTML keeps the prior
+    // fragment shape (no synthetic `<html>`/`<head>` wrappers).
+    let mut result = document
+        .select(&BODY_SELECTOR)
+        .next()
+        .map_or_else(|| document.root_element().html(), |body| body.inner_html());
     for (element_html, replacement) in replacements {
         // Use replace_all for safety, but since we sorted by length,
         // we should handle nested elements correctly
@@ -793,6 +806,29 @@ fn decode_pre(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_clean_html_strips_oddly_formatted_block_elements() {
+        // Navigation/header/footer/aside elements must be removed even when
+        // their source markup is not formatted the way html5ever serializes it
+        // (e.g. extra whitespace inside the tag). Previously the cleanup relied
+        // on string-matching the serialized element against the raw HTML, which
+        // silently leaked such elements into the output.
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<nav  class=\"sidebar\">NAVLEAK</nav>",
+            "<header  data-x=\"1\">HEADERLEAK</header>",
+            "<footer   >FOOTERLEAK</footer>",
+            "<aside  role=\"note\">ASIDELEAK</aside>",
+            "<p>Real doc.</p>",
+            "</section></body></html>"
+        );
+        let cleaned = clean_html(html);
+        for leak in ["NAVLEAK", "HEADERLEAK", "FOOTERLEAK", "ASIDELEAK"] {
+            assert!(!cleaned.contains(leak), "{leak} leaked: {cleaned}");
+        }
+        assert!(cleaned.contains("Real doc."), "content dropped: {cleaned}");
+    }
 
     #[test]
     fn test_clean_html_removes_source_links() {
