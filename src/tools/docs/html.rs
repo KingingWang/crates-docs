@@ -142,14 +142,15 @@ static STRAY_MIDDOT_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Regex to rewrite relative documentation links to their link text.
 ///
-/// Matches `[text](relative_path.html)` where `relative_path` begins with a
-/// letter, digit, `_`, `.` or `/` (covering module paths such as
-/// `_derive/index.html`, `../index.html`, `struct.Foo.html`) and ends with
-/// `.html` (optionally followed by a `#fragment`). The captured link text is
-/// preserved (replacement `$1`) because these targets are docs.rs-relative and
-/// useless to an MCP client, but the label (e.g. "tutorial") is meaningful.
+/// Matches `[text](path.html)` where `path` begins with a letter, digit, `_`,
+/// `.` or `/` (covering module paths such as `_derive/index.html`,
+/// `../index.html`, `struct.Foo.html`) and ends with `.html` (optionally
+/// followed by a `#fragment`). Group 1 captures the link text and group 2 the
+/// URL. Docs.rs-relative targets are useless to an MCP client, so they are
+/// downgraded to their (meaningful) label; absolute external URLs containing a
+/// scheme (`://`) are kept intact since they are still reachable.
 static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\[([^\]]*)\]\([a-zA-Z0-9._/][^)]*\.html(?:#[^)]*)?\)")
+    Regex::new(r"\[([^\]]*)\]\(([a-zA-Z0-9._/][^)]*\.html(?:#[^)]*)?)\)")
         .expect("hardcoded valid regex pattern")
 });
 
@@ -569,7 +570,17 @@ fn clean_markdown(markdown: &str) -> String {
     let result = JS_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = SOURCE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = SRC_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
-    let result = RELATIVE_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
+    let result = RELATIVE_LINK_REGEX.replace_all(&result, |caps: &regex::Captures| {
+        let text = &caps[1];
+        let url = &caps[2];
+        // Keep absolute external links (those carrying a `scheme://`); only
+        // docs.rs-relative `.html` targets are downgraded to their label.
+        if url.contains("://") {
+            format!("[{text}]({url})")
+        } else {
+            text.to_string()
+        }
+    });
     let result = ANCHOR_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = FRAGMENT_TOGGLE_REGEX.replace_all(&result, |caps: &regex::Captures| {
         let label = &caps[1];
@@ -1167,6 +1178,18 @@ mod tests {
             !re.is_match("[External](https://example.com)"),
             "Should not match external URLs"
         ); // External URL
+    }
+
+    #[test]
+    fn test_clean_markdown_keeps_external_html_links() {
+        // Absolute external links that happen to end in `.html` must keep their
+        // URL rather than being downgraded to bare label text.
+        let md = "See the [Guide](https://example.com/book/ch01.html) for details.";
+        let out = clean_markdown(md);
+        assert!(
+            out.contains("[Guide](https://example.com/book/ch01.html)"),
+            "external link should be preserved, got: {out}"
+        );
     }
 
     #[test]
