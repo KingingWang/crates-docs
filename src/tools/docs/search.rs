@@ -165,8 +165,9 @@ impl SearchCratesToolImpl {
             .get_search_results(query, limit, Some(sort))
             .await
         {
-            return serde_json::from_str(&cached)
-                .map_err(|e| CallToolError::from_message(format!("Cache parsing failed: {e}")));
+            return serde_json::from_str(&cached).map_err(|e| {
+                CallToolError::from_message(format!("[search_crates] Cache parsing failed: {e}"))
+            });
         }
 
         // Build URL using helper function
@@ -179,7 +180,9 @@ impl SearchCratesToolImpl {
             .header("User-Agent", crate::user_agent())
             .send()
             .await
-            .map_err(|e| CallToolError::from_message(format!("HTTP request failed: {e}")))?;
+            .map_err(|e| {
+                CallToolError::from_message(format!("[search_crates] HTTP request failed: {e}"))
+            })?;
 
         if !response.status().is_success() {
             // Surface crates.io diagnostics (e.g. rate-limit explanations) from
@@ -198,27 +201,29 @@ impl SearchCratesToolImpl {
                 format!(" - {snippet}")
             };
             return Err(CallToolError::from_message(format!(
-                "crates.io search failed: HTTP {status}{detail}"
+                "[search_crates] crates.io search failed: HTTP {status}{detail}"
             )));
         }
 
         // Use typed deserialization instead of serde_json::Value
-        let search_response: SearchCratesResponse = response
-            .json()
-            .await
-            .map_err(|e| CallToolError::from_message(format!("JSON parsing failed: {e}")))?;
+        let search_response: SearchCratesResponse = response.json().await.map_err(|e| {
+            CallToolError::from_message(format!("[search_crates] JSON parsing failed: {e}"))
+        })?;
 
         let crates = parse_crates_response(search_response, limit as usize);
 
-        let cache_value = serde_json::to_string(&crates)
-            .map_err(|e| CallToolError::from_message(format!("Serialization failed: {e}")))?;
+        let cache_value = serde_json::to_string(&crates).map_err(|e| {
+            CallToolError::from_message(format!("[search_crates] Serialization failed: {e}"))
+        })?;
 
         // Set cache using DocCache API
         self.service
             .doc_cache()
             .set_search_results(query, limit, Some(sort), cache_value)
             .await
-            .map_err(|e| CallToolError::from_message(format!("Cache set failed: {e}")))?;
+            .map_err(|e| {
+                CallToolError::from_message(format!("[search_crates] Cache set failed: {e}"))
+            })?;
 
         Ok(crates)
     }
