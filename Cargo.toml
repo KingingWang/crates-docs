@@ -1,6 +1,6 @@
 [package]
 name = "crates-docs"
-version = "0.9.0"
+version = "0.10.1"
 edition = "2021"
 description = "High-performance Rust crate documentation query MCP server, supports Stdio/HTTP/SSE transport and OAuth authentication"
 authors = ["KingingWang <KingingWang@foxmail.com>"]
