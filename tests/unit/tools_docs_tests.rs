@@ -3,7 +3,10 @@
 use crates_docs::cache::Cache;
 use crates_docs::tools::docs::{
     cache::{DocCache, DocCacheTtl},
-    html::{clean_html, extract_documentation, extract_search_results, html_to_text},
+    html::{
+        clean_html, extract_documentation, extract_documentation_as_text, extract_search_results,
+        html_to_text,
+    },
 };
 use http::Extensions;
 use reqwest::{Request, Response, Url};
@@ -1986,6 +1989,35 @@ fn test_html_to_text_with_code_block() {
     let html = r#"<pre><code>fn main() {}</code></pre>"#;
     let text = html_to_text(html);
     assert!(text.contains("fn main"));
+}
+
+#[test]
+fn test_html_to_text_preserves_pre_formatting() {
+    // Multi-line code blocks must keep their newlines and indentation rather
+    // than being flattened to a single line.
+    let html = "<pre><code>fn main() {\n    let x = 1;\n}</code></pre>";
+    let text = html_to_text(html);
+    assert!(
+        text.contains("fn main() {\n    let x = 1;\n}"),
+        "code block formatting should be preserved, got: {text:?}"
+    );
+}
+
+#[test]
+fn test_extract_documentation_as_text_preserves_pre_formatting() {
+    // The text output path runs extra normalisation passes; verify the verbatim
+    // formatting of `<pre>` blocks still survives them.
+    let html = concat!(
+        "<html><body><section id=\"main-content\">",
+        "<p>Example:</p>",
+        "<pre><code>fn main() {\n    let x = 1;\n}</code></pre>",
+        "</section></body></html>"
+    );
+    let text = extract_documentation_as_text(html);
+    assert!(
+        text.contains("\n    let x = 1;"),
+        "indented code line should be preserved, got: {text:?}"
+    );
 }
 
 #[test]

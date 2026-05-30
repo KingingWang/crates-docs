@@ -67,6 +67,15 @@ const BLOCK_TAGS: &[&str] = &[
 /// any literal NUL in the input with U+FFFD.
 const BLOCK_SEP: &str = "\u{0}";
 
+/// Sentinel characters used to preserve the verbatim whitespace of `<pre>`
+/// code blocks through the whitespace-collapsing passes. They are control
+/// characters that Rust does not classify as whitespace, so they survive both
+/// `str::split_whitespace` and `str::lines`. [`decode_pre`] restores the
+/// original characters once all collapsing is complete.
+const PRE_SPACE: char = '\u{2}';
+const PRE_NEWLINE: char = '\u{3}';
+const PRE_TAB: char = '\u{4}';
+
 /// Regex to remove anchor links like [§](#xxx)
 static ANCHOR_LINK_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").expect("hardcoded valid regex pattern"));
@@ -423,6 +432,15 @@ fn apply_regex_patterns(html: &str) -> String {
 /// Uses the `scraper` crate for robust HTML5 parsing.
 #[must_use]
 pub fn html_to_text(html: &str) -> String {
+    decode_pre(&html_to_text_raw(html))
+}
+
+/// Like [`html_to_text`] but leaves `<pre>` content encoded with the
+/// [`PRE_SPACE`]/[`PRE_NEWLINE`]/[`PRE_TAB`] sentinels. Callers that run
+/// additional whitespace-normalisation passes (e.g.
+/// [`extract_documentation_as_text`]) use this and call [`decode_pre`]
+/// themselves once all collapsing is done.
+fn html_to_text_raw(html: &str) -> String {
     let document = Html::parse_document(html);
 
     // Build selectors for skip tags
@@ -476,14 +494,27 @@ fn extract_text_excluding_skip_tags(
             }
             scraper::node::Node::Element(_) => {
                 if let Some(child_ref) = scraper::element_ref::ElementRef::wrap(child) {
+                    let name = child_ref.value().name().to_lowercase();
+                    // Preserve the verbatim formatting of `<pre>` code blocks.
+                    // Their newlines and indentation would otherwise be flattened
+                    // by the whitespace-collapsing passes, rendering multi-line
+                    // code examples as a single unreadable line. Encode the
+                    // significant whitespace as control sentinels that survive
+                    // collapsing; `decode_pre` restores it at the very end.
+                    if name == "pre" {
+                        let raw = child_ref.text().collect::<String>();
+                        text_parts.push(BLOCK_SEP.to_string());
+                        text_parts.push(encode_pre(raw.trim_matches('\n')));
+                        text_parts.push(BLOCK_SEP.to_string());
+                        continue;
+                    }
                     // Surround block-level elements with a `BLOCK_SEP`
                     // marker so adjacent blocks do not glue together (e.g.
                     // item-index entries) and each renders on its own line.
                     // `collapse_block_whitespace` turns the markers into
                     // newlines. Inline elements get no separator to preserve
                     // intra-word runs.
-                    let is_block =
-                        BLOCK_TAGS.contains(&child_ref.value().name().to_lowercase().as_str());
+                    let is_block = BLOCK_TAGS.contains(&name.as_str());
                     if is_block {
                         text_parts.push(BLOCK_SEP.to_string());
                     }
@@ -677,10 +708,12 @@ pub fn extract_search_results(html: &str, item_path: &str) -> String {
 pub fn extract_documentation_as_text(html: &str) -> String {
     let main_content = extract_main_content(html);
     let cleaned_html = clean_html(&main_content);
-    let text = html_to_text(&cleaned_html);
+    // Use the raw extraction so `<pre>` content stays encoded through the
+    // line-normalisation pass; decode it back to real whitespace at the end.
+    let text = html_to_text_raw(&cleaned_html);
     // Drop standalone section-sign markers, then re-collapse each line so the
-    // newline-delimited block structure from `html_to_text` is preserved.
-    normalize_lines(&text.replace('\u{00a7}', " "))
+    // newline-delimited block structure from `html_to_text_raw` is preserved.
+    decode_pre(&normalize_lines(&text.replace('\u{00a7}', " ")))
 }
 
 /// Collapse whitespace within each block segment and join blocks with newlines.
@@ -712,6 +745,38 @@ fn normalize_lines(text: &str) -> String {
 #[inline]
 fn clean_whitespace(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Encode the significant whitespace of `<pre>` content as control sentinels
+/// ([`PRE_SPACE`], [`PRE_NEWLINE`], [`PRE_TAB`]) so it survives the
+/// whitespace-collapsing passes. Carriage returns are dropped.
+fn encode_pre(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            ' ' => out.push(PRE_SPACE),
+            '\n' => out.push(PRE_NEWLINE),
+            '\t' => out.push(PRE_TAB),
+            '\r' => {}
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// Reverse of [`encode_pre`]: restore the original whitespace characters from
+/// the [`PRE_SPACE`]/[`PRE_NEWLINE`]/[`PRE_TAB`] sentinels.
+fn decode_pre(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            PRE_SPACE => out.push(' '),
+            PRE_NEWLINE => out.push('\n'),
+            PRE_TAB => out.push('\t'),
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
