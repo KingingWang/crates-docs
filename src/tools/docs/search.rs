@@ -404,13 +404,13 @@ impl Tool for SearchCratesToolImpl {
         // network requests. This avoids wasted crates.io calls on invalid input
         // and keeps input-validation errors deterministic regardless of network
         // availability.
-        super::validate_search_query(&params.query)?;
+        super::validate_search_query("search_crates", &params.query)?;
         // Clamp to the documented range [1, 100]. A lower bound of 0 (or a
         // value above 100) would otherwise silently produce an empty/odd
         // result set and a `per_page=0` upstream request.
         let limit = params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).clamp(1, 100);
         let sort = normalize_search_sort(params.sort.as_deref())?;
-        let format = super::parse_format(params.format.as_deref())?;
+        let format = super::parse_format("search_crates", params.format.as_deref())?;
         // search_crates only supports markdown/text/json. Reject `html`
         // explicitly with an actionable error instead of silently returning
         // markdown (the tool schema does not advertise html for search).

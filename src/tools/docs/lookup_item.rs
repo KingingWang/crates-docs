@@ -354,9 +354,9 @@ impl Tool for LookupItemToolImpl {
             )
         })?;
 
-        super::validate_crate_name(&params.crate_name)?;
-        super::validate_version(params.version.as_deref())?;
-        super::validate_item_path(&params.item_path)?;
+        super::validate_crate_name(TOOL_NAME, &params.crate_name)?;
+        super::validate_version(TOOL_NAME, params.version.as_deref())?;
+        super::validate_item_path(TOOL_NAME, &params.item_path)?;
         // Normalise surrounding whitespace so it does not leak into headings or
         // candidate URL construction.
         params.crate_name = params.crate_name.trim().to_string();
@@ -368,7 +368,7 @@ impl Tool for LookupItemToolImpl {
         // Propagate the detailed parse error (e.g. "Invalid format 'xml'. Expected
         // one of: ...") rather than masking it with a generic message, so callers
         // get actionable feedback.
-        let format = super::parse_format(params.format.as_deref())?;
+        let format = super::parse_format(TOOL_NAME, params.format.as_deref())?;
         let content = match format {
             super::Format::Text => {
                 self.fetch_item_docs_as_text(

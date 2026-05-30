@@ -58,7 +58,7 @@ impl std::fmt::Display for Format {
 }
 
 /// Parse format string into Format enum
-pub fn parse_format(format_str: Option<&str>) -> Result<Format, CallToolError> {
+pub fn parse_format(tool_name: &str, format_str: Option<&str>) -> Result<Format, CallToolError> {
     match format_str {
         None => Ok(Format::Markdown),
         Some(s) => match s.to_lowercase().as_str() {
@@ -67,7 +67,7 @@ pub fn parse_format(format_str: Option<&str>) -> Result<Format, CallToolError> {
             "html" => Ok(Format::Html),
             "json" => Ok(Format::Json),
             _ => Err(CallToolError::invalid_arguments(
-                "format",
+                tool_name,
                 Some(format!(
                     "Invalid format '{s}'. Expected one of: markdown, text, html, json"
                 )),
@@ -86,17 +86,17 @@ pub fn parse_format(format_str: Option<&str>) -> Result<Format, CallToolError> {
 /// # Errors
 ///
 /// Returns a `CallToolError` describing the first problem found.
-pub fn validate_crate_name(crate_name: &str) -> Result<(), CallToolError> {
+pub fn validate_crate_name(tool_name: &str, crate_name: &str) -> Result<(), CallToolError> {
     let name = crate_name.trim();
     if name.is_empty() {
         return Err(CallToolError::invalid_arguments(
-            "crate_name",
+            tool_name,
             Some("crate_name must not be empty".to_string()),
         ));
     }
     if name.len() > 64 {
         return Err(CallToolError::invalid_arguments(
-            "crate_name",
+            tool_name,
             Some("crate_name is too long (max 64 characters)".to_string()),
         ));
     }
@@ -105,7 +105,7 @@ pub fn validate_crate_name(crate_name: &str) -> Result<(), CallToolError> {
         .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
     {
         return Err(CallToolError::invalid_arguments(
-            "crate_name",
+            tool_name,
             Some(format!(
                 "Invalid crate_name '{crate_name}'. Only ASCII letters, digits, '_' and '-' are allowed"
             )),
@@ -122,20 +122,20 @@ pub fn validate_crate_name(crate_name: &str) -> Result<(), CallToolError> {
 /// # Errors
 ///
 /// Returns a `CallToolError` describing the first problem found.
-pub fn validate_version(version: Option<&str>) -> Result<(), CallToolError> {
+pub fn validate_version(tool_name: &str, version: Option<&str>) -> Result<(), CallToolError> {
     let Some(raw) = version else {
         return Ok(());
     };
     let ver = raw.trim();
     if ver.is_empty() {
         return Err(CallToolError::invalid_arguments(
-            "version",
+            tool_name,
             Some("version must not be empty when provided".to_string()),
         ));
     }
     if ver.len() > 64 {
         return Err(CallToolError::invalid_arguments(
-            "version",
+            tool_name,
             Some("version is too long (max 64 characters)".to_string()),
         ));
     }
@@ -145,7 +145,7 @@ pub fn validate_version(version: Option<&str>) -> Result<(), CallToolError> {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'+' | b'_' | b'~'))
     {
         return Err(CallToolError::invalid_arguments(
-            "version",
+            tool_name,
             Some(format!(
                 "Invalid version '{raw}'. Only ASCII letters, digits and '.', '-', '+', '_', '~' are allowed"
             )),
@@ -163,17 +163,17 @@ pub fn validate_version(version: Option<&str>) -> Result<(), CallToolError> {
 /// # Errors
 ///
 /// Returns a `CallToolError` describing the first problem found.
-pub fn validate_search_query(query: &str) -> Result<(), CallToolError> {
+pub fn validate_search_query(tool_name: &str, query: &str) -> Result<(), CallToolError> {
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return Err(CallToolError::invalid_arguments(
-            "query",
+            tool_name,
             Some("query must not be empty".to_string()),
         ));
     }
     if trimmed.len() > 200 {
         return Err(CallToolError::invalid_arguments(
-            "query",
+            tool_name,
             Some("query is too long (max 200 characters)".to_string()),
         ));
     }
@@ -191,17 +191,17 @@ pub fn validate_search_query(query: &str) -> Result<(), CallToolError> {
 /// # Errors
 ///
 /// Returns a `CallToolError` describing the first problem found.
-pub fn validate_item_path(item_path: &str) -> Result<(), CallToolError> {
+pub fn validate_item_path(tool_name: &str, item_path: &str) -> Result<(), CallToolError> {
     let path = item_path.trim();
     if path.is_empty() {
         return Err(CallToolError::invalid_arguments(
-            "item_path",
+            tool_name,
             Some("item_path must not be empty".to_string()),
         ));
     }
     if path.len() > 256 {
         return Err(CallToolError::invalid_arguments(
-            "item_path",
+            tool_name,
             Some("item_path is too long (max 256 characters)".to_string()),
         ));
     }
@@ -211,7 +211,7 @@ pub fn validate_item_path(item_path: &str) -> Result<(), CallToolError> {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b':')
     {
         return Err(CallToolError::invalid_arguments(
-            "item_path",
+            tool_name,
             Some(format!(
                 "Invalid item_path '{item_path}'. Only ASCII letters, digits, '_' and '::' separators are allowed"
             )),
@@ -225,7 +225,7 @@ pub fn validate_item_path(item_path: &str) -> Result<(), CallToolError> {
         .any(|segment| segment.is_empty() || segment.contains(':'))
     {
         return Err(CallToolError::invalid_arguments(
-            "item_path",
+            tool_name,
             Some(format!(
                 "Invalid item_path '{item_path}'. Path segments must be separated by '::'"
             )),
@@ -758,83 +758,83 @@ mod tests {
 
     #[test]
     fn test_validate_crate_name_accepts_valid() {
-        assert!(validate_crate_name("serde").is_ok());
-        assert!(validate_crate_name("serde_json").is_ok());
-        assert!(validate_crate_name("tracing-subscriber").is_ok());
-        assert!(validate_crate_name("  tokio  ").is_ok());
+        assert!(validate_crate_name("lookup_crate", "serde").is_ok());
+        assert!(validate_crate_name("lookup_crate", "serde_json").is_ok());
+        assert!(validate_crate_name("lookup_crate", "tracing-subscriber").is_ok());
+        assert!(validate_crate_name("lookup_crate", "  tokio  ").is_ok());
     }
 
     #[test]
     fn test_validate_crate_name_rejects_invalid() {
-        assert!(validate_crate_name("").is_err());
-        assert!(validate_crate_name("   ").is_err());
-        assert!(validate_crate_name("../etc/passwd").is_err());
-        assert!(validate_crate_name("foo/bar").is_err());
-        assert!(validate_crate_name("foo bar").is_err());
-        assert!(validate_crate_name("foo;rm").is_err());
-        assert!(validate_crate_name(&"a".repeat(65)).is_err());
+        assert!(validate_crate_name("lookup_crate", "").is_err());
+        assert!(validate_crate_name("lookup_crate", "   ").is_err());
+        assert!(validate_crate_name("lookup_crate", "../etc/passwd").is_err());
+        assert!(validate_crate_name("lookup_crate", "foo/bar").is_err());
+        assert!(validate_crate_name("lookup_crate", "foo bar").is_err());
+        assert!(validate_crate_name("lookup_crate", "foo;rm").is_err());
+        assert!(validate_crate_name("lookup_crate", &"a".repeat(65)).is_err());
     }
 
     #[test]
     fn test_validate_version_accepts_valid() {
-        assert!(validate_version(None).is_ok());
-        assert!(validate_version(Some("1.0.0")).is_ok());
-        assert!(validate_version(Some("1.0.0-rc.1")).is_ok());
-        assert!(validate_version(Some("1.0.0+build.5")).is_ok());
-        assert!(validate_version(Some("latest")).is_ok());
-        assert!(validate_version(Some("  1.2.3  ")).is_ok());
+        assert!(validate_version("lookup_crate", None).is_ok());
+        assert!(validate_version("lookup_crate", Some("1.0.0")).is_ok());
+        assert!(validate_version("lookup_crate", Some("1.0.0-rc.1")).is_ok());
+        assert!(validate_version("lookup_crate", Some("1.0.0+build.5")).is_ok());
+        assert!(validate_version("lookup_crate", Some("latest")).is_ok());
+        assert!(validate_version("lookup_crate", Some("  1.2.3  ")).is_ok());
     }
 
     #[test]
     fn test_validate_version_rejects_invalid() {
-        assert!(validate_version(Some("")).is_err());
-        assert!(validate_version(Some("../../1.0")).is_err());
-        assert!(validate_version(Some("1.0/2.0")).is_err());
-        assert!(validate_version(Some("1.0 0")).is_err());
-        assert!(validate_version(Some("..")).is_err());
-        assert!(validate_version(Some(&"1".repeat(65))).is_err());
+        assert!(validate_version("lookup_crate", Some("")).is_err());
+        assert!(validate_version("lookup_crate", Some("../../1.0")).is_err());
+        assert!(validate_version("lookup_crate", Some("1.0/2.0")).is_err());
+        assert!(validate_version("lookup_crate", Some("1.0 0")).is_err());
+        assert!(validate_version("lookup_crate", Some("..")).is_err());
+        assert!(validate_version("lookup_crate", Some(&"1".repeat(65))).is_err());
     }
 
     #[test]
     fn test_validate_item_path_accepts_valid() {
-        assert!(validate_item_path("Serialize").is_ok());
-        assert!(validate_item_path("serde::Serialize").is_ok());
-        assert!(validate_item_path("std::vec::Vec::push").is_ok());
-        assert!(validate_item_path("collections::HashMap").is_ok());
-        assert!(validate_item_path("u32").is_ok());
-        assert!(validate_item_path("  tokio::main  ").is_ok());
+        assert!(validate_item_path("lookup_item", "Serialize").is_ok());
+        assert!(validate_item_path("lookup_item", "serde::Serialize").is_ok());
+        assert!(validate_item_path("lookup_item", "std::vec::Vec::push").is_ok());
+        assert!(validate_item_path("lookup_item", "collections::HashMap").is_ok());
+        assert!(validate_item_path("lookup_item", "u32").is_ok());
+        assert!(validate_item_path("lookup_item", "  tokio::main  ").is_ok());
     }
 
     #[test]
     fn test_validate_item_path_rejects_invalid() {
-        assert!(validate_item_path("").is_err());
-        assert!(validate_item_path("   ").is_err());
-        assert!(validate_item_path("../../etc/passwd").is_err());
-        assert!(validate_item_path("serde/Serialize").is_err());
-        assert!(validate_item_path("serde::Ser ialize").is_err());
-        assert!(validate_item_path("foo;rm").is_err());
-        assert!(validate_item_path("foo.bar").is_err());
-        assert!(validate_item_path(&"a".repeat(257)).is_err());
+        assert!(validate_item_path("lookup_item", "").is_err());
+        assert!(validate_item_path("lookup_item", "   ").is_err());
+        assert!(validate_item_path("lookup_item", "../../etc/passwd").is_err());
+        assert!(validate_item_path("lookup_item", "serde/Serialize").is_err());
+        assert!(validate_item_path("lookup_item", "serde::Ser ialize").is_err());
+        assert!(validate_item_path("lookup_item", "foo;rm").is_err());
+        assert!(validate_item_path("lookup_item", "foo.bar").is_err());
+        assert!(validate_item_path("lookup_item", &"a".repeat(257)).is_err());
         // Single-colon separators and empty path segments are malformed.
-        assert!(validate_item_path("serde:Serialize").is_err());
-        assert!(validate_item_path("serde::").is_err());
-        assert!(validate_item_path("::Serialize").is_err());
-        assert!(validate_item_path("std:::vec").is_err());
+        assert!(validate_item_path("lookup_item", "serde:Serialize").is_err());
+        assert!(validate_item_path("lookup_item", "serde::").is_err());
+        assert!(validate_item_path("lookup_item", "::Serialize").is_err());
+        assert!(validate_item_path("lookup_item", "std:::vec").is_err());
     }
 
     #[test]
     fn test_validate_search_query_accepts_valid() {
-        assert!(validate_search_query("serde").is_ok());
-        assert!(validate_search_query("web framework").is_ok());
-        assert!(validate_search_query("  tokio  ").is_ok());
-        assert!(validate_search_query(&"a".repeat(200)).is_ok());
+        assert!(validate_search_query("search_crates", "serde").is_ok());
+        assert!(validate_search_query("search_crates", "web framework").is_ok());
+        assert!(validate_search_query("search_crates", "  tokio  ").is_ok());
+        assert!(validate_search_query("search_crates", &"a".repeat(200)).is_ok());
     }
 
     #[test]
     fn test_validate_search_query_rejects_invalid() {
-        assert!(validate_search_query("").is_err());
-        assert!(validate_search_query("   ").is_err());
-        assert!(validate_search_query(&"a".repeat(201)).is_err());
+        assert!(validate_search_query("search_crates", "").is_err());
+        assert!(validate_search_query("search_crates", "   ").is_err());
+        assert!(validate_search_query("search_crates", &"a".repeat(201)).is_err());
     }
 
     #[test]
@@ -1032,39 +1032,69 @@ mod tests {
 
     #[test]
     fn test_parse_format_none() {
-        assert_eq!(parse_format(None).unwrap(), Format::Markdown);
+        assert_eq!(
+            parse_format("lookup_crate", None).unwrap(),
+            Format::Markdown
+        );
     }
 
     #[test]
     fn test_parse_format_markdown() {
-        assert_eq!(parse_format(Some("markdown")).unwrap(), Format::Markdown);
-        assert_eq!(parse_format(Some("MARKDOWN")).unwrap(), Format::Markdown);
-        assert_eq!(parse_format(Some("Markdown")).unwrap(), Format::Markdown);
+        assert_eq!(
+            parse_format("lookup_crate", Some("markdown")).unwrap(),
+            Format::Markdown
+        );
+        assert_eq!(
+            parse_format("lookup_crate", Some("MARKDOWN")).unwrap(),
+            Format::Markdown
+        );
+        assert_eq!(
+            parse_format("lookup_crate", Some("Markdown")).unwrap(),
+            Format::Markdown
+        );
     }
 
     #[test]
     fn test_parse_format_text() {
-        assert_eq!(parse_format(Some("text")).unwrap(), Format::Text);
-        assert_eq!(parse_format(Some("TEXT")).unwrap(), Format::Text);
+        assert_eq!(
+            parse_format("lookup_crate", Some("text")).unwrap(),
+            Format::Text
+        );
+        assert_eq!(
+            parse_format("lookup_crate", Some("TEXT")).unwrap(),
+            Format::Text
+        );
     }
 
     #[test]
     fn test_parse_format_html() {
-        assert_eq!(parse_format(Some("html")).unwrap(), Format::Html);
-        assert_eq!(parse_format(Some("HTML")).unwrap(), Format::Html);
+        assert_eq!(
+            parse_format("lookup_crate", Some("html")).unwrap(),
+            Format::Html
+        );
+        assert_eq!(
+            parse_format("lookup_crate", Some("HTML")).unwrap(),
+            Format::Html
+        );
     }
 
     #[test]
     fn test_parse_format_json() {
-        assert_eq!(parse_format(Some("json")).unwrap(), Format::Json);
-        assert_eq!(parse_format(Some("JSON")).unwrap(), Format::Json);
+        assert_eq!(
+            parse_format("lookup_crate", Some("json")).unwrap(),
+            Format::Json
+        );
+        assert_eq!(
+            parse_format("lookup_crate", Some("JSON")).unwrap(),
+            Format::Json
+        );
     }
 
     #[test]
     fn test_parse_format_invalid() {
-        assert!(parse_format(Some("invalid")).is_err());
-        assert!(parse_format(Some("xml")).is_err());
-        assert!(parse_format(Some("")).is_err());
+        assert!(parse_format("lookup_crate", Some("invalid")).is_err());
+        assert!(parse_format("lookup_crate", Some("xml")).is_err());
+        assert!(parse_format("lookup_crate", Some("")).is_err());
     }
 
     #[test]
@@ -1149,5 +1179,28 @@ mod tests {
         let url = build_crates_io_search_url("web framework", None, None);
         assert!(url.contains("web+framework") || url.contains("web%20framework"));
         std::env::remove_var("CRATES_DOCS_CRATES_IO_URL");
+    }
+    #[test]
+    fn test_validation_errors_report_their_tool_name() {
+        // Regression: argument-validation errors must name the *tool*
+        // (e.g. "lookup_crate"), not the offending field (e.g. "crate_name"),
+        // so callers see "Invalid arguments for tool 'lookup_crate'".
+        let err = validate_crate_name("lookup_crate", "../etc/passwd").unwrap_err();
+        assert!(
+            err.to_string().contains("lookup_crate"),
+            "expected tool name in error, got: {err}"
+        );
+
+        let err = validate_version("lookup_crate", Some("1.0/2.0")).unwrap_err();
+        assert!(err.to_string().contains("lookup_crate"), "got: {err}");
+
+        let err = validate_item_path("lookup_item", "foo/bar").unwrap_err();
+        assert!(err.to_string().contains("lookup_item"), "got: {err}");
+
+        let err = validate_search_query("search_crates", "").unwrap_err();
+        assert!(err.to_string().contains("search_crates"), "got: {err}");
+
+        let err = parse_format("lookup_crate", Some("xml")).unwrap_err();
+        assert!(err.to_string().contains("lookup_crate"), "got: {err}");
     }
 }

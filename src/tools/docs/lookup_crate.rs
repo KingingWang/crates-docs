@@ -195,8 +195,8 @@ impl Tool for LookupCrateToolImpl {
         // Propagate the detailed parse error (e.g. "Invalid format 'xml'. Expected
         // one of: ...") rather than masking it with a generic message, so callers
         // get actionable feedback.
-        super::validate_crate_name(&params.crate_name)?;
-        super::validate_version(params.version.as_deref())?;
+        super::validate_crate_name(TOOL_NAME, &params.crate_name)?;
+        super::validate_version(TOOL_NAME, params.version.as_deref())?;
         // Normalise surrounding whitespace so it does not leak into headings or
         // candidate URL construction (a padded name would otherwise 404).
         params.crate_name = params.crate_name.trim().to_string();
@@ -204,7 +204,7 @@ impl Tool for LookupCrateToolImpl {
             *version = version.trim().to_string();
         }
 
-        let format = super::parse_format(params.format.as_deref())?;
+        let format = super::parse_format(TOOL_NAME, params.format.as_deref())?;
         let content = match format {
             super::Format::Text => {
                 self.fetch_crate_docs_as_text(&params.crate_name, params.version.as_deref())
