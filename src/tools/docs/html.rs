@@ -11,12 +11,13 @@ use std::sync::LazyLock;
 /// Tags whose content should be completely removed during HTML cleaning
 const SKIP_TAGS: &[&str] = &["script", "style", "noscript", "iframe"];
 
-/// Block-level tags. During plain-text extraction a separating space is
+/// Block-level tags. During plain-text extraction a [`BLOCK_SEP`] marker is
 /// inserted around these so adjacent blocks (e.g. consecutive `<li>`/`<dt>`
 /// item-index entries, table cells, or paragraphs) do not run together into a
-/// single token like `Dl_infoElf32_Chdr`. Inline tags are intentionally
-/// excluded so that runs split across inline elements (`ser`+`<wbr>`+`ializing`,
-/// `RandomState</a>,`) are not corrupted with spurious spaces.
+/// single token like `Dl_infoElf32_Chdr`, and so each block can be emitted on
+/// its own line. Inline tags are intentionally excluded so that runs split
+/// across inline elements (`ser`+`<wbr>`+`ializing`, `RandomState</a>,`) are not
+/// corrupted with spurious spaces.
 const BLOCK_TAGS: &[&str] = &[
     "address",
     "article",
@@ -56,6 +57,15 @@ const BLOCK_TAGS: &[&str] = &[
     "tr",
     "ul",
 ];
+
+/// Sentinel marker inserted around block-level elements during plain-text
+/// extraction (see [`BLOCK_TAGS`]). It is deliberately distinct from any
+/// whitespace so genuine block boundaries can be turned into newlines without
+/// being confused with the incidental whitespace inside text nodes (including
+/// source-indentation newlines), which is collapsed to single spaces. A NUL
+/// byte never appears in rendered documentation text: the HTML parser replaces
+/// any literal NUL in the input with U+FFFD.
+const BLOCK_SEP: &str = "\u{0}";
 
 /// Regex to remove anchor links like [§](#xxx)
 static ANCHOR_LINK_REGEX: LazyLock<Regex> =
@@ -429,9 +439,11 @@ pub fn html_to_text(html: &str) -> String {
     }
 
     // Join with "" (not " "): each text node already carries its own
-    // surrounding whitespace, and `clean_whitespace` collapses runs. Inserting a
-    // space between every node would corrupt inline runs split across elements.
-    clean_whitespace(&text_parts.join(""))
+    // surrounding whitespace, and `collapse_block_whitespace` collapses runs.
+    // Inserting a space between every node would corrupt inline runs split
+    // across elements. `BLOCK_SEP` markers added around block elements become
+    // newlines so the output keeps document structure.
+    collapse_block_whitespace(&text_parts.join(""))
 }
 
 fn extract_text_excluding_skip_tags(
@@ -464,18 +476,20 @@ fn extract_text_excluding_skip_tags(
             }
             scraper::node::Node::Element(_) => {
                 if let Some(child_ref) = scraper::element_ref::ElementRef::wrap(child) {
-                    // Surround block-level elements with a space so adjacent
-                    // blocks do not glue together (e.g. item-index entries).
-                    // `clean_whitespace` collapses the resulting runs. Inline
-                    // elements get no separator to preserve intra-word runs.
+                    // Surround block-level elements with a `BLOCK_SEP`
+                    // marker so adjacent blocks do not glue together (e.g.
+                    // item-index entries) and each renders on its own line.
+                    // `collapse_block_whitespace` turns the markers into
+                    // newlines. Inline elements get no separator to preserve
+                    // intra-word runs.
                     let is_block =
                         BLOCK_TAGS.contains(&child_ref.value().name().to_lowercase().as_str());
                     if is_block {
-                        text_parts.push(" ".to_string());
+                        text_parts.push(BLOCK_SEP.to_string());
                     }
                     extract_text_excluding_skip_tags(&child_ref, text_parts);
                     if is_block {
-                        text_parts.push(" ".to_string());
+                        text_parts.push(BLOCK_SEP.to_string());
                     }
                 }
             }
@@ -664,8 +678,35 @@ pub fn extract_documentation_as_text(html: &str) -> String {
     let main_content = extract_main_content(html);
     let cleaned_html = clean_html(&main_content);
     let text = html_to_text(&cleaned_html);
-    // Drop standalone section-sign markers and re-collapse whitespace.
-    clean_whitespace(&text.replace('\u{00a7}', " "))
+    // Drop standalone section-sign markers, then re-collapse each line so the
+    // newline-delimited block structure from `html_to_text` is preserved.
+    normalize_lines(&text.replace('\u{00a7}', " "))
+}
+
+/// Collapse whitespace within each block segment and join blocks with newlines.
+///
+/// [`BLOCK_SEP`] markers delimit block-level boundaries. Within each segment all
+/// whitespace runs (spaces, tabs, and incidental source newlines) collapse to a
+/// single space, which preserves inline runs split across elements. Empty
+/// segments are dropped so adjacent markers do not emit blank lines.
+#[inline]
+fn collapse_block_whitespace(text: &str) -> String {
+    text.split(BLOCK_SEP)
+        .map(|seg| seg.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|seg| !seg.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Collapse intra-line whitespace and drop blank lines while preserving the
+/// newline-delimited block structure produced by [`html_to_text`].
+#[inline]
+fn normalize_lines(text: &str) -> String {
+    text.lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 #[inline]
@@ -702,7 +743,10 @@ mod tests {
             !text.contains("Dl_infoElf32"),
             "block text glued together: {text}"
         );
-        assert!(text.contains("Dl_info Elf32_Chdr Foo"), "text: {text}");
+        assert!(
+            text.contains("Dl_info\nElf32_Chdr\nFoo"),
+            "blocks not on separate lines: {text}"
+        );
     }
 
     #[test]
@@ -883,9 +927,9 @@ mod tests {
         assert!(text.contains("deserializing"), "split word: {text}");
         assert!(!text.contains("de serializing"), "spurious space: {text}");
         assert!(text.contains("RandomState,"), "space before comma: {text}");
-        // Whitespace between block elements still separates words.
+        // Block elements are now separated by a newline rather than a space.
         assert!(
-            text.contains("data RandomState"),
+            text.contains("data\nRandomState"),
             "lost block separation: {text}"
         );
     }
