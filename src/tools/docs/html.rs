@@ -223,7 +223,24 @@ static SUMMARY_SELECTOR: LazyLock<Selector> =
 /// plain text). Stripping them from the raw HTML first guarantees they leak
 /// into neither plain-text nor markdown output.
 static SRC_ANCHOR_HTML_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?s)<a\b[^>]*\bclass="[^"]*\bsrc\b[^"]*"[^>]*>.*?</a>"#)
+    // Match both modern (`class="src"`, double-quoted) and older rustdoc
+    // (`class='srclink'`, single-quoted) source-code anchors so their `[src]`
+    // label never leaks into the plain-text output (which, unlike the markdown
+    // path, has no later link-stripping pass).
+    Regex::new(r#"(?s)<a\b[^>]*\bclass\s*=\s*['"][^'"]*\bsrc(?:link)?\b[^'"]*['"][^>]*>.*?</a>"#)
+        .expect("hardcoded valid regex pattern")
+});
+
+/// Regex to remove rustdoc UI anchors whose target is a `javascript:` URL
+/// (collapse/expand toggles such as `#toggle-all-docs`, which render as a
+/// bracketed minus/plus marker).
+///
+/// These are pure UI affordances; documentation never legitimately links to a
+/// `javascript:` URL. Their visible marker text would otherwise leak into the
+/// plain-text output, since the `javascript:`-link cleanup only runs on the
+/// markdown path.
+static JS_ANCHOR_HTML_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?is)<a\b[^>]*\bhref\s*=\s*['"]\s*javascript:[^>]*>.*?</a>"#)
         .expect("hardcoded valid regex pattern")
 });
 
@@ -298,6 +315,9 @@ pub fn clean_html(html: &str) -> String {
     // Strip source-code anchors from the raw HTML first so their "Source" label
     // cannot survive as plain text when nested inside preserved <summary> nodes.
     let html = SRC_ANCHOR_HTML_REGEX.replace_all(html, "");
+    // Drop `javascript:` UI toggles (e.g. the bracketed collapse-all control)
+    // so their marker text does not survive plain-text extraction.
+    let html = JS_ANCHOR_HTML_REGEX.replace_all(&html, "");
     // Guarantee removal of executable/style/embedded content regardless of how
     // the source markup was formatted (see DANGEROUS_ELEMENT_REGEX docs).
     let html = DANGEROUS_ELEMENT_REGEX.replace_all(&html, "");
@@ -806,6 +826,27 @@ fn decode_pre(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_text_strips_old_rustdoc_src_and_toggle_anchors() {
+        // Older rustdoc heading markup: a `javascript:` collapse-all toggle and a
+        // single-quoted `srclink` source anchor. Neither must leak its bracketed
+        // marker into the plain-text output.
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<h1>Crate serde",
+            "<a id=\"toggle-all-docs\" href=\"javascript:void(0)\" title=\"collapse all docs\">",
+            "[<span class='inner'>TOGGLEMARK</span>]</a>",
+            "<a class='srclink' href='../src/serde/lib.rs.html#9-267' title='goto source code'>[src]</a>",
+            "</h1><p>Real doc.</p>",
+            "</section></body></html>"
+        );
+        let text = extract_documentation_as_text(html);
+        assert!(!text.contains("[src]"), "src link leaked: {text:?}");
+        assert!(!text.contains("TOGGLEMARK"), "toggle leaked: {text:?}");
+        assert!(text.contains("Crate serde"), "heading dropped: {text:?}");
+        assert!(text.contains("Real doc."), "content dropped: {text:?}");
+    }
 
     #[test]
     fn test_clean_html_strips_oddly_formatted_block_elements() {
