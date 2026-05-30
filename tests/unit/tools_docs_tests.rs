@@ -2129,3 +2129,62 @@ fn test_format_default() {
     use crates_docs::tools::docs::Format;
     assert_eq!(Format::default(), Format::Markdown);
 }
+
+#[tokio::test]
+async fn test_fetch_html_optional_returns_none_on_404() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/missing"))
+        .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+        .mount(&mock_server)
+        .await;
+
+    let cache = Arc::new(crates_docs::cache::memory::MemoryCache::new(10));
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let url = format!("{}/missing", mock_server.uri());
+    let result = service.fetch_html_optional(&url, Some("lookup_item")).await;
+    assert!(matches!(result, Ok(None)), "404 should map to Ok(None)");
+}
+
+#[tokio::test]
+async fn test_fetch_html_optional_surfaces_server_error() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/boom"))
+        .respond_with(ResponseTemplate::new(500).set_body_string("upstream failure"))
+        .mount(&mock_server)
+        .await;
+
+    let cache = Arc::new(crates_docs::cache::memory::MemoryCache::new(10));
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let test_client = reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        Arc::new(test_client),
+    );
+
+    let url = format!("{}/boom", mock_server.uri());
+    let result = service.fetch_html_optional(&url, Some("lookup_item")).await;
+    assert!(result.is_err(), "non-success status must be an error");
+    let msg = result.unwrap_err().to_string();
+    assert!(
+        msg.contains("500"),
+        "error should mention the status: {msg}"
+    );
+    assert!(
+        msg.contains("[lookup_item]"),
+        "error should carry the tool prefix: {msg}"
+    );
+}

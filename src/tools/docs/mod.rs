@@ -692,7 +692,12 @@ impl DocService {
             return Ok(None);
         }
         if !status.is_success() {
-            let error_body = response.text().await.unwrap_or_default();
+            // Surface a body-read failure instead of masking it with an empty
+            // string (matches `fetch_html` and the documented contract).
+            let error_body = response.text().await.map_err(|e| {
+                let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
+                CallToolError::from_message(format!("{prefix}Failed to read error response: {e}"))
+            })?;
             let prefix = tool_name.map_or(String::new(), |n| format!("[{n}] "));
             return Err(CallToolError::from_message(format!(
                 "{prefix}Failed to get documentation: {}",
