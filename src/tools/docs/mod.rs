@@ -781,9 +781,16 @@ impl DocService {
             if let Ok(c) = crate::utils::HttpClientBuilder::new().build() {
                 Arc::new(c)
             } else {
-                // Fallback: create a minimal client without retry middleware
-                // Using Client::new() which is infallible - never panics
-                let plain_client = reqwest::Client::new();
+                // Fallback: create a minimal client without retry middleware.
+                // Apply timeouts matching HttpClientBuilder's defaults so the
+                // fallback cannot hang forever on a slow/stalled connection.
+                // If the builder fails for any reason, fall back to the
+                // infallible Client::new() (which never panics).
+                let plain_client = reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(30))
+                    .connect_timeout(std::time::Duration::from_secs(10))
+                    .build()
+                    .unwrap_or_else(|_| reqwest::Client::new());
                 Arc::new(reqwest_middleware::ClientBuilder::new(plain_client).build())
             };
 
