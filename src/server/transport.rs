@@ -206,6 +206,40 @@ fn warn_if_metrics_configured_but_unavailable(server_config: &crate::config::App
     }
 }
 
+/// Warn when server resource limits are configured but not enforced.
+///
+/// `request_timeout_secs`, `response_timeout_secs`, and `max_connections` are
+/// accepted in configuration, but the underlying SDK `HyperServerOptions` does
+/// not expose request/response timeouts or a connection cap, so these values
+/// are never applied. Warning when an operator sets a non-default value avoids
+/// a false sense that the server enforces limits it does not.
+fn unenforced_server_limits(server_config: &crate::config::AppConfig) -> Vec<&'static str> {
+    let defaults = crate::config::ServerConfig::default();
+    let mut unenforced = Vec::new();
+    if server_config.server.request_timeout_secs != defaults.request_timeout_secs {
+        unenforced.push("request_timeout_secs");
+    }
+    if server_config.server.response_timeout_secs != defaults.response_timeout_secs {
+        unenforced.push("response_timeout_secs");
+    }
+    if server_config.server.max_connections != defaults.max_connections {
+        unenforced.push("max_connections");
+    }
+    unenforced
+}
+
+fn warn_if_unenforced_server_limits_configured(server_config: &crate::config::AppConfig) {
+    let unenforced = unenforced_server_limits(server_config);
+    if !unenforced.is_empty() {
+        tracing::warn!(
+            fields = unenforced.join(", "),
+            "These server limit settings are configured with non-default values but are NOT \
+             enforced: the HTTP transport applies neither request/response timeouts nor a maximum \
+             connection cap. These settings currently have no effect."
+        );
+    }
+}
+
 /// Run a Hyper-based MCP server with the given configuration.
 ///
 /// This function handles HTTP, SSE, and Hybrid servers based on the configuration.
@@ -248,6 +282,7 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
 
     warn_if_auth_configured_but_unenforced(server_config);
     warn_if_metrics_configured_but_unavailable(server_config);
+    warn_if_unenforced_server_limits_configured(server_config);
 
     // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
@@ -389,5 +424,28 @@ pub async fn run_server_with_mode(server: &CratesDocsServer, mode: TransportMode
                 .expect("Hyper config should exist for HTTP/SSE/Hybrid");
             run_hyper_server(server, config).await
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unenforced_server_limits;
+    use crate::config::AppConfig;
+
+    #[test]
+    fn test_unenforced_limits_empty_for_defaults() {
+        let config = AppConfig::default();
+        assert!(unenforced_server_limits(&config).is_empty());
+    }
+
+    #[test]
+    fn test_unenforced_limits_flags_changed_fields() {
+        let mut config = AppConfig::default();
+        config.server.request_timeout_secs += 1;
+        config.server.max_connections += 1;
+        let flagged = unenforced_server_limits(&config);
+        assert!(flagged.contains(&"request_timeout_secs"));
+        assert!(flagged.contains(&"max_connections"));
+        assert!(!flagged.contains(&"response_timeout_secs"));
     }
 }
