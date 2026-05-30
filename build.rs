@@ -28,7 +28,24 @@ fn main() {
     }
     println!("cargo:rustc-env=RUST_VERSION={}", version);
 
-    // Cargo rerun logic
+    // Cargo rerun logic.
+    //
+    // `.git/HEAD` only changes when the active ref changes (branch switch or
+    // detached HEAD), NOT when a new commit lands on the current branch. If we
+    // only watch `.git/HEAD`, GIT_COMMIT and BUILD_TIMESTAMP go stale after
+    // every same-branch commit (the binary keeps reporting an old commit via
+    // `crates-docs version`). Also watch the file backing the current ref
+    // (e.g. `.git/refs/heads/main`) and `.git/packed-refs` (where refs may be
+    // packed) so the build metadata is refreshed whenever HEAD advances.
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=.git/HEAD");
+    println!("cargo:rerun-if-changed=.git/packed-refs");
+    if let Ok(head) = std::fs::read_to_string(".git/HEAD") {
+        if let Some(reference) = head.strip_prefix("ref:") {
+            let reference = reference.trim();
+            if !reference.is_empty() {
+                println!("cargo:rerun-if-changed=.git/{reference}");
+            }
+        }
+    }
 }
