@@ -140,6 +140,18 @@ static STRAY_MIDDOT_LINE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?m)^[ \t]*\u{00b7}[ \t]*$").expect("hardcoded valid regex pattern")
 });
 
+/// Regex to strip the redundant closing hashes html2md appends to ATX
+/// headings.
+///
+/// html2md 0.2.15 renders `<h3>`-`<h6>` as ATX headings with a trailing run of
+/// closing hashes (e.g. `### Examples ###`, `#### pub fn get() ####`). Those
+/// closing hashes are optional in `CommonMark` and read as noise, so we drop the
+/// trailing ` #+` while keeping the leading marker. Group 1 captures the
+/// heading text.
+static HEADING_TRAILING_HASH_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?m)^(#{1,6}[ \t].*?)[ \t]+#+[ \t]*$").expect("hardcoded valid regex pattern")
+});
+
 /// Regex to rewrite relative documentation links to their link text.
 ///
 /// Matches `[text](path.html)` where `path` begins with a letter, digit, `_`,
@@ -687,6 +699,7 @@ fn clean_markdown(markdown: &str) -> String {
     let result = EMPTY_LINK_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = STRAY_COLON_LINE_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = STRAY_MIDDOT_LINE_REGEX.replace_all(&result, Cow::Borrowed(""));
+    let result = HEADING_TRAILING_HASH_REGEX.replace_all(&result, Cow::Borrowed("$1"));
     let result = MULTIPLE_NEWLINES_REGEX.replace_all(&result, Cow::Borrowed("\n\n"));
     result.trim().to_string()
 }
@@ -905,6 +918,22 @@ mod tests {
         assert!(!text.contains("TOGGLEMARK"), "toggle leaked: {text:?}");
         assert!(text.contains("Crate serde"), "heading dropped: {text:?}");
         assert!(text.contains("Real doc."), "content dropped: {text:?}");
+    }
+
+    #[test]
+    fn test_markdown_strips_trailing_heading_hashes() {
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<h3>Examples</h3>",
+            "<h4>pub fn get(&amp;self)</h4>",
+            "<p>Body text.</p>",
+            "</section></body></html>"
+        );
+        let md = extract_documentation(html);
+        assert!(md.contains("### Examples"), "h3 missing: {md:?}");
+        assert!(!md.contains("Examples ###"), "trailing hashes left: {md:?}");
+        assert!(md.contains("#### pub fn get(&self)"), "h4 missing: {md:?}");
+        assert!(!md.contains(") ####"), "trailing hashes left: {md:?}");
     }
 
     #[test]
