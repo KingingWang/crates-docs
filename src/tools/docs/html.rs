@@ -591,15 +591,74 @@ pub fn extract_documentation(html: &str) -> String {
     clean_markdown(&markdown)
 }
 
+/// Reverse the backslash escaping that html2md applies to ordinary text.
+///
+/// html2md 0.2.15 escapes the markdown metacharacters ``< > * _ ~ \`` in every
+/// non-code text node. Because this output is consumed as documentation rather
+/// than re-rendered as markdown, those escapes are pure noise (e.g.
+/// `serde\_json`, `Vec\<u8\>`, `-\>`). This pass removes the escaping outside of
+/// code, while leaving fenced code blocks and inline code spans untouched
+/// (html2md never escapes code, so any backslash there is genuine).
+fn unescape_markdown(markdown: &str) -> String {
+    const ESCAPED: [char; 6] = ['<', '>', '*', '_', '~', '\\'];
+    let mut out = String::with_capacity(markdown.len());
+    let mut in_fence = false;
+    for line in markdown.split_inclusive('\n') {
+        // Fenced code blocks are delimited by a line whose first non-whitespace
+        // characters are three backticks; emit them verbatim and skip unescaping
+        // their contents.
+        if line.trim_start().starts_with("```") {
+            in_fence = !in_fence;
+            out.push_str(line);
+            continue;
+        }
+        if in_fence {
+            out.push_str(line);
+            continue;
+        }
+
+        // Inline pass: toggle in/out of code on each maximal backtick run so
+        // single- and multi-backtick spans are both preserved verbatim.
+        let chars: Vec<char> = line.chars().collect();
+        let mut in_code = false;
+        let mut i = 0;
+        while i < chars.len() {
+            let c = chars[i];
+            if c == '`' {
+                let start = i;
+                while i < chars.len() && chars[i] == '`' {
+                    i += 1;
+                }
+                for _ in start..i {
+                    out.push('`');
+                }
+                in_code = !in_code;
+                continue;
+            }
+            if c == '\\' && !in_code && i + 1 < chars.len() && ESCAPED.contains(&chars[i + 1]) {
+                out.push(chars[i + 1]);
+                i += 2;
+                continue;
+            }
+            out.push(c);
+            i += 1;
+        }
+    }
+    out
+}
+
 /// Clean markdown output by removing relative links and UI artifacts
 #[inline]
 fn clean_markdown(markdown: &str) -> String {
     // Use Cow to avoid allocations when no replacements are needed
     // Chain replacements to process in a single traversal
+    // First strip html2md's backslash escaping from non-code text so escaped
+    // identifiers/generics (`serde\_json`, `Vec\<u8\>`) read naturally.
+    let unescaped = unescape_markdown(markdown);
     // Remove UI/source/javascript links first, then relative and section
     // anchors. Empty- and fragment-only links are downgraded to their text so
     // useful labels (e.g. headings) survive.
-    let result = JS_TOGGLE_REGEX.replace_all(markdown, Cow::Borrowed(""));
+    let result = JS_TOGGLE_REGEX.replace_all(&unescaped, Cow::Borrowed(""));
     let result = JS_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = SOURCE_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
     let result = SRC_LINK_REGEX.replace_all(&result, Cow::Borrowed(""));
@@ -846,6 +905,40 @@ mod tests {
         assert!(!text.contains("TOGGLEMARK"), "toggle leaked: {text:?}");
         assert!(text.contains("Crate serde"), "heading dropped: {text:?}");
         assert!(text.contains("Real doc."), "content dropped: {text:?}");
+    }
+
+    #[test]
+    fn test_markdown_unescapes_identifiers_outside_code() {
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<h1>Crate serde_json</h1>",
+            "<p>Use <code>serde_json::value</code> to build <code>Vec&lt;u8&gt;</code>.</p>",
+            "<p>pub fn get(&amp;self) -&gt; Option&lt;&amp;Value&gt;</p>",
+            "<pre><code>let v: Vec&lt;u8&gt; = path\\to;</code></pre>",
+            "</section></body></html>"
+        );
+        let md = extract_documentation(html);
+        // Escapes removed from ordinary text and signatures.
+        assert!(
+            md.contains("Crate serde_json"),
+            "heading still escaped: {md:?}"
+        );
+        assert!(
+            md.contains("-> Option<&Value>"),
+            "signature still escaped: {md:?}"
+        );
+        assert!(!md.contains("\\_"), "stray underscore escape: {md:?}");
+        assert!(
+            !md.contains("\\<") && !md.contains("\\>"),
+            "stray angle escape: {md:?}"
+        );
+        // Inline code span is preserved verbatim (no escaping introduced).
+        assert!(
+            md.contains("`serde_json::value`"),
+            "inline code mangled: {md:?}"
+        );
+        // Fenced code content (a genuine backslash) is left untouched.
+        assert!(md.contains("path\\to"), "fenced backslash altered: {md:?}");
     }
 
     #[test]
