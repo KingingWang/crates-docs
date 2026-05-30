@@ -206,7 +206,7 @@ impl Tool for LookupCrateToolImpl {
         // candidate URL construction (a padded name would otherwise 404).
         params.crate_name = params.crate_name.trim().to_string();
         if let Some(version) = params.version.as_mut() {
-            *version = version.trim().to_string();
+            *version = super::normalize_version(version);
         }
 
         let format = super::parse_format(TOOL_NAME, params.format.as_deref(), super::DOC_FORMATS)?;

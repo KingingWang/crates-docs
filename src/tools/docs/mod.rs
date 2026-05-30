@@ -144,6 +144,25 @@ pub fn validate_crate_name(tool_name: &str, crate_name: &str) -> Result<(), Call
     Ok(())
 }
 
+/// Normalize a user-supplied version string for docs.rs URL construction.
+///
+/// Trims surrounding whitespace and strips a single leading `v`/`V` when it is
+/// immediately followed by a digit (e.g. `v1.2.3` -> `1.2.3`). crates.io and
+/// docs.rs versions are plain semver and never carry a `v` prefix, but users
+/// routinely copy versions from git tags or changelogs where that prefix is
+/// conventional; without this they hit a confusing 400/404. Non-version
+/// identifiers such as `latest` (no leading-`v`-before-digit) are unchanged.
+#[must_use]
+pub fn normalize_version(version: &str) -> String {
+    let trimmed = version.trim();
+    let bytes = trimmed.as_bytes();
+    if bytes.len() >= 2 && (bytes[0] == b'v' || bytes[0] == b'V') && bytes[1].is_ascii_digit() {
+        trimmed[1..].to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 /// Validate an optional version string supplied by a tool caller.
 ///
 /// Accepts concrete versions and identifiers such as `latest` while rejecting
@@ -838,6 +857,19 @@ mod tests {
         assert!(validate_crate_name("lookup_crate", "foo bar").is_err());
         assert!(validate_crate_name("lookup_crate", "foo;rm").is_err());
         assert!(validate_crate_name("lookup_crate", &"a".repeat(65)).is_err());
+    }
+
+    #[test]
+    fn test_normalize_version_strips_leading_v() {
+        assert_eq!(normalize_version("v1.2.3"), "1.2.3");
+        assert_eq!(normalize_version("V2.0.0"), "2.0.0");
+        assert_eq!(normalize_version("  v1.0  "), "1.0");
+        // Already canonical / non-version identifiers are untouched.
+        assert_eq!(normalize_version("1.0.0"), "1.0.0");
+        assert_eq!(normalize_version("latest"), "latest");
+        // A leading 'v' not followed by a digit is part of the identifier.
+        assert_eq!(normalize_version("vendored"), "vendored");
+        assert_eq!(normalize_version("v"), "v");
     }
 
     #[test]

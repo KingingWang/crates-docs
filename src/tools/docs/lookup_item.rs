@@ -366,7 +366,7 @@ impl Tool for LookupItemToolImpl {
         // candidate URL construction.
         params.crate_name = params.crate_name.trim().to_string();
         if let Some(version) = params.version.as_mut() {
-            *version = version.trim().to_string();
+            *version = super::normalize_version(version);
         }
         params.item_path = params.item_path.trim().to_string();
 
