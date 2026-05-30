@@ -28,7 +28,6 @@ const ESTIMATED_TEXT_ENTRY_SIZE: usize = 100;
     idempotent_hint = true,
     open_world_hint = false,
     read_only_hint = true,
-    execution(task_support = "optional"),
     icons = [
         (src = "https://crates.io/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "light"),
         (src = "https://crates.io/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "dark")

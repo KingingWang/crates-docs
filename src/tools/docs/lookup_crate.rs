@@ -31,7 +31,6 @@ const TOOL_NAME: &str = "lookup_crate";
     idempotent_hint = true,
     open_world_hint = false,
     read_only_hint = true,
-    execution(task_support = "optional"),
     icons = [
         (src = "https://docs.rs/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "light"),
         (src = "https://docs.rs/favicon.ico", mime_type = "image/x-icon", sizes = ["32x32"], theme = "dark")

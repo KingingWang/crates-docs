@@ -28,7 +28,6 @@ const VALID_CHECK_TYPES: &[&str] = &["all", "external", "internal", "docs_rs", "
     idempotent_hint = true,
     open_world_hint = false,
     read_only_hint = true,
-    execution(task_support = "optional"),
     icons = [
         (src = "https://img.icons8.com/color/96/000000/heart-health.png", mime_type = "image/png", sizes = ["96x96"], theme = "light"),
         (src = "https://img.icons8.com/color/96/000000/heart-health.png", mime_type = "image/png", sizes = ["96x96"], theme = "dark")
