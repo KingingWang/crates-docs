@@ -67,7 +67,7 @@ pub struct SearchCratesTool {
     /// Output format: "markdown", "text", or "json" (defaults to "markdown")
     #[json_schema(
         title = "Output Format",
-        description = "Output format: markdown (default), text (plain text), json (raw JSON)",
+        description = "Output format: markdown (default), text (plain text), json (structured JSON: name, version, downloads, description, repository, documentation, docs_rs)",
         default = "markdown"
     )]
     pub format: Option<String>,
@@ -242,8 +242,14 @@ struct CrateInfo {
     downloads: u64,
     /// Repository URL
     repository: Option<String>,
-    /// Documentation URL
+    /// Documentation URL (as provided by crates.io, if any)
     documentation: Option<String>,
+    /// Canonical docs.rs URL for the crate (always present on fresh results).
+    /// Tolerate cache entries written by older binaries that predate this
+    /// field so a stale cache hit degrades to an empty value instead of a
+    /// fatal "Cache parsing failed" error.
+    #[serde(default)]
+    docs_rs: String,
 }
 
 #[inline]
@@ -252,18 +258,22 @@ fn parse_crates_response(response: SearchCratesResponse, limit: usize) -> Vec<Cr
         .crates
         .into_iter()
         .take(limit)
-        .map(|crate_record| CrateInfo {
-            name: crate_record.name,
-            description: crate_record.description,
-            // Prefer the highest stable (non-yanked) version so results do not
-            // advertise a version users cannot `cargo add`. Fall back to
-            // max_version when a crate has no stable release.
-            version: crate_record
-                .max_stable_version
-                .unwrap_or(crate_record.max_version),
-            downloads: crate_record.downloads,
-            repository: crate_record.repository,
-            documentation: crate_record.documentation,
+        .map(|crate_record| {
+            let docs_rs = format!("https://docs.rs/{}/", crate_record.name);
+            CrateInfo {
+                name: crate_record.name,
+                description: crate_record.description,
+                // Prefer the highest stable (non-yanked) version so results do
+                // not advertise a version users cannot `cargo add`. Fall back to
+                // max_version when a crate has no stable release.
+                version: crate_record
+                    .max_stable_version
+                    .unwrap_or(crate_record.max_version),
+                downloads: crate_record.downloads,
+                repository: crate_record.repository,
+                documentation: crate_record.documentation,
+                docs_rs,
+            }
         })
         .collect()
 }
@@ -362,8 +372,8 @@ fn format_markdown_results(crates: &[CrateInfo]) -> String {
 
         writeln!(
             output,
-            "**Docs.rs**: [https://docs.rs/{}/](https://docs.rs/{}/)\n",
-            crate_info.name, crate_info.name
+            "**Docs.rs**: {}\n",
+            render_markdown_url(&crate_info.docs_rs, &crate_info.docs_rs)
         )
         .unwrap();
     }
@@ -396,7 +406,7 @@ fn format_text_results(crates: &[CrateInfo]) -> String {
             writeln!(output, "   Documentation: {docs}").unwrap();
         }
 
-        writeln!(output, "   Docs.rs: https://docs.rs/{}/", crate_info.name).unwrap();
+        writeln!(output, "   Docs.rs: {}", crate_info.docs_rs).unwrap();
         writeln!(output).unwrap();
     }
 
@@ -493,6 +503,7 @@ mod tests {
             downloads: 42,
             repository: Some("https://github.com/x/demo".to_string()),
             documentation: Some("https://docs.rs/demo".to_string()),
+            docs_rs: "https://docs.rs/demo/".to_string(),
         }];
         let out = format_text_results(&crates);
         assert!(
@@ -500,5 +511,6 @@ mod tests {
             "{out}"
         );
         assert!(out.contains("Documentation: https://docs.rs/demo"), "{out}");
+        assert!(out.contains("Docs.rs: https://docs.rs/demo/"), "{out}");
     }
 }

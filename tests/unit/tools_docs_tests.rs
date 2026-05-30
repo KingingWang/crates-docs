@@ -1431,6 +1431,23 @@ async fn test_search_crates_tool_execute_json_format() {
 
     let result = tool.execute(args).await;
     assert!(result.is_ok());
+
+    // The JSON output must expose the canonical docs.rs URL so structured
+    // consumers get the same docs.rs link that the markdown/text formats
+    // always include.
+    let call = result.unwrap();
+    let text = call
+        .content
+        .first()
+        .and_then(|c| c.as_text_content().ok())
+        .map(|t| t.text.clone())
+        .expect("json result should contain text content");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).expect("json format output should be valid JSON");
+    assert_eq!(
+        parsed[0]["docs_rs"], "https://docs.rs/reqwest/",
+        "json output should include the canonical docs_rs URL: {text}"
+    );
 }
 
 #[tokio::test]
