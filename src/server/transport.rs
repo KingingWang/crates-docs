@@ -262,6 +262,50 @@ fn warn_if_enable_sse_ignored(server_config: &crate::config::AppConfig, sse_acti
     }
 }
 
+/// Whether `host` is a loopback address (or `localhost`).
+///
+/// Used to decide whether binding exposes the server beyond the local machine.
+/// Anything that is not an IP loopback address and not `localhost` is treated
+/// as network-exposed (conservative: unknown hostnames warn).
+fn host_is_loopback(host: &str) -> bool {
+    match host.parse::<std::net::IpAddr>() {
+        Ok(ip) => ip.is_loopback(),
+        Err(_) => host.eq_ignore_ascii_case("localhost"),
+    }
+}
+
+/// Warn when the server binds to a non-loopback address and is therefore
+/// reachable from other hosts on the network. The HTTP/SSE transport performs
+/// no authentication, so an exposed bind is a real risk.
+fn warn_if_network_exposed(server_config: &crate::config::AppConfig) {
+    if !host_is_loopback(&server_config.server.host) {
+        tracing::warn!(
+            host = %server_config.server.host,
+            "Server is binding to a non-loopback address and is reachable from other hosts on \
+             the network. The HTTP/SSE transport performs no authentication; put a reverse proxy \
+             with authentication in front of it, restrict the network, or run in stdio mode."
+        );
+    }
+}
+
+/// Warn when DNS rebinding protection is disabled, so the configured
+/// `allowed_hosts`/`allowed_origins` allowlists are not enforced.
+///
+/// With protection off (the default) the SDK installs no `Host`/`Origin`
+/// validation, so a malicious web page loaded in a local browser can reach
+/// this server via DNS rebinding. Surfacing this avoids a false sense of
+/// security from the presence of the allowlist settings.
+fn warn_if_dns_rebinding_protection_disabled(server_config: &crate::config::AppConfig) {
+    if !server_config.server.dns_rebinding_protection {
+        tracing::warn!(
+            "dns_rebinding_protection is disabled: the allowed_hosts/allowed_origins allowlists \
+             are NOT enforced, so a malicious local web page could reach this server via DNS \
+             rebinding. Set server.dns_rebinding_protection = true (with exact host:port and \
+             origin values) to enable Host/Origin validation."
+        );
+    }
+}
+
 /// Run a Hyper-based MCP server with the given configuration.
 ///
 /// This function handles HTTP, SSE, and Hybrid servers based on the configuration.
@@ -306,6 +350,8 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
     warn_if_metrics_configured_but_unavailable(server_config);
     warn_if_unenforced_server_limits_configured(server_config);
     warn_if_enable_sse_ignored(server_config, config.sse_support());
+    warn_if_network_exposed(server_config);
+    warn_if_dns_rebinding_protection_disabled(server_config);
 
     // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
@@ -470,6 +516,19 @@ mod tests {
         assert!(flagged.contains(&"request_timeout_secs"));
         assert!(flagged.contains(&"max_connections"));
         assert!(!flagged.contains(&"response_timeout_secs"));
+    }
+
+    #[test]
+    fn test_host_is_loopback() {
+        assert!(super::host_is_loopback("127.0.0.1"));
+        assert!(super::host_is_loopback("::1"));
+        assert!(super::host_is_loopback("localhost"));
+        assert!(super::host_is_loopback("LocalHost"));
+        // Non-loopback / network-exposed binds.
+        assert!(!super::host_is_loopback("0.0.0.0"));
+        assert!(!super::host_is_loopback("::"));
+        assert!(!super::host_is_loopback("192.168.1.5"));
+        assert!(!super::host_is_loopback("example.com"));
     }
 
     #[test]
