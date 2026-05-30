@@ -43,8 +43,12 @@ fn load_from_env(config: &mut crate::config::AppConfig) -> Result<(), Box<dyn st
 fn init_logging(
     config: &crate::config::AppConfig,
     debug: bool,
+    verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if debug {
+    // Both `--debug` and the global `--verbose` raise logging to debug level
+    // (the only level above the default `info` used by this server), so the
+    // documented `--verbose` flag has a real effect instead of being ignored.
+    if debug || verbose {
         let debug_config = crate::config::LoggingConfig {
             level: "debug".to_string(),
             ..config.logging.clone()
@@ -164,6 +168,7 @@ async fn run_server_by_mode(
 pub async fn run_serve_command(
     config_path: &PathBuf,
     debug: bool,
+    verbose: bool,
     mode: Option<String>,
     host: Option<String>,
     port: Option<u16>,
@@ -193,7 +198,7 @@ pub async fn run_serve_command(
 
     let transport_mode = &config.server.transport_mode;
 
-    init_logging(&config, debug)?;
+    init_logging(&config, debug, verbose)?;
 
     tracing::info!(
         "Starting Crates Docs MCP Server v{}",

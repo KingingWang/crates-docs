@@ -43,7 +43,7 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub debug: bool,
 
-    /// Enable verbose output
+    /// Enable verbose output (debug-level logging when serving)
     #[arg(short, long, global = true)]
     pub verbose: bool,
 }
@@ -67,6 +67,7 @@ pub async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             run_serve_command(
                 &cli.config,
                 cli.debug,
+                cli.verbose,
                 mode,
                 host,
                 port,
