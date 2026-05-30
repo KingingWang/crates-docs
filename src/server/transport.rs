@@ -188,6 +188,24 @@ fn warn_if_auth_configured_but_unenforced(server_config: &crate::config::AppConf
     }
 }
 
+/// Warn when Prometheus metrics are requested in configuration but the server
+/// neither collects nor exposes them.
+///
+/// The metrics subsystem (`ServerMetrics`, `performance.metrics_port`) is not
+/// currently wired into the request pipeline and no metrics endpoint is served,
+/// so `enable_metrics = true` has no observable effect. Surfacing this avoids
+/// misleading operators into believing a scrape target exists.
+fn warn_if_metrics_configured_but_unavailable(server_config: &crate::config::AppConfig) {
+    if server_config.performance.enable_metrics {
+        tracing::warn!(
+            metrics_port = server_config.performance.metrics_port,
+            "performance.enable_metrics is set, but this server does not yet collect or expose \
+             Prometheus metrics: no metrics endpoint is served and no request metrics are recorded. \
+             This setting currently has no effect."
+        );
+    }
+}
+
 /// Run a Hyper-based MCP server with the given configuration.
 ///
 /// This function handles HTTP, SSE, and Hybrid servers based on the configuration.
@@ -229,6 +247,7 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
     );
 
     warn_if_auth_configured_but_unenforced(server_config);
+    warn_if_metrics_configured_but_unavailable(server_config);
 
     // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
