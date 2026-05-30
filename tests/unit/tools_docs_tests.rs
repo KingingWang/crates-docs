@@ -1450,6 +1450,81 @@ async fn test_search_crates_tool_execute_json_format() {
     );
 }
 
+/// Cache backend that always fails on `set` (simulating e.g. a Redis outage)
+/// while reporting every key as missing. Used to verify that a cache write
+/// failure does not fail a tool call.
+struct FailingSetCache;
+
+#[async_trait::async_trait]
+impl crates_docs::cache::Cache for FailingSetCache {
+    async fn get(&self, _key: &str) -> Option<Arc<str>> {
+        None
+    }
+
+    async fn set(
+        &self,
+        _key: String,
+        _value: String,
+        _ttl: Option<std::time::Duration>,
+    ) -> crates_docs::error::Result<()> {
+        Err(crates_docs::error::Error::cache(
+            "set",
+            None,
+            "simulated cache backend outage",
+        ))
+    }
+
+    async fn delete(&self, _key: &str) -> crates_docs::error::Result<()> {
+        Ok(())
+    }
+
+    async fn clear(&self) -> crates_docs::error::Result<()> {
+        Ok(())
+    }
+
+    async fn exists(&self, _key: &str) -> bool {
+        false
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+#[tokio::test]
+#[serial(crates_io_env)]
+async fn test_search_crates_tool_survives_cache_set_failure() {
+    use crates_docs::tools::Tool;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    let mock_server = MockServer::start().await;
+    let mock_uri = mock_server.uri();
+    let mock_response =
+        r#"{ "crates": [ { "name": "serde", "max_version": "1.0.0", "downloads": 1 } ] }"#;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path_regex(r"/api/v1/crates.*"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
+        .mount(&mock_server)
+        .await;
+
+    let cache: Arc<dyn crates_docs::cache::Cache> = Arc::new(FailingSetCache);
+    let cache_config = crates_docs::cache::CacheConfig::default();
+    let service = crates_docs::tools::docs::DocService::with_custom_client(
+        cache,
+        &cache_config,
+        build_crates_io_test_client(&mock_uri),
+    );
+    let tool = crates_docs::tools::docs::search::SearchCratesToolImpl::new(Arc::new(service));
+
+    let args = serde_json::json!({ "query": "serde", "format": "json" });
+    let result = tool.execute(args).await;
+    assert!(
+        result.is_ok(),
+        "search should succeed even when caching the result fails: {:?}",
+        result.err()
+    );
+}
+
 #[tokio::test]
 #[serial(crates_io_env)]
 async fn test_search_crates_tool_invalid_sort() {

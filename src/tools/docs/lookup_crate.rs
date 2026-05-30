@@ -103,13 +103,16 @@ impl LookupCrateToolImpl {
         let url = Self::build_url(crate_name, version);
         let html = self.service.fetch_html(&url, Some(TOOL_NAME)).await?;
 
-        self.service
+        // Cache write failures must not fail the request (see fetch_crate_docs):
+        // the HTML was fetched successfully, so log and continue uncached.
+        if let Err(e) = self
+            .service
             .doc_cache()
             .set_crate_html(crate_name, version, html.clone())
             .await
-            .map_err(|e| {
-                CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
-            })?;
+        {
+            tracing::warn!("[{TOOL_NAME}] failed to cache crate HTML (continuing uncached): {e}");
+        }
 
         Ok(html)
     }
@@ -138,14 +141,17 @@ impl LookupCrateToolImpl {
         // Extract documentation into Arc<str> for shared ownership
         let docs: Arc<str> = Arc::from(html::extract_documentation(&html).into_boxed_str());
 
-        // Cache result - convert Arc<str> to String for the cache
-        self.service
+        // Cache the result. A cache write failure (e.g. a Redis outage) must
+        // not fail the user's request: the documentation was fetched
+        // successfully, so log and continue with an uncached result.
+        if let Err(e) = self
+            .service
             .doc_cache()
             .set_crate_docs(crate_name, version, docs.to_string())
             .await
-            .map_err(|e| {
-                CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
-            })?;
+        {
+            tracing::warn!("[{TOOL_NAME}] failed to cache crate docs (continuing uncached): {e}");
+        }
 
         Ok(docs)
     }

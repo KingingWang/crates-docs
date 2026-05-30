@@ -216,14 +216,19 @@ impl SearchCratesToolImpl {
             CallToolError::from_message(format!("[search_crates] Serialization failed: {e}"))
         })?;
 
-        // Set cache using DocCache API
-        self.service
+        // Cache the results. A cache write failure (e.g. a Redis outage) must
+        // not fail the user's request: the search succeeded, so log and
+        // continue returning the results uncached.
+        if let Err(e) = self
+            .service
             .doc_cache()
             .set_search_results(query, limit, Some(sort), cache_value)
             .await
-            .map_err(|e| {
-                CallToolError::from_message(format!("[search_crates] Cache set failed: {e}"))
-            })?;
+        {
+            tracing::warn!(
+                "[search_crates] failed to cache search results (continuing uncached): {e}"
+            );
+        }
 
         Ok(crates)
     }

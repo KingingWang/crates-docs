@@ -119,13 +119,16 @@ impl LookupItemToolImpl {
             .resolve_item_html(crate_name, item_path, version)
             .await?;
 
-        self.service
+        // Cache write failures must not fail the request (see fetch_item_docs):
+        // the HTML was fetched successfully, so log and continue uncached.
+        if let Err(e) = self
+            .service
             .doc_cache()
             .set_item_html(crate_name, item_path, version, html.clone())
             .await
-            .map_err(|e| {
-                CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
-            })?;
+        {
+            tracing::warn!("[{TOOL_NAME}] failed to cache item HTML (continuing uncached): {e}");
+        }
 
         Ok(html)
     }
@@ -270,14 +273,17 @@ impl LookupItemToolImpl {
         let docs: Arc<str> =
             Arc::from(html::extract_search_results(&html, item_path).into_boxed_str());
 
-        // Cache result - convert Arc<str> to String for the cache
-        self.service
+        // Cache the result. A cache write failure (e.g. a Redis outage) must
+        // not fail the user's request: the documentation was fetched
+        // successfully, so log and continue with an uncached result.
+        if let Err(e) = self
+            .service
             .doc_cache()
             .set_item_docs(crate_name, item_path, version, docs.to_string())
             .await
-            .map_err(|e| {
-                CallToolError::from_message(format!("[{TOOL_NAME}] Cache set failed: {e}"))
-            })?;
+        {
+            tracing::warn!("[{TOOL_NAME}] failed to cache item docs (continuing uncached): {e}");
+        }
 
         Ok(docs)
     }
