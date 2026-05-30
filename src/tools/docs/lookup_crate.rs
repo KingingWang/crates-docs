@@ -204,7 +204,7 @@ impl Tool for LookupCrateToolImpl {
             *version = version.trim().to_string();
         }
 
-        let format = super::parse_format(TOOL_NAME, params.format.as_deref())?;
+        let format = super::parse_format(TOOL_NAME, params.format.as_deref(), super::DOC_FORMATS)?;
         let content = match format {
             super::Format::Text => {
                 self.fetch_crate_docs_as_text(&params.crate_name, params.version.as_deref())

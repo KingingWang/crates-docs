@@ -368,7 +368,7 @@ impl Tool for LookupItemToolImpl {
         // Propagate the detailed parse error (e.g. "Invalid format 'xml'. Expected
         // one of: ...") rather than masking it with a generic message, so callers
         // get actionable feedback.
-        let format = super::parse_format(TOOL_NAME, params.format.as_deref())?;
+        let format = super::parse_format(TOOL_NAME, params.format.as_deref(), super::DOC_FORMATS)?;
         let content = match format {
             super::Format::Text => {
                 self.fetch_item_docs_as_text(

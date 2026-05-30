@@ -690,7 +690,7 @@ async fn test_lookup_crate_tool_invalid_format_preserves_detailed_message() {
         error_message.contains("Invalid format 'xml'"),
         "unexpected error message: {error_message}"
     );
-    assert!(error_message.contains("markdown, text, html, json"));
+    assert!(error_message.contains("markdown, text, html"));
 }
 
 // ============================================================================
@@ -1186,7 +1186,7 @@ async fn test_lookup_item_tool_invalid_format_preserves_detailed_message() {
         error_message.contains("Invalid format 'xml'"),
         "unexpected error message: {error_message}"
     );
-    assert!(error_message.contains("markdown, text, html, json"));
+    assert!(error_message.contains("markdown, text, html"));
 }
 
 // ============================================================================
@@ -1488,7 +1488,7 @@ async fn test_search_crates_tool_invalid_format_preserves_detailed_message() {
     let error_message = error.to_string();
 
     assert!(error_message.contains("Invalid format 'xml'"));
-    assert!(error_message.contains("markdown, text, html, json"));
+    assert!(error_message.contains("markdown, text, json"));
 }
 
 #[tokio::test]

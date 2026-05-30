@@ -429,19 +429,14 @@ impl Tool for SearchCratesToolImpl {
         // result set and a `per_page=0` upstream request.
         let limit = params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT).clamp(1, 100);
         let sort = normalize_search_sort(params.sort.as_deref())?;
-        let format = super::parse_format("search_crates", params.format.as_deref())?;
-        // search_crates only supports markdown/text/json. Reject `html`
-        // explicitly with an actionable error instead of silently returning
-        // markdown (the tool schema does not advertise html for search).
-        if matches!(format, super::Format::Html) {
-            return Err(rust_mcp_sdk::schema::CallToolError::invalid_arguments(
-                "search_crates",
-                Some(
-                    "Invalid format 'html' for search_crates. Expected one of: markdown, text, json"
-                        .to_string(),
-                ),
-            ));
-        }
+        // `parse_format` validates against SEARCH_FORMATS, so an unsupported
+        // (e.g. `html`) or unknown format is rejected here with an error that
+        // lists only the formats search actually accepts.
+        let format = super::parse_format(
+            "search_crates",
+            params.format.as_deref(),
+            super::SEARCH_FORMATS,
+        )?;
 
         // Trim the query before fetching so the upstream crates.io request
         // matches the normalized (trimmed + lowercased) cache key. Otherwise a

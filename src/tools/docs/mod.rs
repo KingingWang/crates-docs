@@ -57,22 +57,52 @@ impl std::fmt::Display for Format {
     }
 }
 
-/// Parse format string into Format enum
-pub fn parse_format(tool_name: &str, format_str: Option<&str>) -> Result<Format, CallToolError> {
-    match format_str {
-        None => Ok(Format::Markdown),
-        Some(s) => match s.trim().to_lowercase().as_str() {
-            "markdown" => Ok(Format::Markdown),
-            "text" => Ok(Format::Text),
-            "html" => Ok(Format::Html),
-            "json" => Ok(Format::Json),
-            _ => Err(CallToolError::invalid_arguments(
+/// Formats supported by the documentation lookup tools (`lookup_crate`,
+/// `lookup_item`). JSON is intentionally excluded: these tools render prose
+/// documentation, not structured data.
+pub const DOC_FORMATS: &[Format] = &[Format::Markdown, Format::Text, Format::Html];
+
+/// Formats supported by the `search_crates` tool. HTML is intentionally
+/// excluded: search results are structured records, not an HTML document.
+pub const SEARCH_FORMATS: &[Format] = &[Format::Markdown, Format::Text, Format::Json];
+
+/// Parse and validate a format string against the formats a tool supports.
+///
+/// `allowed` lists the formats the calling tool actually accepts. Both an
+/// unrecognized string and a recognized format outside `allowed` produce an
+/// error that lists only the supported formats, so a caller is never advised to
+/// retry with a format the tool will then reject. `None` defaults to markdown,
+/// which every tool supports.
+pub fn parse_format(
+    tool_name: &str,
+    format_str: Option<&str>,
+    allowed: &[Format],
+) -> Result<Format, CallToolError> {
+    let Some(s) = format_str else {
+        return Ok(Format::Markdown);
+    };
+    let parsed = match s.trim().to_lowercase().as_str() {
+        "markdown" => Some(Format::Markdown),
+        "text" => Some(Format::Text),
+        "html" => Some(Format::Html),
+        "json" => Some(Format::Json),
+        _ => None,
+    };
+    match parsed {
+        Some(format) if allowed.contains(&format) => Ok(format),
+        _ => {
+            let supported = allowed
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(CallToolError::invalid_arguments(
                 tool_name,
                 Some(format!(
-                    "Invalid format '{s}'. Expected one of: markdown, text, html, json"
+                    "Invalid format '{s}'. This tool supports: {supported}"
                 )),
-            )),
-        },
+            ))
+        }
     }
 }
 
@@ -780,6 +810,10 @@ pub use cache::DocCacheTtl;
 mod tests {
     use super::*;
 
+    /// All syntactically valid formats, used to exercise the string->Format
+    /// mapping independently of any single tool's allowed set.
+    const ALL: &[Format] = &[Format::Markdown, Format::Text, Format::Html, Format::Json];
+
     #[test]
     fn test_validate_crate_name_accepts_valid() {
         assert!(validate_crate_name("lookup_crate", "serde").is_ok());
@@ -1085,7 +1119,7 @@ mod tests {
     #[test]
     fn test_parse_format_none() {
         assert_eq!(
-            parse_format("lookup_crate", None).unwrap(),
+            parse_format("lookup_crate", None, ALL).unwrap(),
             Format::Markdown
         );
     }
@@ -1093,15 +1127,15 @@ mod tests {
     #[test]
     fn test_parse_format_markdown() {
         assert_eq!(
-            parse_format("lookup_crate", Some("markdown")).unwrap(),
+            parse_format("lookup_crate", Some("markdown"), ALL).unwrap(),
             Format::Markdown
         );
         assert_eq!(
-            parse_format("lookup_crate", Some("MARKDOWN")).unwrap(),
+            parse_format("lookup_crate", Some("MARKDOWN"), ALL).unwrap(),
             Format::Markdown
         );
         assert_eq!(
-            parse_format("lookup_crate", Some("Markdown")).unwrap(),
+            parse_format("lookup_crate", Some("Markdown"), ALL).unwrap(),
             Format::Markdown
         );
     }
@@ -1109,11 +1143,11 @@ mod tests {
     #[test]
     fn test_parse_format_text() {
         assert_eq!(
-            parse_format("lookup_crate", Some("text")).unwrap(),
+            parse_format("lookup_crate", Some("text"), ALL).unwrap(),
             Format::Text
         );
         assert_eq!(
-            parse_format("lookup_crate", Some("TEXT")).unwrap(),
+            parse_format("lookup_crate", Some("TEXT"), ALL).unwrap(),
             Format::Text
         );
     }
@@ -1121,11 +1155,11 @@ mod tests {
     #[test]
     fn test_parse_format_html() {
         assert_eq!(
-            parse_format("lookup_crate", Some("html")).unwrap(),
+            parse_format("lookup_crate", Some("html"), ALL).unwrap(),
             Format::Html
         );
         assert_eq!(
-            parse_format("lookup_crate", Some("HTML")).unwrap(),
+            parse_format("lookup_crate", Some("HTML"), ALL).unwrap(),
             Format::Html
         );
     }
@@ -1133,11 +1167,11 @@ mod tests {
     #[test]
     fn test_parse_format_json() {
         assert_eq!(
-            parse_format("lookup_crate", Some("json")).unwrap(),
+            parse_format("lookup_crate", Some("json"), ALL).unwrap(),
             Format::Json
         );
         assert_eq!(
-            parse_format("lookup_crate", Some("JSON")).unwrap(),
+            parse_format("lookup_crate", Some("JSON"), ALL).unwrap(),
             Format::Json
         );
     }
@@ -1147,22 +1181,61 @@ mod tests {
         // Surrounding whitespace is tolerated (consistent with sort
         // normalization) so e.g. " markdown " parses like "markdown".
         assert_eq!(
-            parse_format("lookup_crate", Some(" markdown ")).unwrap(),
+            parse_format("lookup_crate", Some(" markdown "), ALL).unwrap(),
             Format::Markdown
         );
         assert_eq!(
-            parse_format("lookup_crate", Some("\tjson\n")).unwrap(),
+            parse_format("lookup_crate", Some("\tjson\n"), ALL).unwrap(),
             Format::Json
         );
         // Whitespace-only input still trims to empty and is rejected.
-        assert!(parse_format("lookup_crate", Some("   ")).is_err());
+        assert!(parse_format("lookup_crate", Some("   "), ALL).is_err());
     }
 
     #[test]
     fn test_parse_format_invalid() {
-        assert!(parse_format("lookup_crate", Some("invalid")).is_err());
-        assert!(parse_format("lookup_crate", Some("xml")).is_err());
-        assert!(parse_format("lookup_crate", Some("")).is_err());
+        assert!(parse_format("lookup_crate", Some("invalid"), ALL).is_err());
+        assert!(parse_format("lookup_crate", Some("xml"), ALL).is_err());
+        assert!(parse_format("lookup_crate", Some(""), ALL).is_err());
+    }
+
+    #[test]
+    fn test_parse_format_rejects_unsupported_for_tool() {
+        // `html` is a valid format string but not supported by search; the
+        // error must advertise only the formats search actually accepts and
+        // must not over-advertise html.
+        let err = parse_format("search_crates", Some("html"), SEARCH_FORMATS).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("This tool supports: markdown, text, json"),
+            "got: {msg}"
+        );
+        assert!(!msg.contains("text, html"), "over-advertises html: {msg}");
+
+        // `json` is valid but unsupported by the doc lookup tools.
+        let err = parse_format("lookup_crate", Some("json"), DOC_FORMATS).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("This tool supports: markdown, text, html"),
+            "got: {err}"
+        );
+
+        // Unknown formats are rejected against the same per-tool allowed list.
+        let err = parse_format("search_crates", Some("xml"), SEARCH_FORMATS).unwrap_err();
+        assert!(
+            err.to_string().contains("markdown, text, json"),
+            "got: {err}"
+        );
+
+        // Supported formats still parse.
+        assert_eq!(
+            parse_format("search_crates", Some("json"), SEARCH_FORMATS).unwrap(),
+            Format::Json
+        );
+        assert_eq!(
+            parse_format("lookup_crate", Some("html"), DOC_FORMATS).unwrap(),
+            Format::Html
+        );
     }
 
     #[test]
@@ -1268,7 +1341,7 @@ mod tests {
         let err = validate_search_query("search_crates", "").unwrap_err();
         assert!(err.to_string().contains("search_crates"), "got: {err}");
 
-        let err = parse_format("lookup_crate", Some("xml")).unwrap_err();
+        let err = parse_format("lookup_crate", Some("xml"), ALL).unwrap_err();
         assert!(err.to_string().contains("lookup_crate"), "got: {err}");
     }
 }
