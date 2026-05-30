@@ -88,6 +88,27 @@ static RELATIVE_LINK_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         .expect("hardcoded valid regex pattern")
 });
 
+/// Matches a rustdoc item-index table (`<dl class="item-table">...</dl>`).
+///
+/// docs.rs/rustdoc renders crate- and module-overview item indexes as a
+/// definition list of `<dt>` (item name + link) / optional `<dd>` (summary)
+/// pairs. `html2md` does not treat `<dt>` as block-level, so every entry
+/// collapses onto a single line (e.g. `Dl_infoElf32_ChdrElf32_Ehdr...`). We
+/// rewrite these tables into `<ul><li>` lists before markdown/text conversion
+/// so each item renders on its own line. The class only appears on overview
+/// pages, never on individual item pages.
+static ITEM_TABLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?is)<dl[^>]*\bitem-table\b[^>]*>(.*?)</dl\s*>")
+        .expect("hardcoded valid regex pattern")
+});
+
+/// Matches a single `<dt>name</dt>` row with an optional following
+/// `<dd>summary</dd>` inside an item-table (see `ITEM_TABLE_REGEX`).
+static ITEM_TABLE_ROW_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?is)<dt\b[^>]*>(.*?)</dt\s*>\s*(?:<dd\b[^>]*>(.*?)</dd\s*>)?")
+        .expect("hardcoded valid regex pattern")
+});
+
 /// Regex to collapse three or more newlines to two newlines
 static MULTIPLE_NEWLINES_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\n\n\n+").expect("hardcoded valid regex pattern"));
@@ -165,6 +186,38 @@ static MAIN_CONTENT_SELECTOR: LazyLock<Selector> =
 static RUSTDOC_BODY_WRAPPER_SELECTOR: LazyLock<Selector> =
     LazyLock::new(|| Selector::parse("#rustdoc_body_wrapper").expect("hardcoded valid selector"));
 
+/// Rewrite rustdoc item-index tables into HTML unordered lists.
+///
+/// Converts each `<dl class="item-table">` block into a `<ul>` whose `<li>`
+/// entries each hold one item (name link, optional ` — summary`). This keeps
+/// `html2md` from concatenating every item name onto a single line. See
+/// `ITEM_TABLE_REGEX` for details.
+#[must_use]
+fn rewrite_item_tables(html: &str) -> String {
+    ITEM_TABLE_REGEX
+        .replace_all(html, |caps: &regex::Captures| {
+            let inner = &caps[1];
+            let mut out = String::from("<ul>");
+            for row in ITEM_TABLE_ROW_REGEX.captures_iter(inner) {
+                let name = row.get(1).map_or("", |m| m.as_str()).trim();
+                if name.is_empty() {
+                    continue;
+                }
+                out.push_str("<li>");
+                out.push_str(name);
+                let desc = row.get(2).map_or("", |m| m.as_str()).trim();
+                if !desc.is_empty() {
+                    out.push_str(" \u{2014} ");
+                    out.push_str(desc);
+                }
+                out.push_str("</li>");
+            }
+            out.push_str("</ul>");
+            out
+        })
+        .into_owned()
+}
+
 /// Clean HTML by removing unwanted tags and their content
 ///
 /// Uses the `scraper` crate for robust HTML5 parsing, which handles
@@ -180,6 +233,9 @@ pub fn clean_html(html: &str) -> String {
     // Guarantee removal of executable/style/embedded content regardless of how
     // the source markup was formatted (see DANGEROUS_ELEMENT_REGEX docs).
     let html = DANGEROUS_ELEMENT_REGEX.replace_all(&html, "");
+    // Rewrite rustdoc item-index tables into <ul><li> lists so html2md does not
+    // concatenate every item name onto a single line (overview pages only).
+    let html = rewrite_item_tables(&html);
     let document = Html::parse_document(&html);
     remove_unwanted_elements(&document, &html)
 }
@@ -518,6 +574,40 @@ mod tests {
         let text = extract_documentation_as_text(html);
         assert!(text.contains("Real documentation text."));
         assert!(!text.contains("Source"), "source label leaked: {text}");
+    }
+
+    #[test]
+    fn test_item_index_table_renders_as_separate_items() {
+        // docs.rs renders crate/module overview item indexes as
+        // <dl class="item-table"><dt>name</dt><dd>summary</dd>...</dl>.
+        // Without rewriting, html2md concatenates every name onto one line.
+        let html = concat!(
+            "<html><body><section id=\"main-content\">",
+            "<dl class=\"item-table\">",
+            "<dt><a class=\"struct\" href=\"struct.Dl_info.html\">Dl_info</a></dt>",
+            "<dt><a class=\"struct\" href=\"struct.Elf32_Chdr.html\">Elf32_Chdr</a></dt>",
+            "<dt><a class=\"trait\" href=\"trait.Foo.html\">Foo</a></dt>",
+            "<dd>A foo trait.</dd>",
+            "</dl></section></body></html>"
+        );
+        let md = extract_documentation(html);
+        // Item names must not be glued together (html2md escapes `_` as `\_`,
+        // so the broken output would contain `info` directly before `Elf32`).
+        assert!(!md.contains("infoElf32"), "item names concatenated: {md}");
+        // Each item appears (allowing markdown underscore escaping), the
+        // description is preserved, and entries are emitted as separate
+        // markdown list items (one per line).
+        assert!(
+            md.contains("Dl") && md.contains("info"),
+            "missing Dl_info: {md}"
+        );
+        assert!(md.contains("Elf32"), "missing Elf32_Chdr: {md}");
+        assert!(md.contains("Foo"), "missing Foo: {md}");
+        assert!(md.contains("A foo trait."), "missing description: {md}");
+        assert!(
+            md.matches("* ").count() >= 3,
+            "expected separate list items, got: {md}"
+        );
     }
 
     #[test]
