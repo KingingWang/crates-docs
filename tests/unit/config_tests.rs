@@ -243,7 +243,9 @@ fn test_performance_config_default() {
     assert!(config.http_client_max_retries > 0);
     assert!(config.http_client_retry_initial_delay_ms > 0);
     assert!(config.http_client_retry_max_delay_ms > 0);
-    assert!(config.enable_metrics);
+    // enable_metrics defaults to false: the metrics subsystem is unimplemented,
+    // so it must not be enabled (and warn) by default.
+    assert!(!config.enable_metrics);
 }
 
 #[test]

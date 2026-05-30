@@ -500,7 +500,11 @@ pub struct PerformanceConfig {
     #[serde(default = "default_perf_enable_response_compression")]
     pub enable_response_compression: bool,
 
-    /// Enable Prometheus metrics
+    /// Enable Prometheus metrics.
+    ///
+    /// Defaults to `false`: the metrics subsystem is not yet wired into the
+    /// request pipeline, so enabling it currently has no effect (a startup
+    /// warning is logged when set).
     #[serde(default = "default_perf_enable_metrics")]
     pub enable_metrics: bool,
 
@@ -566,7 +570,7 @@ impl Default for PerformanceConfig {
             rate_limit_per_second: DEFAULT_RATE_LIMIT_PER_SECOND,
             concurrent_request_limit: DEFAULT_CONCURRENT_REQUEST_LIMIT,
             enable_response_compression: true,
-            enable_metrics: true,
+            enable_metrics: false,
             metrics_port: 0,
         }
     }
