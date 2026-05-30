@@ -234,7 +234,7 @@ impl CratesDocsServer {
             },
             protocol_version: ProtocolVersion::V2025_11_25.into(),
             instructions: Some(
-                "Use this server to query Rust crate documentation. Supports crate lookup, crate search, and health check."
+                "Use this server to query Rust crate documentation. Supports crate lookup, item lookup (functions, structs, traits, etc.), crate search, and health check."
                 .to_string(),
             ),
             meta: None,
