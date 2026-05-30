@@ -67,7 +67,7 @@ pub struct SearchCratesTool {
     /// Output format: "markdown", "text", or "json" (defaults to "markdown")
     #[json_schema(
         title = "Output Format",
-        description = "Output format: markdown (default), text (plain text), json (structured JSON: name, version, downloads, description, repository, documentation, docs_rs)",
+        description = "Output format: markdown (default), text (plain text), json (structured JSON: name, version, downloads, recent_downloads, description, repository, documentation, docs_rs)",
         default = "markdown"
     )]
     pub format: Option<String>,
@@ -102,6 +102,10 @@ struct SearchCrateRecord {
     max_stable_version: Option<String>,
     #[serde(default)]
     downloads: u64,
+    /// Downloads in the last 90 days (crates.io `recent_downloads`). Drives the
+    /// `recent-downloads` sort, so it is surfaced alongside the total.
+    #[serde(default)]
+    recent_downloads: Option<u64>,
     #[serde(default)]
     repository: Option<String>,
     #[serde(default)]
@@ -245,6 +249,10 @@ struct CrateInfo {
     version: String,
     /// Total downloads
     downloads: u64,
+    /// Recent downloads (last 90 days), when reported by crates.io. Shown next
+    /// to the total so `recent-downloads`-sorted results are not confusing.
+    #[serde(default)]
+    recent_downloads: Option<u64>,
     /// Repository URL
     repository: Option<String>,
     /// Documentation URL (as provided by crates.io, if any)
@@ -275,6 +283,7 @@ fn parse_crates_response(response: SearchCratesResponse, limit: usize) -> Vec<Cr
                     .max_stable_version
                     .unwrap_or(crate_record.max_version),
                 downloads: crate_record.downloads,
+                recent_downloads: crate_record.recent_downloads,
                 repository: crate_record.repository,
                 documentation: crate_record.documentation,
                 docs_rs,
@@ -369,6 +378,9 @@ fn format_markdown_results(crates: &[CrateInfo]) -> String {
         writeln!(output, "## {}. {}", i + 1, crate_info.name).unwrap();
         writeln!(output, "**Version**: {}", crate_info.version).unwrap();
         writeln!(output, "**Downloads**: {}", crate_info.downloads).unwrap();
+        if let Some(recent) = crate_info.recent_downloads {
+            writeln!(output, "**Recent downloads**: {recent}").unwrap();
+        }
 
         if let Some(desc) = &crate_info.description {
             writeln!(output, "**Description**: {}", escape_markdown_text(desc)).unwrap();
@@ -413,6 +425,9 @@ fn format_text_results(crates: &[CrateInfo]) -> String {
         writeln!(output, "{}. {}", i + 1, crate_info.name).unwrap();
         writeln!(output, "   Version: {}", crate_info.version).unwrap();
         writeln!(output, "   Downloads: {}", crate_info.downloads).unwrap();
+        if let Some(recent) = crate_info.recent_downloads {
+            writeln!(output, "   Recent downloads: {recent}").unwrap();
+        }
 
         if let Some(desc) = &crate_info.description {
             writeln!(output, "   Description: {desc}").unwrap();
@@ -519,6 +534,21 @@ mod tests {
     }
 
     #[test]
+    fn test_recent_downloads_parsed_and_rendered() {
+        use crate::tools::docs::Format;
+        let json = r#"{"crates":[
+            {"name":"a","max_stable_version":"1.0.0","downloads":1000,"recent_downloads":42}
+        ]}"#;
+        let resp: SearchCratesResponse = serde_json::from_str(json).unwrap();
+        let crates = parse_crates_response(resp, 10);
+        assert_eq!(crates[0].recent_downloads, Some(42));
+        let md = format_search_results(&crates, Format::Markdown);
+        assert!(md.contains("**Recent downloads**: 42"), "markdown: {md}");
+        let text = format_search_results(&crates, Format::Text);
+        assert!(text.contains("Recent downloads: 42"), "text: {text}");
+    }
+
+    #[test]
     fn test_parse_crates_response_prefers_stable_version() {
         // crates.io returns both max_version (may be yanked) and
         // max_stable_version; the stable one must win so results do not
@@ -541,6 +571,7 @@ mod tests {
             description: Some("A demo crate".to_string()),
             version: "1.0.0".to_string(),
             downloads: 42,
+            recent_downloads: None,
             repository: Some("https://github.com/x/demo".to_string()),
             documentation: Some("https://docs.rs/demo".to_string()),
             docs_rs: "https://docs.rs/demo/".to_string(),
