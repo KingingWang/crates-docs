@@ -53,6 +53,24 @@ fn escape_key_segment(segment: &str) -> String {
     }
 }
 
+/// Normalize an optional version string for cache-key generation.
+///
+/// Trims surrounding whitespace and lowercases the version (versions are
+/// treated case-insensitively). An empty/whitespace-only version and the
+/// `"latest"` sentinel both normalize to `None` so they share a cache entry
+/// with an unversioned (`None`) lookup. This mirrors the URL builders: for
+/// std crates `rust_lang_docs_base` maps `None`/`"latest"` to the same
+/// unversioned docs, the non-std crate overview at `docs.rs/<crate>/` and
+/// `docs.rs/<crate>/latest/` resolve to identical content, and the item URL
+/// builder maps `None` to `latest`. Keying them separately would duplicate
+/// entries and trigger redundant network fetches.
+#[inline]
+fn normalize_cache_version(version: Option<&str>) -> Option<String> {
+    version
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty() && v != "latest")
+}
+
 /// Cache key generator for document cache
 pub struct CacheKeyGenerator;
 
@@ -89,7 +107,7 @@ impl CacheKeyGenerator {
     pub fn crate_cache_key(crate_name: &str, version: Option<&str>) -> String {
         // Inline normalization to avoid intermediate allocations
         let normalized_name = crate_name.trim().to_lowercase();
-        let normalized_ver = version.map(|v| v.trim().to_lowercase());
+        let normalized_ver = normalize_cache_version(version);
 
         if !is_valid_crate_name(&normalized_name) {
             let mut hasher = DefaultHasher::new();
@@ -133,7 +151,7 @@ impl CacheKeyGenerator {
     pub fn item_cache_key(crate_name: &str, item_path: &str, version: Option<&str>) -> String {
         let normalized_name = crate_name.trim().to_lowercase();
         let normalized_path = item_path.trim();
-        let normalized_ver = version.map(|v| v.trim().to_lowercase());
+        let normalized_ver = normalize_cache_version(version);
 
         if !is_valid_crate_name(&normalized_name) || !is_valid_item_path(normalized_path) {
             let mut hasher = DefaultHasher::new();
@@ -337,6 +355,55 @@ mod tests {
     }
 
     #[test]
+    fn test_cache_key_version_latest_normalizes_to_none() {
+        // `None`, `Some("latest")`, and whitespace/empty versions all fetch the
+        // same content, so they must share a single cache key.
+        let none = CacheKeyGenerator::crate_cache_key("serde", None);
+        assert_eq!(none, "crate:serde");
+        assert_eq!(
+            CacheKeyGenerator::crate_cache_key("serde", Some("latest")),
+            none
+        );
+        assert_eq!(
+            CacheKeyGenerator::crate_cache_key("serde", Some("LATEST")),
+            none
+        );
+        assert_eq!(
+            CacheKeyGenerator::crate_cache_key("serde", Some(" latest ")),
+            none
+        );
+        assert_eq!(CacheKeyGenerator::crate_cache_key("serde", Some("")), none);
+        assert_eq!(
+            CacheKeyGenerator::crate_cache_key("serde", Some("   ")),
+            none
+        );
+
+        // The HTML artifact keyspace inherits the same normalization.
+        assert_eq!(
+            CacheKeyGenerator::crate_html_cache_key("serde", Some("latest")),
+            CacheKeyGenerator::crate_html_cache_key("serde", None)
+        );
+
+        // Item keys normalize identically.
+        let item_none = CacheKeyGenerator::item_cache_key("serde", "Serialize", None);
+        assert_eq!(item_none, "item:serde:Serialize");
+        assert_eq!(
+            CacheKeyGenerator::item_cache_key("serde", "Serialize", Some("latest")),
+            item_none
+        );
+        assert_eq!(
+            CacheKeyGenerator::item_cache_key("serde", "Serialize", Some("")),
+            item_none
+        );
+
+        // A real version is still preserved verbatim (lowercased/trimmed).
+        assert_eq!(
+            CacheKeyGenerator::crate_cache_key("serde", Some("1.0")),
+            "crate:serde:1.0"
+        );
+    }
+
+    #[test]
     fn test_item_path_case_sensitivity() {
         assert_ne!(
             CacheKeyGenerator::item_cache_key("serde", "Serialize", None),
@@ -352,9 +419,11 @@ mod tests {
         let whitespace_key = CacheKeyGenerator::crate_cache_key("   ", None);
         assert!(whitespace_key.starts_with("crate:hash:"));
 
+        // Empty/whitespace-only versions normalize to the unversioned key
+        // (same as `None`) so they do not create duplicate cache entries.
         assert_eq!(
             CacheKeyGenerator::crate_cache_key("serde", Some("")),
-            "crate:serde:"
+            "crate:serde"
         );
 
         let unicode_key = CacheKeyGenerator::crate_cache_key("serde测试", None);
