@@ -745,9 +745,12 @@ impl AppConfig {
             ));
         }
 
-        // Validate transport mode
+        // Validate transport mode. Match case-insensitively to stay consistent
+        // with the dispatcher (`run_server_by_mode`) and `TransportMode::from_str`,
+        // which both lowercase the value; otherwise `--mode HTTP` would be
+        // rejected here even though it would dispatch fine.
         let valid_modes = ["stdio", "http", "sse", "hybrid"];
-        if !valid_modes.contains(&self.server.transport_mode.as_str()) {
+        if !valid_modes.contains(&self.server.transport_mode.to_lowercase().as_str()) {
             return Err(crate::error::Error::config(
                 "transport_mode",
                 format!(

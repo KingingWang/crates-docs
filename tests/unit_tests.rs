@@ -182,6 +182,22 @@ fn test_config_validation_invalid_transport_mode() {
         .contains("Invalid transport mode"));
 }
 
+/// Test configuration validation - transport mode is case-insensitive.
+///
+/// The dispatcher and `TransportMode::from_str` accept mixed case, so
+/// validation must not reject e.g. `HTTP`.
+#[test]
+fn test_config_validation_transport_mode_case_insensitive() {
+    for mode in ["HTTP", "Http", "STDIO", "Sse", "HYBRID"] {
+        let mut config = crates_docs::config::AppConfig::default();
+        config.server.transport_mode = mode.to_string();
+        assert!(
+            config.validate().is_ok(),
+            "transport mode {mode} should validate case-insensitively"
+        );
+    }
+}
+
 /// Test configuration validation - invalid log level
 #[test]
 fn test_config_validation_invalid_log_level() {
