@@ -196,12 +196,22 @@ pub struct ServerConfig {
     #[serde(default = "default_server_response_timeout_secs")]
     pub response_timeout_secs: u64,
 
-    /// Allowed hosts for CORS (e.g., `["localhost", "127.0.0.1"]`)
+    /// Allowed `Host` header values for DNS-rebinding protection.
+    ///
+    /// Only enforced when `dns_rebinding_protection` is `true`. Matching is
+    /// exact and case-insensitive (no wildcards); entries must include the
+    /// port clients connect to, e.g. `["127.0.0.1:8080", "localhost:8080"]`.
+    /// Has no effect while `dns_rebinding_protection` is `false`.
     #[serde(default = "default_server_allowed_hosts")]
     pub allowed_hosts: Vec<String>,
 
-    /// Allowed origins for CORS (e.g., `["http://localhost:*"]`)
-    /// Use `"*"` only in development, specify exact origins in production
+    /// Allowed `Origin` header values for DNS-rebinding protection.
+    ///
+    /// Only enforced when `dns_rebinding_protection` is `true`. Matching is
+    /// exact and case-insensitive (no wildcards); list full origins including
+    /// scheme and port, e.g. `["http://localhost:8080"]`. The `*` wildcard is
+    /// NOT supported. Has no effect while `dns_rebinding_protection` is
+    /// `false`.
     #[serde(default = "default_server_allowed_origins")]
     pub allowed_origins: Vec<String>,
 
