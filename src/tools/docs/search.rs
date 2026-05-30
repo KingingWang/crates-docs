@@ -97,6 +97,10 @@ struct SearchCrateRecord {
     description: Option<String>,
     #[serde(default = "default_max_version")]
     max_version: String,
+    /// Highest non-yanked version (crates.io). Preferred over `max_version`
+    /// (which can be a yanked release users cannot install).
+    #[serde(default)]
+    max_stable_version: Option<String>,
     #[serde(default)]
     downloads: u64,
     #[serde(default)]
@@ -247,7 +251,12 @@ fn parse_crates_response(response: SearchCratesResponse, limit: usize) -> Vec<Cr
         .map(|crate_record| CrateInfo {
             name: crate_record.name,
             description: crate_record.description,
-            version: crate_record.max_version,
+            // Prefer the highest stable (non-yanked) version so results do not
+            // advertise a version users cannot `cargo add`. Fall back to
+            // max_version when a crate has no stable release.
+            version: crate_record
+                .max_stable_version
+                .unwrap_or(crate_record.max_version),
             downloads: crate_record.downloads,
             repository: crate_record.repository,
             documentation: crate_record.documentation,
@@ -373,6 +382,16 @@ fn format_text_results(crates: &[CrateInfo]) -> String {
             writeln!(output, "   Description: {desc}").unwrap();
         }
 
+        // Mirror the markdown format so the text format does not silently drop
+        // the repository/documentation links when crates.io provides them.
+        if let Some(repo) = &crate_info.repository {
+            writeln!(output, "   Repository: {repo}").unwrap();
+        }
+
+        if let Some(docs) = &crate_info.documentation {
+            writeln!(output, "   Documentation: {docs}").unwrap();
+        }
+
         writeln!(output, "   Docs.rs: https://docs.rs/{}/", crate_info.name).unwrap();
         writeln!(output).unwrap();
     }
@@ -443,5 +462,44 @@ impl Tool for SearchCratesToolImpl {
 impl Default for SearchCratesToolImpl {
     fn default() -> Self {
         Self::new(Arc::new(super::DocService::default()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_crates_response_prefers_stable_version() {
+        // crates.io returns both max_version (may be yanked) and
+        // max_stable_version; the stable one must win so results do not
+        // advertise an uninstallable version.
+        let json = r#"{"crates":[
+            {"name":"a","max_version":"2.0.0-yanked","max_stable_version":"1.9.0","downloads":1},
+            {"name":"b","max_version":"0.3.0","downloads":2}
+        ]}"#;
+        let resp: SearchCratesResponse = serde_json::from_str(json).unwrap();
+        let crates = parse_crates_response(resp, 10);
+        assert_eq!(crates[0].version, "1.9.0");
+        // No max_stable_version -> fall back to max_version.
+        assert_eq!(crates[1].version, "0.3.0");
+    }
+
+    #[test]
+    fn test_format_text_results_includes_repository_and_documentation() {
+        let crates = vec![CrateInfo {
+            name: "demo".to_string(),
+            description: Some("A demo crate".to_string()),
+            version: "1.0.0".to_string(),
+            downloads: 42,
+            repository: Some("https://github.com/x/demo".to_string()),
+            documentation: Some("https://docs.rs/demo".to_string()),
+        }];
+        let out = format_text_results(&crates);
+        assert!(
+            out.contains("Repository: https://github.com/x/demo"),
+            "{out}"
+        );
+        assert!(out.contains("Documentation: https://docs.rs/demo"), "{out}");
     }
 }
