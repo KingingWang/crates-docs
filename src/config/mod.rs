@@ -799,6 +799,18 @@ impl AppConfig {
             ));
         }
 
+        // A read timeout of 0 makes reqwest's per-read deadline elapse
+        // immediately, so every response body read fails. Reject it like the
+        // other HTTP-client timeouts above (it was previously the only one not
+        // checked, letting `http_client_read_timeout_secs = 0` silently break
+        // all fetches).
+        if self.performance.http_client_read_timeout_secs == 0 {
+            return Err(crate::error::Error::config(
+                "http_client_read_timeout_secs",
+                "cannot be 0",
+            ));
+        }
+
         if self.performance.cache_max_size == 0 {
             return Err(crate::error::Error::config("cache_max_size", "cannot be 0"));
         }

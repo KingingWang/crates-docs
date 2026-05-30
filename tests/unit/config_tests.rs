@@ -272,6 +272,14 @@ fn test_config_validation_zero_request_timeout() {
     assert!(result.is_err());
 }
 
+#[test]
+fn test_config_validation_zero_read_timeout() {
+    let mut config = AppConfig::default();
+    config.performance.http_client_read_timeout_secs = 0;
+    let result = config.validate();
+    assert!(result.is_err());
+}
+
 // ============================================================================
 // Environment variable logging tests
 // ============================================================================
