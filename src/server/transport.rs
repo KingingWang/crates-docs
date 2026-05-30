@@ -240,6 +240,28 @@ fn warn_if_unenforced_server_limits_configured(server_config: &crate::config::Ap
     }
 }
 
+/// Whether the `server.enable_sse` setting contradicts the active transport.
+///
+/// SSE support is decided solely by the transport mode (`sse`/`hybrid` enable
+/// it; `http` does not); the `enable_sse` config flag is never consulted. A
+/// mismatch means the operator's `enable_sse` value is being ignored.
+fn enable_sse_setting_ignored(configured_enable_sse: bool, sse_active: bool) -> bool {
+    configured_enable_sse != sse_active
+}
+
+/// Warn when `server.enable_sse` does not match the transport-derived state.
+fn warn_if_enable_sse_ignored(server_config: &crate::config::AppConfig, sse_active: bool) {
+    if enable_sse_setting_ignored(server_config.server.enable_sse, sse_active) {
+        tracing::warn!(
+            configured_enable_sse = server_config.server.enable_sse,
+            sse_active,
+            "server.enable_sse does not match the active transport and is being ignored: SSE \
+             support is determined solely by transport_mode (sse/hybrid serve SSE, http does not). \
+             Set transport_mode to control SSE; the enable_sse flag has no effect."
+        );
+    }
+}
+
 /// Run a Hyper-based MCP server with the given configuration.
 ///
 /// This function handles HTTP, SSE, and Hybrid servers based on the configuration.
@@ -283,6 +305,7 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
     warn_if_auth_configured_but_unenforced(server_config);
     warn_if_metrics_configured_but_unavailable(server_config);
     warn_if_unenforced_server_limits_configured(server_config);
+    warn_if_enable_sse_ignored(server_config, config.sse_support());
 
     // Create Hyper server options with security settings from config
     let options = HyperServerOptions {
@@ -447,5 +470,15 @@ mod tests {
         assert!(flagged.contains(&"request_timeout_secs"));
         assert!(flagged.contains(&"max_connections"));
         assert!(!flagged.contains(&"response_timeout_secs"));
+    }
+
+    #[test]
+    fn test_enable_sse_setting_ignored() {
+        // No contradiction: enable_sse matches the active SSE state.
+        assert!(!super::enable_sse_setting_ignored(true, true));
+        assert!(!super::enable_sse_setting_ignored(false, false));
+        // Contradiction: setting is ignored.
+        assert!(super::enable_sse_setting_ignored(false, true));
+        assert!(super::enable_sse_setting_ignored(true, false));
     }
 }
