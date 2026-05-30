@@ -286,14 +286,31 @@ fn parse_crates_response(response: SearchCratesResponse, limit: usize) -> Vec<Cr
 #[inline]
 fn format_search_results(crates: &[CrateInfo], format: super::Format) -> String {
     match format {
+        // Machine-readable: an empty array is the correct, parseable result for
+        // a no-match search, so it is left as-is.
         super::Format::Json => {
             serde_json::to_string_pretty(crates).unwrap_or_else(|_| "[]".to_string())
         }
-        super::Format::Text => format_text_results(crates),
+        // Human-readable formats must not return a blank (text) or header-only
+        // (markdown) body when nothing matched: that looks like a failure. Emit
+        // an explicit "no crates found" message instead.
+        super::Format::Text => {
+            if crates.is_empty() {
+                "No crates found matching the query.".to_string()
+            } else {
+                format_text_results(crates)
+            }
+        }
         // `html` is rejected before formatting (see `execute`); list both
         // variants explicitly so adding a new `Format` variant becomes a
         // compile error here rather than a silent fall-through to markdown.
-        super::Format::Markdown | super::Format::Html => format_markdown_results(crates),
+        super::Format::Markdown | super::Format::Html => {
+            if crates.is_empty() {
+                "# Search Results\n\nNo crates found matching the query.".to_string()
+            } else {
+                format_markdown_results(crates)
+            }
+        }
     }
 }
 
@@ -482,6 +499,24 @@ impl Default for SearchCratesToolImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_format_search_results_empty_emits_message() {
+        use crate::tools::docs::Format;
+        let text = format_search_results(&[], Format::Text);
+        assert!(
+            text.contains("No crates found"),
+            "text empty should explain no matches: {text:?}"
+        );
+        let md = format_search_results(&[], Format::Markdown);
+        assert!(
+            md.contains("No crates found"),
+            "markdown empty should explain no matches: {md:?}"
+        );
+        // JSON stays machine-parseable: an empty array, not a prose message.
+        let json = format_search_results(&[], Format::Json);
+        assert_eq!(json, "[]");
+    }
 
     #[test]
     fn test_parse_crates_response_prefers_stable_version() {
