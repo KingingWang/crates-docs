@@ -173,9 +173,13 @@ impl CratesDocsHandler {
             tracing::info!("Executing tool: {}", tool_name);
             let start = std::time::Instant::now();
 
-            let arguments = params
-                .arguments
-                .map_or_else(|| serde_json::Value::Null, serde_json::Value::Object);
+            // An omitted `arguments` field is valid per the MCP spec
+            // (`CallToolRequestParams.arguments` is optional). Default to an
+            // empty object so tools whose parameters are all optional (e.g.
+            // `health_check`) still deserialize and run with their defaults,
+            // and tools with required fields produce a clear
+            // "missing field ..." error instead of "invalid type: null".
+            let arguments = serde_json::Value::Object(params.arguments.unwrap_or_default());
 
             let result = self
                 .tool_registry()
@@ -328,7 +332,7 @@ mod tests {
         let metrics = Arc::new(ServerMetrics::new());
         let handler = CratesDocsHandler::new(server).with_metrics(metrics.clone());
 
-        let _result = handler
+        let result = handler
             .execute_tool(rust_mcp_sdk::schema::CallToolRequestParams {
                 arguments: None,
                 meta: None,
@@ -336,6 +340,14 @@ mod tests {
                 task: None,
             })
             .await;
+
+        // A tool call that omits `arguments` is valid per the MCP spec; a
+        // tool whose parameters are all optional (health_check) must run
+        // successfully with its defaults rather than failing to deserialize.
+        assert!(
+            result.success && result.result.is_ok(),
+            "health_check with omitted arguments should succeed: {result:?}"
+        );
 
         // Verify metrics are recorded
         let metrics_output = metrics.export().unwrap();
