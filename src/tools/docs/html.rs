@@ -324,7 +324,10 @@ pub fn html_to_text(html: &str) -> String {
         }
     }
 
-    clean_whitespace(&text_parts.join(" "))
+    // Join with "" (not " "): each text node already carries its own
+    // surrounding whitespace, and `clean_whitespace` collapses runs. Inserting a
+    // space between every node would corrupt inline runs split across elements.
+    clean_whitespace(&text_parts.join(""))
 }
 
 fn extract_text_excluding_skip_tags(
@@ -344,10 +347,16 @@ fn extract_text_excluding_skip_tags(
     for child in element.children() {
         match child.value() {
             scraper::node::Node::Text(text) => {
-                let trimmed = text.trim();
-                if !trimmed.is_empty() {
-                    text_parts.push(trimmed.to_string());
-                }
+                // Preserve the text node verbatim. Trimming each node and later
+                // joining with spaces inserted spurious spaces at every inline
+                // boundary: `RandomState</a>,` became "RandomState ," and words
+                // split by `<wbr>`/syntax spans ("ser"+"ializing") became
+                // "ser ializing". Keeping raw text lets `clean_whitespace`
+                // collapse genuine whitespace (including the indentation between
+                // block elements) without corrupting adjacent inline runs.
+                // Empty/whitespace nodes are harmless: `clean_whitespace`
+                // collapses them at the end.
+                text_parts.push(text.to_string());
             }
             scraper::node::Node::Element(_) => {
                 if let Some(child_ref) = scraper::element_ref::ElementRef::wrap(child) {
@@ -642,6 +651,23 @@ mod tests {
         assert!(
             !text.contains("NOSCRIPT"),
             "noscript content leaked: {text}"
+        );
+    }
+
+    #[test]
+    fn test_html_to_text_preserves_inline_runs() {
+        // Regression: words split across inline elements (e.g. docs.rs `<wbr>`
+        // hints or syntax-highlight spans) and punctuation directly following an
+        // inline element must not gain spurious spaces.
+        let html = "<body><p>de<wbr>serializing data</p>\n<div><code>RandomState</code>, <code>Global</code>&gt;</div></body>";
+        let text = html_to_text(html);
+        assert!(text.contains("deserializing"), "split word: {text}");
+        assert!(!text.contains("de serializing"), "spurious space: {text}");
+        assert!(text.contains("RandomState,"), "space before comma: {text}");
+        // Whitespace between block elements still separates words.
+        assert!(
+            text.contains("data RandomState"),
+            "lost block separation: {text}"
         );
     }
 
