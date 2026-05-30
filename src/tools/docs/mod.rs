@@ -306,12 +306,28 @@ pub fn is_rust_std_crate(crate_name: &str) -> bool {
     )
 }
 
+/// Base URL for Rust std-family crate docs on doc.rust-lang.org, honoring an
+/// explicit version.
+///
+/// `doc.rust-lang.org` serves versioned docs at `/{version}/{krate}/` (e.g.
+/// `https://doc.rust-lang.org/1.75.0/std/`, and channels `stable`/`beta`/
+/// `nightly`). `None` or `"latest"` use the unversioned current docs. The
+/// returned base always ends in `/`.
+fn rust_lang_docs_base(krate: &str, version: Option<&str>) -> String {
+    match version {
+        Some(ver) if !ver.trim().is_empty() && ver != "latest" => {
+            format!("https://doc.rust-lang.org/{}/{krate}/", ver.trim())
+        }
+        _ => format!("https://doc.rust-lang.org/{krate}/"),
+    }
+}
+
 /// Build docs.rs URL for crate documentation
 #[must_use]
 pub fn build_docs_url(crate_name: &str, version: Option<&str>) -> String {
     if is_rust_std_crate(crate_name) {
         let krate = crate_name.replace('-', "_");
-        return format!("https://doc.rust-lang.org/{krate}/");
+        return rust_lang_docs_base(&krate, version);
     }
     let base_url = docs_rs_base_url();
     match version {
@@ -329,7 +345,8 @@ pub fn build_docs_item_url(crate_name: &str, version: Option<&str>, item_path: &
         // doc.rust-lang.org. Mirror the other URL builders so the last-resort
         // fallback degrades to the crate overview instead of a hard 404.
         let krate = crate_name.replace('-', "_");
-        return format!("https://doc.rust-lang.org/{krate}/?search={encoded_path}");
+        let base = rust_lang_docs_base(&krate, version);
+        return format!("{base}?search={encoded_path}");
     }
     let base_url = docs_rs_base_url();
     match version {
@@ -374,7 +391,7 @@ pub fn build_docs_item_url_candidates(
     };
 
     let mut prefix = if is_rust_std_crate(crate_name) {
-        format!("https://doc.rust-lang.org/{krate}/")
+        rust_lang_docs_base(&krate, version)
     } else {
         let base_url = docs_rs_base_url();
         let ver = version.unwrap_or("latest");
@@ -417,7 +434,8 @@ pub fn build_docs_item_url_candidates(
 pub fn build_docs_all_items_url(crate_name: &str, version: Option<&str>) -> String {
     let krate = crate_name.replace('-', "_");
     if is_rust_std_crate(crate_name) {
-        return format!("https://doc.rust-lang.org/{krate}/all.html");
+        let base = rust_lang_docs_base(&krate, version);
+        return format!("{base}all.html");
     }
     let base_url = docs_rs_base_url();
     let ver = version.unwrap_or("latest");
@@ -454,7 +472,8 @@ pub fn find_item_url_in_all_html(
     if is_rust_std_crate(crate_name) {
         // std/core/alloc docs live on doc.rust-lang.org, not docs.rs; the
         // all.html index there links relative to the crate root.
-        return Some(format!("https://doc.rust-lang.org/{krate}/{href}"));
+        let base = rust_lang_docs_base(&krate, version);
+        return Some(format!("{base}{href}"));
     }
     let base_url = docs_rs_base_url();
     let ver = version.unwrap_or("latest");
@@ -907,6 +926,32 @@ mod tests {
         for c in ["serde", "tokio", "anyhow", "stdweb"] {
             assert!(!is_rust_std_crate(c), "{c} should not be a std crate");
         }
+    }
+
+    #[test]
+    fn test_std_crate_honors_explicit_version() {
+        // doc.rust-lang.org serves versioned docs; an explicit version must not
+        // be silently dropped for std-family crates.
+        assert_eq!(
+            build_docs_url("std", Some("1.75.0")),
+            "https://doc.rust-lang.org/1.75.0/std/"
+        );
+        assert_eq!(
+            build_docs_all_items_url("core", Some("1.75.0")),
+            "https://doc.rust-lang.org/1.75.0/core/all.html"
+        );
+        let c = build_docs_item_url_candidates("std", Some("1.75.0"), "collections::HashMap");
+        assert!(
+            c.contains(
+                &"https://doc.rust-lang.org/1.75.0/std/collections/struct.HashMap.html".to_string()
+            ),
+            "versioned std candidate missing: {c:?}"
+        );
+        // "latest" and None fall back to the unversioned current docs.
+        assert_eq!(
+            build_docs_url("std", Some("latest")),
+            "https://doc.rust-lang.org/std/"
+        );
     }
 
     #[test]
