@@ -424,7 +424,14 @@ impl Tool for SearchCratesToolImpl {
             ));
         }
 
-        let crates = self.search_crates(&params.query, limit, &sort).await?;
+        // Trim the query before fetching so the upstream crates.io request
+        // matches the normalized (trimmed + lowercased) cache key. Otherwise a
+        // query like "  tokio  " is sent verbatim to crates.io (poorer results)
+        // yet cached/looked-up under the trimmed key, letting a whitespace-laden
+        // first request poison the cache for every later "tokio" caller.
+        let crates = self
+            .search_crates(params.query.trim(), limit, &sort)
+            .await?;
         let content = format_search_results(&crates, format);
 
         Ok(rust_mcp_sdk::schema::CallToolResult::text_content(vec![

@@ -61,7 +61,7 @@ impl std::fmt::Display for Format {
 pub fn parse_format(tool_name: &str, format_str: Option<&str>) -> Result<Format, CallToolError> {
     match format_str {
         None => Ok(Format::Markdown),
-        Some(s) => match s.to_lowercase().as_str() {
+        Some(s) => match s.trim().to_lowercase().as_str() {
             "markdown" => Ok(Format::Markdown),
             "text" => Ok(Format::Text),
             "html" => Ok(Format::Html),
@@ -1140,6 +1140,22 @@ mod tests {
             parse_format("lookup_crate", Some("JSON")).unwrap(),
             Format::Json
         );
+    }
+
+    #[test]
+    fn test_parse_format_trims_whitespace() {
+        // Surrounding whitespace is tolerated (consistent with sort
+        // normalization) so e.g. " markdown " parses like "markdown".
+        assert_eq!(
+            parse_format("lookup_crate", Some(" markdown ")).unwrap(),
+            Format::Markdown
+        );
+        assert_eq!(
+            parse_format("lookup_crate", Some("\tjson\n")).unwrap(),
+            Format::Json
+        );
+        // Whitespace-only input still trims to empty and is rejected.
+        assert!(parse_format("lookup_crate", Some("   ")).is_err());
     }
 
     #[test]
