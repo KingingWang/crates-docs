@@ -11,6 +11,52 @@ use std::sync::LazyLock;
 /// Tags whose content should be completely removed during HTML cleaning
 const SKIP_TAGS: &[&str] = &["script", "style", "noscript", "iframe"];
 
+/// Block-level tags. During plain-text extraction a separating space is
+/// inserted around these so adjacent blocks (e.g. consecutive `<li>`/`<dt>`
+/// item-index entries, table cells, or paragraphs) do not run together into a
+/// single token like `Dl_infoElf32_Chdr`. Inline tags are intentionally
+/// excluded so that runs split across inline elements (`ser`+`<wbr>`+`ializing`,
+/// `RandomState</a>,`) are not corrupted with spurious spaces.
+const BLOCK_TAGS: &[&str] = &[
+    "address",
+    "article",
+    "aside",
+    "blockquote",
+    "br",
+    "dd",
+    "div",
+    "dl",
+    "dt",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "header",
+    "hr",
+    "li",
+    "main",
+    "nav",
+    "ol",
+    "p",
+    "pre",
+    "section",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "tr",
+    "ul",
+];
+
 /// Regex to remove anchor links like [§](#xxx)
 static ANCHOR_LINK_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[§\]\([^)]*\)").expect("hardcoded valid regex pattern"));
@@ -416,7 +462,19 @@ fn extract_text_excluding_skip_tags(
             }
             scraper::node::Node::Element(_) => {
                 if let Some(child_ref) = scraper::element_ref::ElementRef::wrap(child) {
+                    // Surround block-level elements with a space so adjacent
+                    // blocks do not glue together (e.g. item-index entries).
+                    // `clean_whitespace` collapses the resulting runs. Inline
+                    // elements get no separator to preserve intra-word runs.
+                    let is_block =
+                        BLOCK_TAGS.contains(&child_ref.value().name().to_lowercase().as_str());
+                    if is_block {
+                        text_parts.push(" ".to_string());
+                    }
                     extract_text_excluding_skip_tags(&child_ref, text_parts);
+                    if is_block {
+                        text_parts.push(" ".to_string());
+                    }
                 }
             }
             _ => {}
@@ -574,6 +632,19 @@ mod tests {
         let text = extract_documentation_as_text(html);
         assert!(text.contains("Real documentation text."));
         assert!(!text.contains("Source"), "source label leaked: {text}");
+    }
+
+    #[test]
+    fn test_html_to_text_separates_block_elements() {
+        // Adjacent block elements (item-index entries, list items, table cells)
+        // must not glue their text together in the plain-text output.
+        let html = "<ul><li>Dl_info</li><li>Elf32_Chdr</li><li>Foo</li></ul>";
+        let text = html_to_text(html);
+        assert!(
+            !text.contains("Dl_infoElf32"),
+            "block text glued together: {text}"
+        );
+        assert!(text.contains("Dl_info Elf32_Chdr Foo"), "text: {text}");
     }
 
     #[test]
