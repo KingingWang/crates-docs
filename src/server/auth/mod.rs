@@ -26,9 +26,14 @@ mod manager;
 mod token;
 mod types;
 
+#[cfg(all(feature = "api-key", feature = "auth"))]
+mod api_key_provider;
+
 #[cfg(test)]
 mod tests;
 
+#[cfg(all(feature = "api-key", feature = "auth"))]
+pub use api_key_provider::ApiKeyAuthProvider;
 #[cfg(feature = "api-key")]
 pub use config::ApiKeyConfig;
 pub use config::{AuthConfig, OAuthConfig};

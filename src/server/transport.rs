@@ -162,28 +162,110 @@ impl HyperServerConfig {
     }
 }
 
-/// Emit a prominent warning when authentication is configured but cannot be
-/// enforced on the HTTP/SSE transport.
+/// Whether in-process API-key enforcement is active for this build and config.
 ///
-/// The in-tree `auth_middleware` is not wired into the SDK's Hyper request
-/// pipeline, so API key / OAuth settings do NOT protect HTTP endpoints today.
-/// Failing silently here would give operators a dangerous false sense of
-/// security, so we log a loud warning instead.
-fn warn_if_auth_configured_but_unenforced(server_config: &crate::config::AppConfig) {
-    let mut configured = Vec::new();
+/// True only when the binary is compiled with **both** the `api-key` and `auth`
+/// features (so [`crate::server::auth::ApiKeyAuthProvider`] exists and the SDK
+/// can attach its `AuthMiddleware`) **and** `api_key.enabled` is set. When true,
+/// the HTTP/SSE transport rejects any request lacking a valid
+/// `Authorization: Bearer <key>` with 401; when false, no API-key check runs
+/// in-process.
+#[cfg(all(feature = "api-key", feature = "auth"))]
+fn api_key_auth_enforced(server_config: &crate::config::AppConfig) -> bool {
+    server_config.auth.api_key.enabled
+}
 
+/// Fallback for builds without both `api-key` and `auth`: enforcement is
+/// impossible, so it is never active.
+#[cfg(not(all(feature = "api-key", feature = "auth")))]
+fn api_key_auth_enforced(_server_config: &crate::config::AppConfig) -> bool {
+    false
+}
+
+/// Build the SDK auth provider for in-process API-key enforcement, if enabled.
+///
+/// Returns `Some(provider)` only when `api_key.enabled` is set; the SDK's
+/// `HyperServer::new` then auto-attaches its `AuthMiddleware`. Returns `None`
+/// otherwise, leaving the transport unauthenticated (the runtime on/off switch).
+#[cfg(all(feature = "api-key", feature = "auth"))]
+fn build_api_key_auth(
+    server_config: &crate::config::AppConfig,
+) -> Option<Arc<dyn rust_mcp_sdk::auth::AuthProvider>> {
+    server_config.auth.api_key.enabled.then(|| {
+        Arc::new(crate::server::auth::ApiKeyAuthProvider::new(
+            server_config.auth.api_key.clone(),
+        )) as Arc<dyn rust_mcp_sdk::auth::AuthProvider>
+    })
+}
+
+/// Report how authentication settings map onto actual HTTP/SSE enforcement.
+///
+/// In-process API-key enforcement is active only when the binary is built with
+/// both the `api-key` and `auth` features and `api_key.enabled` is set; the
+/// SDK's `AuthMiddleware` then rejects requests without a valid
+/// `Authorization: Bearer <key>`. OAuth, by contrast, is still **not** wired
+/// into the request pipeline, so an enabled OAuth config protects nothing.
+/// Reporting both accurately avoids giving operators a false sense of security
+/// (and avoids hiding that protection is, in fact, on).
+fn warn_if_auth_configured_but_unenforced(server_config: &crate::config::AppConfig) {
     #[cfg(feature = "api-key")]
     if server_config.auth.api_key.enabled {
-        configured.push("API key");
-    }
-    if server_config.auth.oauth.enabled || server_config.oauth.enabled {
-        configured.push("OAuth");
+        if api_key_auth_enforced(server_config) {
+            tracing::info!(
+                "API key authentication is ENFORCED on the HTTP/SSE transport: clients must send \
+                 `Authorization: Bearer <key>` or receive 401 (the /health endpoint stays open). \
+                 The in-process layer does not read the `X-API-Key` header directly — to keep \
+                 using `X-API-Key` and to encrypt traffic with TLS, front the server with the \
+                 bundled reverse proxy (docs/reverse-proxy/)."
+            );
+        } else {
+            tracing::warn!(
+                "API key authentication is enabled in configuration but is NOT enforced: this \
+                 binary was built without the `auth` feature, so HTTP/SSE requests are \
+                 unauthenticated. Rebuild with the `auth` feature (it is in the default set) or \
+                 front the server with an authenticating reverse proxy. Do not expose this \
+                 server on an untrusted network."
+            );
+        }
     }
 
-    if !configured.is_empty() {
+    // OAuth is accepted in configuration but never attached to the pipeline.
+    if server_config.auth.oauth.enabled || server_config.oauth.enabled {
         tracing::warn!(
-            "{auth} authentication is enabled in configuration but is NOT enforced on the HTTP/SSE transport: requests to this server are currently unauthenticated. Do not expose this server on an untrusted network. Restrict access via allowed_hosts/allowed_origins, a reverse proxy, or run in stdio mode.",
-            auth = configured.join(" + ")
+            "OAuth authentication is enabled in configuration but is NOT enforced on the \
+             HTTP/SSE transport: OAuth requests are not validated. Do not rely on it for access \
+             control; use API-key authentication or an authenticating reverse proxy instead."
+        );
+    }
+}
+
+/// Warn when API-key header / query settings are set but ignored in-process.
+///
+/// The SDK middleware reads **only** `Authorization: Bearer <token>` — it cannot
+/// honor a custom `header_name` or `allow_query_param`. Those settings take
+/// effect solely at a fronting reverse proxy. The default `header_name`
+/// (`X-API-Key`) is the documented proxy path and is covered by the info log
+/// above, so this only fires for a genuinely non-default header or an enabled
+/// query parameter, preventing the belief that the server reads them directly.
+#[cfg(all(feature = "api-key", feature = "auth"))]
+fn warn_if_api_key_header_settings_ignored(server_config: &crate::config::AppConfig) {
+    if !api_key_auth_enforced(server_config) {
+        return;
+    }
+    let non_default_header = !server_config
+        .auth
+        .api_key
+        .header_name
+        .eq_ignore_ascii_case("x-api-key");
+    let query_allowed = server_config.auth.api_key.allow_query_param;
+    if non_default_header || query_allowed {
+        tracing::warn!(
+            header_name = %server_config.auth.api_key.header_name,
+            allow_query_param = query_allowed,
+            "In-process API-key enforcement reads ONLY `Authorization: Bearer <key>`; the \
+             configured `header_name` and `allow_query_param` are ignored by the server and take \
+             effect only at a fronting reverse proxy. Translate your custom header / query param \
+             into `Authorization: Bearer <key>` at the proxy — see docs/reverse-proxy/."
         );
     }
 }
@@ -275,10 +357,25 @@ fn host_is_loopback(host: &str) -> bool {
 }
 
 /// Warn when the server binds to a non-loopback address and is therefore
-/// reachable from other hosts on the network. The HTTP/SSE transport performs
-/// no authentication, so an exposed bind is a real risk.
+/// reachable from other hosts on the network.
+///
+/// If in-process API-key auth is enforced, the risk is plaintext exposure
+/// (requests and keys travel unencrypted over HTTP); otherwise the risk is the
+/// absence of any authentication. Both warrant a reverse proxy.
 fn warn_if_network_exposed(server_config: &crate::config::AppConfig) {
-    if !host_is_loopback(&server_config.server.host) {
+    if host_is_loopback(&server_config.server.host) {
+        return;
+    }
+    if api_key_auth_enforced(server_config) {
+        tracing::warn!(
+            host = %server_config.server.host,
+            "Server is binding to a non-loopback address and is reachable from other hosts on \
+             the network. API-key authentication IS enforced (requests need `Authorization: \
+             Bearer <key>`), but traffic is sent UNENCRYPTED over plain HTTP: anyone who can \
+             observe the network sees requests and keys in clear text. Terminate TLS with the \
+             bundled reverse proxy (docs/reverse-proxy/) or restrict the network."
+        );
+    } else {
         tracing::warn!(
             host = %server_config.server.host,
             "Server is binding to a non-loopback address and is reachable from other hosts on \
@@ -347,6 +444,8 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
     );
 
     warn_if_auth_configured_but_unenforced(server_config);
+    #[cfg(all(feature = "api-key", feature = "auth"))]
+    warn_if_api_key_header_settings_ignored(server_config);
     warn_if_metrics_configured_but_unavailable(server_config);
     warn_if_unenforced_server_limits_configured(server_config);
     warn_if_enable_sse_ignored(server_config, config.sse_support());
@@ -369,6 +468,13 @@ pub async fn run_hyper_server(server: &CratesDocsServer, config: HyperServerConf
         // explicit opt-in instead.
         dns_rebinding_protection: server_config.server.dns_rebinding_protection,
         health_endpoint: Some("/health".to_string()),
+        // Runtime on/off switch for in-process auth: `Some` only when
+        // `api_key.enabled` is set, which makes the SDK attach its
+        // `AuthMiddleware`. Toggling the config flag + restart flips
+        // enforcement without a rebuild. Cfg-gated as a field init (rather than
+        // a `mut` mutation) so `options` stays immutable under `-D warnings`.
+        #[cfg(all(feature = "api-key", feature = "auth"))]
+        auth: build_api_key_auth(server_config),
         ..Default::default()
     };
 
@@ -539,5 +645,25 @@ mod tests {
         // Contradiction: setting is ignored.
         assert!(super::enable_sse_setting_ignored(false, true));
         assert!(super::enable_sse_setting_ignored(true, false));
+    }
+
+    #[cfg(all(feature = "api-key", feature = "auth"))]
+    #[test]
+    fn test_api_key_auth_enforced_tracks_enabled_flag() {
+        let mut config = AppConfig::default();
+        // Disabled by default → no in-process enforcement.
+        assert!(!super::api_key_auth_enforced(&config));
+        // Flipping the runtime flag turns enforcement on (no rebuild needed).
+        config.auth.api_key.enabled = true;
+        assert!(super::api_key_auth_enforced(&config));
+    }
+
+    #[cfg(all(feature = "api-key", feature = "auth"))]
+    #[test]
+    fn test_build_api_key_auth_follows_enabled_flag() {
+        let mut config = AppConfig::default();
+        assert!(super::build_api_key_auth(&config).is_none());
+        config.auth.api_key.enabled = true;
+        assert!(super::build_api_key_auth(&config).is_some());
     }
 }

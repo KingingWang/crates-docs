@@ -11,7 +11,7 @@ keywords = ["mcp", "docs", "documentation", "crates", "server"]
 categories = ["api-bindings", "web-programming", "network-programming"]
 
 [features]
-default = ["server", "stdio", "macros", "cache-memory", "logging", "api-key"]
+default = ["server", "stdio", "macros", "cache-memory", "logging", "api-key", "auth"]
 server = ["rust-mcp-sdk/server"]
 client = ["rust-mcp-sdk/client"]
 hyper-server = ["rust-mcp-sdk/hyper-server"]
@@ -19,7 +19,7 @@ streamable-http = ["rust-mcp-sdk/streamable-http"]
 sse = ["rust-mcp-sdk/sse"]
 stdio = ["rust-mcp-sdk/stdio"]
 macros = ["rust-mcp-sdk/macros"]
-auth = ["rust-mcp-sdk/auth"]
+auth = ["rust-mcp-sdk/auth", "dep:http"]
 api-key = ["dep:api-keys-simplified"]
 cache-memory = ["dep:moka"]
 cache-redis = ["dep:redis"]
@@ -28,7 +28,7 @@ logging = []
 
 [dependencies]
 # MCP core dependencies
-rust-mcp-sdk = { version = "0.9", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http", "sse"] }
+rust-mcp-sdk = { version = "0.9", default-features = false, features = ["server", "macros", "stdio", "hyper-server", "streamable-http", "sse", "auth"] }
 
 # HTTP client
 reqwest = { version = "0.13.4", features = ["json"] }
@@ -60,6 +60,9 @@ prometheus-client = "0.24.1"
 
 # Utility libraries
 async-trait = "0.1.89"
+# `http` types appear in the SDK `AuthProvider` signatures we implement for
+# in-process API-key enforcement; only needed when the `auth` feature is on.
+http = { version = "1", optional = true }
 html2md = "0.2.15"
 scraper = "0.27"
 regex = "1.12"

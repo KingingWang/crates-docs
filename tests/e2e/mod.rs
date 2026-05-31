@@ -199,6 +199,7 @@ pub fn extract_sse_json(body_text: &str) -> &str {
         .unwrap_or(body_text)
 }
 
+pub mod auth_enforcement_tests;
 pub mod external_api_tests;
 /// Test modules
 pub mod server_start_tests;

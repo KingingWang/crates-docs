@@ -1,0 +1,52 @@
+# Caddyfile for crates-docs: TLS termination + X-API-Key -> Bearer translation.
+#
+# What it does:
+#   - Terminates HTTPS (automatic certificates).
+#   - Rejects requests that carry no `X-API-Key` (except /health) at the edge.
+#   - Rewrites `X-API-Key: <k>` into `Authorization: Bearer <k>` so the
+#     crates-docs in-process auth layer enforces the key cryptographically.
+#   - Forwards to the loopback-only backend on 127.0.0.1:8080.
+#
+# Run with:   caddy run --config ./Caddyfile
+#
+# Replace `docs.example.com` with your domain for a public Let's Encrypt cert.
+# For local testing use `localhost` (Caddy issues an internal-CA cert; pass
+# `curl -k` or trust the Caddy root CA).
+
+docs.example.com {
+	# /health stays open so monitoring needs no key. Forwarded as-is; the
+	# backend health route bypasses the auth middleware too.
+	handle /health {
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# Reject requests that carry no X-API-Key before they ever reach the
+	# backend (fail fast at the edge). Note: this matcher fires only when the
+	# header is *absent*; a present-but-empty `X-API-Key:` falls through and is
+	# rejected by the backend's token check (which refuses empty keys). Either
+	# way the request is denied — the backend re-verifies every key, so this
+	# edge check is defense in depth, not the only gate.
+	@no_api_key {
+		not header X-Api-Key *
+	}
+	handle @no_api_key {
+		respond "Missing X-API-Key header" 401
+	}
+
+	# Everything else (/mcp, /sse, /messages): translate the header and proxy.
+	handle {
+		reverse_proxy 127.0.0.1:8080 {
+			# X-API-Key -> Authorization: Bearer for the in-process check.
+			header_up Authorization "Bearer {http.request.header.X-Api-Key}"
+			# Don't forward the raw key header upstream once translated.
+			header_up -X-Api-Key
+
+			# SSE: Caddy streams responses and does not buffer by default, so
+			# `/sse` works without extra flush settings. Allow long-lived
+			# streams instead of cutting them at the default timeout.
+			transport http {
+				read_timeout 3600s
+			}
+		}
+	}
+}

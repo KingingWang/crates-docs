@@ -853,6 +853,51 @@ crates-docs config --output config.toml --force
 
 > 注意：这些是 MCP 协议端点，不是普通的 HTTP API。需要使用 MCP 客户端进行交互。
 
+## 认证与加密传输（TLS）
+
+在 HTTP/SSE/Hybrid 服务器模式下，访问控制分为两层，可按需组合：
+
+| 能力 | 由谁提供 | 说明 |
+|------|----------|------|
+| **认证**（只有持有密钥者可连接） | 进程内置（默认编译进二进制） | 校验 `Authorization: Bearer <key>`，密钥以 Argon2 哈希存储、常量时间比对 |
+| **加密**（被监听也无法解密） | 前置反向代理（Caddy/nginx） | 终止 TLS，并把 `X-API-Key: <k>` 改写为 `Authorization: Bearer <k>` |
+
+### 进程内置认证（Bearer）
+
+`auth` 已包含在 `default` features 中，因此标准 `cargo build` / `cargo install`
+即具备认证能力。是否真正启用是**运行时开关**，无需重新编译：
+
+- 打开/关闭由 `auth.api_key.enabled` 控制（配置文件、`--enable-api-key`
+  CLI 标志或 `CRATES_DOCS_API_KEY_ENABLED` 环境变量），改动后**重启生效**。
+- 启用后，每个 MCP 请求都必须携带 `Authorization: Bearer <key>`，否则返回 `401`；
+  `/health` 始终开放，便于监控。
+- 密钥用 `crates-docs generate-api-key` 生成：配置里保存 **hash**，把**明文 key**
+  发给客户端。吊销密钥 = 从 `keys` 移除并重启。
+
+```bash
+# 启用后，直连服务端必须使用 Bearer 头：
+curl -H "Authorization: Bearer <明文 key>" -X POST http://127.0.0.1:8080/mcp
+```
+
+> **为什么是 Bearer 而不是 `X-API-Key`？** 进程内的 MCP 中间件**只**识别
+> `Authorization: Bearer` 头，无法读取 `X-API-Key` 或查询参数。`header_name`、
+> `allow_query_param` 等配置项仅对前置反向代理有意义（见下）。
+
+### 加密传输与 `X-API-Key`（反向代理）
+
+进程本身只说明文 HTTP，没有 TLS。若服务要对外暴露、需要加密，或希望继续使用
+`X-API-Key` 头，请在前面加一层反向代理：它终止 TLS（HTTPS），把
+`X-API-Key: <k>` 改写为 `Authorization: Bearer <k>`，再转发到仅监听 127.0.0.1
+的后端——后端依旧做密码学校验，构成纵深防御。
+
+```
+客户端 --HTTPS, X-API-Key--> 反向代理 --HTTP, Authorization: Bearer--> 127.0.0.1:8080
+```
+
+开箱即用的配置（含 Caddy 与 nginx，以及完整步骤）见
+**[`docs/reverse-proxy/`](docs/reverse-proxy/README.md)**。使用反向代理时，请把后端
+绑定到回环地址（`server.host = "127.0.0.1"`），避免客户端绕过 TLS 直连后端。
+
 ## 缓存策略
 
 ### 内存缓存（默认）
