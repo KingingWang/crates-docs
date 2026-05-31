@@ -41,7 +41,7 @@ use crate::server::auth::ApiKeyConfig;
 /// removing the key from configuration and restarting the server — never by
 /// token expiry — which matches the existing hot-reload security note in
 /// `serve_cmd`.
-const API_KEY_TTL: Duration = Duration::from_hours(87_600);
+const API_KEY_TTL_SECS: u64 = 87_600 * 60 * 60;
 
 /// Opaque, non-secret identifier reported for every accepted API key.
 ///
@@ -98,7 +98,7 @@ impl SdkAuthProvider for ApiKeyAuthProvider {
                 client_id: None,
                 user_id: None,
                 scopes: None,
-                expires_at: Some(SystemTime::now() + API_KEY_TTL),
+                expires_at: Some(SystemTime::now() + Duration::from_secs(API_KEY_TTL_SECS)),
                 audience: None,
                 extra: None,
             })

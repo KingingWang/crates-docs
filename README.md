@@ -130,47 +130,6 @@ sequenceDiagram
     Server-->>Client: MCP 响应
 ```
 
-## 项目结构
-
-```
-src/
-├── lib.rs              # 库入口，导出公共 API
-├── main.rs             # 程序入口
-├── cache/              # 缓存层
-│   ├── mod.rs          # Cache trait 定义
-│   ├── memory.rs       # 内存缓存实现（TinyLFU + 按条目 TTL）
-│   └── redis.rs        # Redis 缓存实现
-├── cli/                # 命令行接口
-│   ├── mod.rs          # CLI 定义和路由
-│   ├── commands.rs     # 子命令定义
-│   ├── serve_cmd.rs    # serve 命令实现
-│   ├── test_cmd.rs     # test 命令实现
-│   ├── config_cmd.rs   # config 命令实现
-│   ├── health_cmd.rs   # health 命令实现
-│   └── version_cmd.rs  # version 命令实现
-├── config/             # 配置管理
-│   └── mod.rs          # 配置结构和加载逻辑
-├── error/              # 错误处理
-│   └── mod.rs          # 错误类型定义
-├── server/             # 服务器核心
-│   ├── mod.rs          # 服务器定义
-│   ├── auth.rs         # OAuth 认证
-│   ├── handler.rs      # MCP 请求处理
-│   └── transport.rs    # 传输层实现
-├── tools/              # MCP 工具
-│   ├── mod.rs          # 工具注册表
-│   ├── health.rs       # 健康检查工具
-│   └── docs/           # 文档查询工具
-│       ├── mod.rs      # 文档服务
-│       ├── cache.rs    # 文档缓存
-│       ├── html.rs     # HTML 处理
-│       ├── lookup_crate.rs  # crate 文档查找
-│       ├── lookup_item.rs   # 项目文档查找
-│       └── search.rs        # crate 搜索
-└── utils/              # 工具函数
-    └── mod.rs          # 通用工具
-```
-
 ## 快速开始
 
 ### 使用 Docker（推荐）
@@ -853,6 +812,211 @@ crates-docs config --output config.toml --force
 
 > 注意：这些是 MCP 协议端点，不是普通的 HTTP API。需要使用 MCP 客户端进行交互。
 
+## API Key 认证使用指南
+
+API Key 认证用于保护 HTTP/SSE/Hybrid 模式下的 MCP 端点，防止未授权访问。启用后，所有 MCP 请求必须携带有效的 API Key，`/health` 端点始终开放以便监控。
+
+### 完整流程概览
+
+```
+1. 生成 API Key  →  得到明文 key（客户端用）和 hash（服务端存）
+2. 配置服务端    →  将 hash 写入 config.toml 或环境变量
+3. 启动服务      →  crates-docs serve --config config.toml
+4. 客户端携带 key →  Authorization: Bearer <明文 key>
+```
+
+### 第一步：生成 API Key
+
+```bash
+crates-docs generate-api-key
+```
+
+输出示例：
+
+```
+Generated API key successfully.
+
+Plain-text key (show once and store securely):
+sk-live-<your-api-key-here>
+
+Key ID:
+<key-id>
+
+Store this hash in configuration or secret storage:
+$argon2id$v=19$m=47104,t=1,p=1$<salt>$<hash>
+```
+
+**⚠️ 重要**：
+- **明文 key**（`sk-live-...`）只显示一次，请立即保存到密钥管理器中，服务端无法从 hash 反推出明文
+- **hash**（`$argon2id$...`）写入服务端配置，用于验证客户端发来的 key
+- 两者不可互换：客户端用明文，服务端存 hash
+
+也可以指定自定义前缀：
+
+```bash
+crates-docs generate-api-key --prefix myapp
+```
+
+### 第二步：配置服务端
+
+#### 方式 A：配置文件（推荐）
+
+创建或编辑 `config.toml`，将生成的 hash 放入 `keys` 列表：
+
+```toml
+[auth.api_key]
+enabled = true
+keys = ["$argon2id$v=19$m=47104,t=1,p=1$<salt>$<hash>"]
+header_name = "X-API-Key"
+query_param_name = "api_key"
+allow_query_param = false
+key_prefix = "sk"
+```
+
+支持多个 key（例如为不同客户端分配不同 key）：
+
+```toml
+[auth.api_key]
+enabled = true
+keys = [
+  "$argon2id$v=19$m=47104,t=1,p=1$hash1...",
+  "$argon2id$v=19$m=47104,t=1,p=1$hash2...",
+]
+key_prefix = "sk"
+```
+
+#### 方式 B：环境变量
+
+```bash
+export CRATES_DOCS_API_KEY_ENABLED=true
+export CRATES_DOCS_API_KEYS='$argon2id$v=19$m=47104,t=1,p=1$<salt>$<hash>'
+export CRATES_DOCS_API_KEY_PREFIX=sk
+```
+
+#### 方式 C：CLI 标志
+
+```bash
+crates-docs serve --enable-api-key
+```
+
+> 注意：CLI 标志仅启用认证开关，key 列表仍需通过配置文件或环境变量提供。
+
+### 第三步：启动服务
+
+```bash
+# 使用配置文件
+crates-docs serve --config config.toml --mode hybrid --host 0.0.0.0 --port 8080
+
+# 或使用环境变量
+export CRATES_DOCS_API_KEY_ENABLED=true
+export CRATES_DOCS_API_KEYS='$argon2id$...'
+crates-docs serve --mode hybrid
+```
+
+启动后日志中会显示 API Key 认证已启用。
+
+### 第四步：客户端使用 API Key
+
+#### curl 测试
+
+```bash
+# 使用 Bearer token（直连服务端必须用此方式）
+curl -H "Authorization: Bearer sk-live-<your-api-key-here>" \
+  -X POST http://127.0.0.1:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# 未携带 key 的请求会返回 401
+curl -X POST http://127.0.0.1:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+# → 401 Unauthorized
+
+# /health 端点无需认证
+curl http://127.0.0.1:8080/health
+```
+
+#### Claude Desktop 配置
+
+```json
+{
+  "mcpServers": {
+    "crates-docs": {
+      "url": "http://your-server:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer sk-live-<your-api-key-here>"
+      }
+    }
+  }
+}
+```
+
+#### Cursor 配置
+
+编辑 `~/.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "crates-docs": {
+      "url": "http://your-server:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer sk-live-<your-api-key-here>"
+      }
+    }
+  }
+}
+```
+
+#### 其他 MCP 客户端
+
+任何支持自定义 HTTP header 的 MCP 客户端，添加以下 header 即可：
+
+```
+Authorization: Bearer <你的明文 key>
+```
+
+### 管理操作
+
+#### 查看已注册的 API Key
+
+```bash
+crates-docs list-api-keys
+```
+
+#### 吊销 API Key
+
+```bash
+# 通过 Key ID 吊销
+crates-docs revoke-api-key --key-id <key_id>
+
+# 吊销后需重启服务生效
+```
+
+#### 添加新 Key
+
+1. 运行 `crates-docs generate-api-key` 生成新 key
+2. 将新 hash 追加到 `config.toml` 的 `keys` 列表中
+3. 重启服务
+
+### 常见问题
+
+**Q: 为什么不能用 `X-API-Key` header 直连服务端？**
+
+A: 进程内的 MCP 中间件只识别 `Authorization: Bearer` 头。`X-API-Key` header 需要配合反向代理使用——代理将 `X-API-Key: <k>` 改写为 `Authorization: Bearer <k>` 后转发给后端。详见下方"认证与加密传输"章节。
+
+**Q: 可以通过 URL 查询参数传递 key 吗？**
+
+A: 配置 `allow_query_param = true` 后，反向代理可以支持 `?api_key=<key>` 方式。但直连服务端仍只接受 Bearer token。出于安全考虑，不建议在 URL 中传递 key（会出现在日志和浏览器历史中）。
+
+**Q: 忘记了明文 key 怎么办？**
+
+A: 明文 key 只在生成时显示一次，无法从 hash 反推。如果丢失，需要生成新 key 并替换配置中的 hash。
+
+**Q: 多个客户端可以共用同一个 key 吗？**
+
+A: 可以，但建议为不同客户端分配不同 key，便于独立吊销。
+
 ## 认证与加密传输（TLS）
 
 在 HTTP/SSE/Hybrid 服务器模式下，访问控制分为两层，可按需组合：
@@ -893,6 +1057,7 @@ curl -H "Authorization: Bearer <明文 key>" -X POST http://127.0.0.1:8080/mcp
 ```
 客户端 --HTTPS, X-API-Key--> 反向代理 --HTTP, Authorization: Bearer--> 127.0.0.1:8080
 ```
+
 
 开箱即用的配置（含 Caddy 与 nginx，以及完整步骤）见
 **[`docs/reverse-proxy/`](docs/reverse-proxy/README.md)**。使用反向代理时，请把后端
