@@ -323,6 +323,15 @@ fn format_search_results(crates: &[CrateInfo], format: super::Format) -> String 
     }
 }
 
+/// Collapse internal whitespace runs (including embedded newlines) to single
+/// spaces and trim the ends so a publisher-supplied description renders as one
+/// clean field line. crates.io descriptions frequently carry a trailing
+/// newline, which otherwise splits a record with a blank line between
+/// `Description` and the following field.
+fn normalize_description(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// Escape characters that would let upstream-controlled text (e.g. a crate
 /// description set by its publisher) inject markdown links, inline HTML, or
 /// code spans into the rendered output. Only structural characters are escaped
@@ -383,7 +392,12 @@ fn format_markdown_results(crates: &[CrateInfo]) -> String {
         }
 
         if let Some(desc) = &crate_info.description {
-            writeln!(output, "**Description**: {}", escape_markdown_text(desc)).unwrap();
+            writeln!(
+                output,
+                "**Description**: {}",
+                escape_markdown_text(&normalize_description(desc))
+            )
+            .unwrap();
         }
 
         if let Some(repo) = &crate_info.repository {
@@ -430,7 +444,7 @@ fn format_text_results(crates: &[CrateInfo]) -> String {
         }
 
         if let Some(desc) = &crate_info.description {
-            writeln!(output, "   Description: {desc}").unwrap();
+            writeln!(output, "   Description: {}", normalize_description(desc)).unwrap();
         }
 
         // Mirror the markdown format so the text format does not silently drop
@@ -583,5 +597,33 @@ mod tests {
         );
         assert!(out.contains("Documentation: https://docs.rs/demo"), "{out}");
         assert!(out.contains("Docs.rs: https://docs.rs/demo/"), "{out}");
+    }
+
+    #[test]
+    fn test_description_trailing_newline_does_not_split_record() {
+        // crates.io descriptions frequently end with a trailing newline; it must
+        // not insert a blank line between Description and the next field.
+        let crates = vec![CrateInfo {
+            name: "futures-executor".to_string(),
+            description: Some("Runtime for the async/await macros.\n".to_string()),
+            version: "0.3.0".to_string(),
+            downloads: 1,
+            recent_downloads: None,
+            repository: Some("https://github.com/rust-lang/futures-rs".to_string()),
+            documentation: None,
+            docs_rs: "https://docs.rs/futures-executor/".to_string(),
+        }];
+
+        let text = format_text_results(&crates);
+        assert!(
+            text.contains("Description: Runtime for the async/await macros.\n   Repository:"),
+            "text record split by stray blank line: {text:?}"
+        );
+
+        let md = format_markdown_results(&crates);
+        assert!(
+            !md.contains("macros.\n\n**Repository"),
+            "markdown record split by stray blank line: {md:?}"
+        );
     }
 }

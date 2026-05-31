@@ -134,6 +134,23 @@ async fn execute_search_crates(
     Ok(())
 }
 
+/// Build the human-readable item path shown in the `lookup_item` test echo.
+///
+/// The `lookup_item` tool drops a redundant leading crate-name segment from
+/// `item_path` when resolving the docs URL (e.g. `std::string::String` under
+/// crate `std`). Mirror that here so the diagnostic line does not print a
+/// doubled prefix such as `std::std::string::String`. Crate-name hyphens are
+/// normalized to underscores for the comparison, matching the resolver.
+fn display_item_path(crate_name: &str, item_path: &str) -> String {
+    let krate = crate_name.replace('-', "_");
+    let first = item_path.split("::").map(str::trim).find(|s| !s.is_empty());
+    if first.map(|s| s.replace('-', "_")) == Some(krate) {
+        item_path.trim().to_string()
+    } else {
+        format!("{crate_name}::{item_path}")
+    }
+}
+
 /// Execute `lookup_item` tool
 async fn execute_lookup_item(
     crate_name: Option<&str>,
@@ -143,7 +160,10 @@ async fn execute_lookup_item(
     registry: &crate::tools::ToolRegistry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let (Some(name), Some(path)) = (crate_name, item_path) {
-        println!("Testing item lookup: {name}::{path} (version: {version:?})");
+        println!(
+            "Testing item lookup: {} (version: {version:?})",
+            display_item_path(name, path)
+        );
         println!("Output format: {format}");
 
         // Prepare arguments
@@ -200,5 +220,46 @@ fn print_tool_result(result: &rust_mcp_sdk::schema::CallToolResult) {
                 println!("Non-text content: {other:?}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::display_item_path;
+
+    #[test]
+    fn drops_redundant_leading_crate_segment() {
+        // A path that already includes the crate prefix must not be doubled.
+        assert_eq!(
+            display_item_path("std", "std::string::String"),
+            "std::string::String"
+        );
+        assert_eq!(
+            display_item_path("std", "std::collections"),
+            "std::collections"
+        );
+    }
+
+    #[test]
+    fn prepends_crate_when_prefix_absent() {
+        assert_eq!(
+            display_item_path("std", "string::String"),
+            "std::string::String"
+        );
+        assert_eq!(display_item_path("std", "collections"), "std::collections");
+    }
+
+    #[test]
+    fn normalizes_crate_name_hyphens() {
+        // docs.rs uses the underscore form of the crate name in paths.
+        assert_eq!(
+            display_item_path("tokio-util", "tokio_util::codec::Framed"),
+            "tokio_util::codec::Framed"
+        );
+        // Without the prefix, the original crate name is preserved verbatim.
+        assert_eq!(
+            display_item_path("tokio-util", "codec::Framed"),
+            "tokio-util::codec::Framed"
+        );
     }
 }
